@@ -1,5 +1,6 @@
 "use client";
 
+import { LockedEmailChip } from "@/components/PlanLock";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { FeedCreator } from "@/lib/discovery-feed";
 import type { CreatorProfileData, HistoryPoint, LibraryVideo } from "@/lib/creator-intel-types";
@@ -329,7 +330,7 @@ export function CreatorProfilePage({
         {c.countryCode ? <span className="cp-chip"><Icon d="M12 22s-8-6-8-12a8 8 0 0 1 16 0c0 6-8 12-8 12zM12 12a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" />{c.countryCode}</span> : null}
         {c.language && c.language !== "unknown" ? <span className="cp-chip"><Icon d="M5 8l6 6M4 14l6-6 2-3M2 5h12M7 2h1M22 22l-5-10-5 10M14 18h6" />{c.language.toUpperCase()}</span> : null}
         {c.primaryNiche ? <span className="cp-chip is-niche">{fr ? nicheLabel(c.primaryNiche, "fr") : c.primaryNiche}</span> : null}
-        {c.email ? <span className="cp-chip is-mail"><Icon d="M3 5h18v14H3zM3 7l9 6 9-6" />{fr ? "E-mail disponible" : "Email on file"}</span> : null}
+        {c.email ? <span className="cp-chip is-mail"><Icon d="M3 5h18v14H3zM3 7l9 6 9-6" />{fr ? "E-mail disponible" : "Email on file"}</span> : c.emailLocked && c.hasEmail ? <LockedEmailChip lang={lang} /> : null}
         {g?.bioLink ? (
           <a className="cp-chip" href={g.bioLink} target="_blank" rel="noreferrer"><Icon d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7" />{g.bioLink.replace(/^https?:\/\//, "").slice(0, 32)}</a>
         ) : null}

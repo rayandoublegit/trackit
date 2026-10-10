@@ -1,5 +1,7 @@
 "use client";
 
+import { LockedEmailChip, UpgradeNudge } from "@/components/PlanLock";
+import { openPlanUpgrade } from "@/lib/plan-upgrade-events";
 import "./sample-preview.css";
 import "./gifting-view.css";
 import "./discovery-motion.css";
@@ -7,6 +9,7 @@ import "./discovery-motion.css";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PlanTier } from "@/lib/plan-limits";
 import {
+  canUseLiveLookup,
   getDailyDiscoveryLimit,
   getResultsPerSearchLimit,
   hasDiscoveryDailyCap,
@@ -234,7 +237,7 @@ function applyClientFilters(
         );
       }
     }
-    if (f.hasEmail) out = out.filter((c) => Boolean(c.email));
+    if (f.hasEmail) out = out.filter((c) => Boolean(c.email) || Boolean(c.hasEmail));
     if (f.verified) out = out.filter((c) => c.authenticityScore >= 60);
     if (f.excludeBrands) out = out.filter((c) => !detectBrand({ username: c.username, displayName: c.displayName, bio: c.bio }).isBrand);
     if (Number(f.reach) > 0) out = out.filter((c) => (c.viewsPerFollower ?? 0) >= Number(f.reach));
@@ -511,7 +514,7 @@ function FeedListRow({
       </div>
       <div className="cf-row__tags">
         {c.primaryNiche ? <span className="cf-tag">{fr ? nicheLabel(c.primaryNiche, "fr") : c.primaryNiche}</span> : null}
-        {c.email ? <span className="cf-tag is-mail">{fr ? "E-mail" : "Email"}</span> : null}
+        {c.email ? <span className="cf-tag is-mail">{fr ? "E-mail" : "Email"}</span> : c.emailLocked && c.hasEmail ? <LockedEmailChip lang={lang} compact /> : null}
       </div>
       <div className="cf-stat">
         <b>
@@ -904,12 +907,7 @@ export function DiscoveryFeed({ plan, workspaceUserId, isMobile, onUpgrade, onRe
     mode: "replace" | "append" = "replace",
   ): Promise<{ count: number; blocked?: boolean }> => {
     const gen = fetchGenRef.current;
-    if (plan === "free" && isGlobalSearch) {
-      setGatePaywall(true);
-      setShowDiscoveryGate(true);
-      setHasMore(false);
-      return { count: 0, blocked: true };
-    }
+    // Free searches the catalog too (first results only, enforced by /api/catalog); live lookups stay Growth+.
     const countsTowardQuota = hasDiscoveryCap && discoveryLimit != null && !allNichesBrowse && !isGlobalSearch;
     const shouldSyncQuota = hasDiscoveryCap && discoveryLimit != null;
     let quotaBlocked = false;
@@ -959,6 +957,8 @@ export function DiscoveryFeed({ plan, workspaceUserId, isMobile, onUpgrade, onRe
     if (mode !== "append") setCatalogTotal(typeof d.total === "number" ? d.total : null);
 
     const list: FeedCreator[] = Array.isArray(d.creators) ? d.creators : [];
+    // Free hard wall (/api/catalog): more creators match than the plan shows.
+    const teaserWall = plan === "free" && Boolean(d.teaserLocked || d.liveLocked);
     const rows = list;
     const apiHasMore = !!d.hasMore;
     poolHasMoreRef.current = apiHasMore;
@@ -1008,6 +1008,11 @@ export function DiscoveryFeed({ plan, workspaceUserId, isMobile, onUpgrade, onRe
       setHasMore(false);
     } else {
       setHasMore(poolHasMoreRef.current);
+    }
+    if (teaserWall) {
+      // Scrolling further needs an upgrade: the teaser overlay replaces "load more".
+      setShowDiscoveryGate(true);
+      setHasMore(false);
     }
 
     return { count: deduped.length, blocked: quotaBlocked };
@@ -1243,6 +1248,7 @@ export function DiscoveryFeed({ plan, workspaceUserId, isMobile, onUpgrade, onRe
         const res = await lookupCreatorLive(`@${handle}`, { platform, tab: platform, lang, signal: ctrl.signal });
         if (ctrl.signal.aborted) return;
         if (res.ok || !RETRYABLE_LOOKUP.has(res.code)) lookupCacheRef.current.set(key, res);
+        if (!res.ok && res.code === "plan_required") openPlanUpgrade("live-lookup");
         if (res.ok) {
           // The creator page must open on the data just stored, not a cached copy.
           if (res.source === "live") refreshCreatorProfile(res.storageKey);
@@ -1478,6 +1484,15 @@ export function DiscoveryFeed({ plan, workspaceUserId, isMobile, onUpgrade, onRe
               <p style={{ fontSize: 12, color: "var(--ws-text-dim)", margin: 0, letterSpacing: "-0.01em" }}>
                 {t.creatorNotInDatabaseQuery(searchQuery)}
               </p>
+              {!canUseLiveLookup(plan) ? (
+                <div style={{ marginTop: 16, textAlign: "left" }}>
+                  <UpgradeNudge
+                    lang={lang}
+                    feature="live-lookup"
+                    body={lang === "fr" ? "Avec Growth, Trackit va chercher ce créateur en direct sur TikTok, Instagram ou YouTube." : "With Growth, Trackit fetches this creator live from TikTok, Instagram or YouTube."}
+                  />
+                </div>
+              ) : null}
             </div>
           )}
           {mode === "creators" && !loading && !error && filtered.length === 0 && !discoveryGateActive && !isCreatorSearchMiss && !lookupFound && (

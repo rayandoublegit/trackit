@@ -4,8 +4,9 @@ import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { sourceFor } from "@/lib/scraper/sources";
 import { runCreatorLookup } from "@/lib/creator-live-lookup-server";
 import { lookupErrorMessage } from "@/lib/creator-live-lookup";
-import { DEV_BYPASS_PLAN } from "@/lib/dev-bypass";
-import { normalizePlan } from "@/lib/plan-limits";
+import { canSeeCreatorEmails, canUseLiveLookup, lowestTierFor } from "@/lib/plan-limits";
+import { paywallBody, redactCreatorEmail } from "@/lib/plan-paywall";
+import { resolveOwnerPlan } from "@/lib/plan-gate-server";
 
 export const dynamic = "force-dynamic";
 // The lookup answers within 25 s; the refresh it started may finish a little later.
@@ -17,7 +18,9 @@ export const maxDuration = 60;
  * Finds one creator: from the catalog when refreshed in the last 3 days,
  * otherwise live from the platform (profile + latest videos, stored like a
  * scraper refresh). Answers the catalog row (same shape as /api/catalog rows).
- * Signed-in users only; live lookups are rate limited per user (lib/creator-live-lookup-server).
+ * Signed-in users only. Live lookups: Growth and above (402 plan_required on Free),
+ * rate limited per workspace owner per hour (lib/creator-live-lookup-server).
+ * Free answers never carry the creator email (hasEmail instead).
  * POST (it may spend API calls and write rows); GET is accepted for manual checks.
  */
 async function handle(req: NextRequest) {
@@ -34,20 +37,21 @@ async function handle(req: NextRequest) {
   }
   const pick = (name: string) => String(body[name] ?? p.get(name) ?? "");
 
-  // Live lookups (API calls) come with the paid plans, like the catalog search itself.
-  let plan = normalizePlan(DEV_BYPASS_PLAN || null);
-  if (!DEV_BYPASS_PLAN) {
-    const { data } = await admin.from("profiles").select("plan").eq("id", userId).maybeSingle();
-    plan = normalizePlan(data?.plan);
-  }
+  // Live lookups (API calls) come with Growth and above; a creator already in
+  // the catalog is answered from the database for every plan.
+  const plan = await resolveOwnerPlan(admin, userId);
 
   const { status, body: out } = await runCreatorLookup(
     { admin, sourceFor },
-    { userId, query: pick("q"), platform: pick("platform") || "auto", tab: pick("tab") || null, lang, allowLive: plan !== "free" },
+    { userId, query: pick("q"), platform: pick("platform") || "auto", tab: pick("tab") || null, lang, allowLive: canUseLiveLookup(plan) },
   );
   const headers: Record<string, string> = { "cache-control": "no-store" };
   if (!out.ok && out.retryAfterSec) headers["retry-after"] = String(out.retryAfterSec);
-  return NextResponse.json(out, { status, headers });
+  if (!out.ok && out.code === "plan_required") {
+    return NextResponse.json({ ...out, ...paywallBody("live-lookup", lowestTierFor(canUseLiveLookup), { message: out.message }) }, { status: 402, headers });
+  }
+  const answer = out.ok && !canSeeCreatorEmails(plan) ? { ...out, creator: redactCreatorEmail(out.creator) } : out;
+  return NextResponse.json(answer, { status, headers });
 }
 
 export const GET = handle;

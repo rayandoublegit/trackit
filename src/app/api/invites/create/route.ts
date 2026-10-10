@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { requireWorkspaceAccess } from "@/lib/api-auth";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { randomBytes } from "crypto";
+import { canInviteCreators, lowestTierFor } from "@/lib/plan-limits";
+import { paywallResponse, resolveOwnerPlan } from "@/lib/plan-gate-server";
 
 export const dynamic = "force-dynamic";
 
@@ -48,6 +50,10 @@ export async function POST(req: Request) {
   }
   if (brand.account_type === "creator") {
     return NextResponse.json({ ok: false, error: "Creators cannot invite" }, { status: 403 });
+  }
+  // Creator invitations (portal access) are Pro and above.
+  if (!canInviteCreators(await resolveOwnerPlan(supabase, brandId))) {
+    return paywallResponse("invitations", lowestTierFor(canInviteCreators));
   }
 
   // Génère un token unique (retry en cas de collision improbable).

@@ -55,4 +55,6 @@ export type VideoLibraryResult = {
   source: "tracked" | "snapshot";
   /** No tracked video yet, and a filter needs data only tracked videos have (format, length, product). */
   needsTracking?: boolean;
+  /** Free plan: more videos match than the plan shows (upgrade to see them). */
+  teaserLocked?: boolean;
 };

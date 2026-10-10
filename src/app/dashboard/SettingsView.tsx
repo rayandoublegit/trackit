@@ -37,7 +37,8 @@ import {
 } from "@/lib/notification-preferences";
 import { useDisplayCurrency } from "@/lib/useCurrency";
 import { getGrowthPriceId, getProPriceId, getScalePriceId, handleUpgrade } from "@/lib/checkout";
-import { normalizePlan, type PlanTier } from "@/lib/plan-limits";
+import { canInviteTeamMembers, normalizePlan, type PlanTier } from "@/lib/plan-limits";
+import { UpgradeNudge } from "@/components/PlanLock";
 import {
   fetchProfileUsernameAvailability,
   isValidProfileUsername,
@@ -221,11 +222,14 @@ export function SettingsView({
   isMobile,
   actorUserId,
   actorEmail,
+  plan = "free",
 }: {
   onProfileUpdate?: () => void;
   isMobile?: boolean;
   actorUserId: string;
   actorEmail?: string | null;
+  /** Workspace owner's plan (team members are Scale only). */
+  plan?: PlanTier;
 }) {
   useDisplayCurrency();
   const lang = useLang();
@@ -370,6 +374,7 @@ export function SettingsView({
             )}
             {tab === "team" && user && (
               <TeamSettings
+                plan={plan}
                 isMobile={isMobile}
                 userId={user.id}
                 email={user.email ?? ""}
@@ -1492,6 +1497,7 @@ function ToggleRow({ label, on, onToggle }: { label: string; on: boolean; onTogg
 }
 
 function TeamSettings({
+  plan,
   isMobile,
   userId,
   email,
@@ -1505,8 +1511,10 @@ function TeamSettings({
   fullName: string;
   username: string;
   avatarUrl: string | null;
+  plan: PlanTier;
 }) {
   const lang = useLang();
+  const teamAllowed = canInviteTeamMembers(plan);
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [membersLoading, setMembersLoading] = useState(true);
   const [inviteEmail, setInviteEmail] = useState("");
@@ -1562,6 +1570,14 @@ function TeamSettings({
   return (
     <>
       <Card title={lang === "fr" ? "Inviter un membre" : "Invite team member"}>
+        {!teamAllowed ? (
+          <UpgradeNudge
+            lang={lang}
+            feature="team-members"
+            body={lang === "fr" ? "Scale, c’est Pro avec votre équipe dans l’espace de marque." : "Scale is Pro with your team in the brand workspace."}
+          />
+        ) : (
+        <>
         <p style={{ fontSize: 13, color: "var(--ws-text-muted)", letterSpacing: "-0.01em", margin: "0 0 16px 0" }}>
           {lang === "fr" ? "Ajoutez des collègues à votre espace de travail. Ils recevront une invitation par email." : "Add colleagues to your workspace. They will receive an email invite to join."}
         </p>
@@ -1607,6 +1623,8 @@ function TeamSettings({
               ? "Les invitations d'équipe seront disponibles prochainement."
               : "Team invites will be available soon."}
           </p>
+        )}
+        </>
         )}
       </Card>
 

@@ -10,7 +10,7 @@ import { HeroPreviewShell, LangSwitch } from "@/app/hero-preview/HeroPreviewShel
 import { annualBilledSubtitle, annualFreeMonthsBadge, checkoutCurrencyFromLang, formatPricingAmount, getPlanAnnualMonthlyEquivalent, getPlanAnnualTotal, planDisplayName, PLAN_PRICES } from "@/lib/plan-marketing";
 import { getGrowthPriceId, getProPriceId, getScalePriceId } from "@/lib/stripe-config";
 import { normalizePlan, type PlanTier } from "@/lib/plan-limits";
-import { getPlanPricingHighlights, type PricingHighlight } from "@/lib/plan-pricing-highlights";
+import { formatBentoHighlightLine, getPlanPricingHighlights, type PricingHighlight } from "@/lib/plan-pricing-highlights";
 import { HOME_FAQ_EN, HOME_FAQ_FR } from "@/lib/home-faq";
 import { SocialFooterLinks } from "@/components/SocialFooterLinks";
 import { planCtaAction, planCtaLabel, type PaidTier } from "@/lib/pricing-cta";
@@ -47,51 +47,8 @@ const disabledPricingCtaStyle: CSSProperties = {
   transition: "none",
 };
 
-function formatBentoFeatureLine(item: PricingHighlight, lang: "en" | "fr"): string {
-  const fr = lang === "fr";
-  const leadingNumber = item.value.match(/^(\d+)/)?.[1];
-
-  switch (item.id) {
-    case "discoveries":
-      if (/illimit/i.test(item.value)) return fr ? "Découvertes illimitées" : "Unlimited discoveries";
-      if (leadingNumber) return fr ? `${leadingNumber} Découvertes / mois` : `${leadingNumber} Discoveries / month`;
-      return item.label;
-    case "campaigns":
-      if (/illimit/i.test(item.value)) return fr ? "Campagnes illimitées" : "Unlimited campaigns";
-      if (leadingNumber) return fr ? `${leadingNumber} campagnes actives` : `${leadingNumber} active campaigns`;
-      return item.label;
-    case "shopify":
-      if (leadingNumber === "1") return fr ? "1 boutique Shopify connectée" : "1 connected Shopify store";
-      if (leadingNumber) return fr ? `${leadingNumber} boutiques Shopify` : `${leadingNumber} Shopify stores`;
-      return item.label;
-    case "affiliate":
-      return fr ? "Liens d’affiliation suivis (clics, ventes, CA)" : "Tracked affiliate links (clicks, sales, revenue)";
-    case "commissions":
-      return fr ? "Calcul automatique des commissions" : "Automatic commission calculation";
-    case "templates":
-      return fr ? "Modèles et historique d’outreach" : "Outreach templates and history";
-    case "payout":
-      if (/manuel|manual/i.test(item.value)) return fr ? "Paiements créateurs manuels" : "Manual creator payouts";
-      return fr ? "Paiements créateurs automatiques via Stripe" : "Automatic creator payouts via Stripe";
-    case "includes-starter":
-      return fr ? "Tout Growth, et en plus :" : "Everything in Growth, plus";
-    case "includes-pro":
-      return fr ? "Tout Pro, et en plus :" : "Everything in Pro, plus";
-    case "ai":
-      return fr ? "Outreach IA illimité" : "Unlimited AI outreach";
-    case "creator-dashboard":
-      return fr ? "Tableau de bord dédié à vos créateurs" : "Dedicated dashboard for your creators";
-    case "creator-content":
-      return fr ? "Import de contenus et statistiques de performance" : "Content upload and performance stats";
-    case "automation":
-      return fr ? "Scripts et briefs inclus" : "Scripts and briefs included";
-    case "support":
-      return fr ? "Support dédié et prioritaire" : "Dedicated support, priority response";
-    default:
-      if (!item.value.trim()) return item.label;
-      if (leadingNumber) return `${leadingNumber} ${item.label}`;
-      return item.value;
-  }
+function formatBentoFeatureLine(item: PricingHighlight, _lang: "en" | "fr"): string {
+  return formatBentoHighlightLine(item);
 }
 
 function BentoFeatures({ features, lang }: { features: PricingHighlight[]; lang: "en" | "fr" }) {
@@ -201,7 +158,7 @@ export default function TrackitLanding() {
   why_desc: lang === "fr" ? "Chaque autre outil a été conçu pour des agences avec 10 personnes et 500€/mois. Trackit a été conçu pour les marques Shopify agiles qui ont besoin de résultats." : "Every other tool was built for agencies with 10 people and $500/month budgets. Trackit was built for lean Shopify brands who need results not complexity.",
   pricing_sub: lang === "fr" ? "Commencez gratuitement. Changez d’offre quand vous êtes prêt. Résiliable à tout moment, sans frais cachés ni engagement annuel imposé." : "Start free. Upgrade when you're ready. Cancel anytime. No hidden fees. No annual contracts forced on you.",
   pricing_save: annualFreeMonthsBadge(lang),
-  pricing_scale_pill: lang === "fr" ? "Agences & multi-marques" : "Agencies & multi-brand",
+  pricing_scale_pill: lang === "fr" ? "Pro + votre équipe" : "Pro + your team",
   pricing_most_popular: lang === "fr" ? "Le plus populaire" : "Most Popular",
   pricing_cta: lang === "fr" ? "Commencer" : "Get Started",
   pricing_month: lang === "fr" ? "/mois" : "/month",
@@ -595,8 +552,8 @@ export default function TrackitLanding() {
               </button>
             </div>
             <p className="pb-card__headline">
-              <span className="is-strong">{lang === "fr" ? "Vos premières ventes." : "Your first sales."}</span>
-              <span className="is-mute">{lang === "fr" ? "Lancez vos affiliés Trackit." : "Launch your Trackit affiliates."}</span>
+              <span className="is-strong">{lang === "fr" ? "Trouvez vos créateurs." : "Find your creators."}</span>
+              <span className="is-mute">{lang === "fr" ? "Recherche illimitée, e-mails inclus." : "Unlimited search, emails included."}</span>
             </p>
             <div className="pb-card__buy">
               <div className="pb-price">
@@ -668,8 +625,8 @@ export default function TrackitLanding() {
             </div>
             <div className="pb-card__wide-body">
               <p className="pb-card__headline">
-                <span className="is-mute">{lang === "fr" ? "Pour les équipes qui" : "Great for those who"}</span>
-                <span className="is-strong">{lang === "fr" ? "gèrent plusieurs marques." : "want quality + scale."}</span>
+                <span className="is-mute">{lang === "fr" ? "Tout Pro, pour" : "All of Pro, for"}</span>
+                <span className="is-strong">{lang === "fr" ? "toute votre équipe." : "your whole team."}</span>
               </p>
               <div className="pb-card__buy">
                 <div className="pb-price">

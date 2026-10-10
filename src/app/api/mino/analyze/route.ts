@@ -7,11 +7,18 @@ import { catalogFiltersToSearch, describeCatalogFilters, type MinoCatalogFilters
 import { fetchSiteInfo, SiteFetchFailure } from "@/lib/mino-site-fetch";
 import { siteBrief, type SiteInfo } from "@/lib/mino-site-extract";
 import { checkPublicUrl, findSiteUrl } from "@/lib/mino-url-safety";
+import { canSeeCreatorEmails, canUseMinoAnalysis, lowestTierFor, minoAnalysisHourlyLimit } from "@/lib/plan-limits";
+import { creatorsForPlan } from "@/lib/plan-paywall";
+import { hourlyLimitResponse, paywallResponse, resolveOwnerPlan } from "@/lib/plan-gate-server";
+import { checkHourlyLimit, recordUsage } from "@/lib/feature-usage";
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 // Mino's brand analysis: reads a website and/or a photo, asks Claude what the
 // brand sells and which creators fit (structured JSON, clamped server-side),
 // then runs the real catalog search with those filters. Never invents creators:
 // every card comes from the catalog or the live platform search.
+// Plans: Growth and above (402 plan_required on Free), MINO_ANALYSIS_MAX_PER_HOUR
+// analyses per workspace owner per hour (429), counted in feature_usage.
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -111,10 +118,20 @@ const DROP_LABEL: Record<string, { en: string; fr: string }> = {
   country: { en: "any country", fr: "tous pays" },
 };
 
+/** MINO_ANALYSIS_MAX_PER_HOUR env override, else null (plan default). */
+function envLimit(): number | null {
+  const raw = process.env.MINO_ANALYSIS_MAX_PER_HOUR;
+  const n = Number(raw);
+  return raw != null && raw !== "" && Number.isFinite(n) && n >= 0 ? Math.floor(n) : null;
+}
+
 export async function POST(request: Request) {
   // Signed-in users only: every call spends AI credits and fetches the web.
   const userId = await getAuthedUserId(request);
   if (!userId) return fail(401, "Unauthorized");
+  const admin = getSupabaseAdmin();
+  const plan = await resolveOwnerPlan(admin, userId);
+  if (!canUseMinoAnalysis(plan)) return paywallResponse("mino-analysis", lowestTierFor(canUseMinoAnalysis));
 
   const length = Number(request.headers.get("content-length") || 0);
   if (length > 8 * 1024 * 1024) return fail(413, "image_too_large");
@@ -161,6 +178,10 @@ export async function POST(request: Request) {
     });
   }
 
+  // Hourly anti-abuse limit, checked only once there is something to send to Claude.
+  const hourly = await checkHourlyLimit(admin, userId, "mino-analysis", envLimit() ?? minoAnalysisHourlyLimit(plan));
+  if (!hourly.allowed) return hourlyLimitResponse("mino-analysis", hourly.used, hourly.limit, hourly.retryAfterSec);
+
   const text = [
     site ? `WEBSITE\n${siteBrief(site)}` : "",
     img ? "PHOTO: attached above." : "",
@@ -188,6 +209,8 @@ export async function POST(request: Request) {
       },
       messages: [{ role: "user", content }],
     });
+    // Reached Claude: a billable analysis, whatever the answer.
+    await recordUsage(admin, userId, "mino-analysis", { site: site?.host ?? null, image: Boolean(img) });
     if (response.stop_reason === "refusal") return fail(422, "analysis_refused");
     const out = response.content
       .filter((b): b is Anthropic.TextBlock => b.type === "text")
@@ -229,7 +252,7 @@ export async function POST(request: Request) {
     reply: replyText(result.creators.length, source, meta.widened.map((d) => DROP_LABEL[d]?.[lang] ?? d), lang),
     analysis: meta,
     siteError,
-    creators: result.creators.map(cardCreator),
+    creators: creatorsForPlan(result.creators.map(cardCreator), canSeeCreatorEmails(plan)),
     search: {
       label: describeCatalogFilters(used, lang)
         .map((c) => c.label)

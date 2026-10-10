@@ -7,6 +7,10 @@ import { creatorMatchesFollowerRange } from "@/lib/discovery-follower-ranges";
 import { feedAvatarUrlForCreator } from "@/lib/feed-avatar-url";
 import { displayVideoThumbnails } from "@/lib/tiktok-video-thumbs";
 import { clientImageUrl } from "@/lib/client-image-url";
+import { getAuthedUserId } from "@/lib/api-auth";
+import { canSeeCreatorEmails } from "@/lib/plan-limits";
+import { creatorsForPlan } from "@/lib/plan-paywall";
+import { resolveOwnerPlan } from "@/lib/plan-gate-server";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 15;
@@ -171,5 +175,9 @@ export async function POST(request: Request) {
     }
   }
 
-  return NextResponse.json({ creators: merged, source: "db", count: merged.length });
+  // Emails only for signed-in workspaces on Growth and above.
+  const ownerId = await getAuthedUserId(request).catch(() => null);
+  const emails = ownerId ? canSeeCreatorEmails(await resolveOwnerPlan(supabaseAdmin, ownerId)) : false;
+  const visible = creatorsForPlan(merged as { email?: string | null; bio?: string | null }[], emails);
+  return NextResponse.json({ creators: visible, source: "db", count: visible.length });
 }

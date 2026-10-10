@@ -67,17 +67,17 @@ export function UpgradeGate({
 
   return (
     <>
-      <div style={{ padding: isMobile ? "56px 16px 0" : "40px 40px 0", background: "#FFFFFF" }}>
-        <h1 style={{ fontSize: isMobile ? 22 : 26, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", margin: 0 }}>
+      <div style={{ padding: isMobile ? "56px 16px 0" : "40px 40px 0", background: "var(--ws-bg, #FFFFFF)" }}>
+        <h1 style={{ fontSize: isMobile ? 22 : 26, fontWeight: 600, color: "var(--ws-text, #1A1A1A)", letterSpacing: "-0.03em", margin: 0 }}>
           {title}
         </h1>
-        <p style={{ fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.02em", margin: "6px 0 0" }}>{subtitle}</p>
+        <p style={{ fontSize: 14, color: "var(--ws-text-muted, #7A7A7A)", letterSpacing: "-0.02em", margin: "6px 0 0" }}>{subtitle}</p>
       </div>
       <div style={{ padding: isMobile ? "16px" : "40px" }}>
         <div
           style={{
-            background: "#FFFFFF",
-            border: "1px solid #EFEFEF",
+            background: "var(--ws-surface, #FFFFFF)",
+            border: "1px solid var(--ws-border, #EFEFEF)",
             borderRadius: 16,
             padding: isMobile ? "32px 24px" : "56px 48px",
             textAlign: "center",
@@ -110,7 +110,7 @@ export function UpgradeGate({
             style={{
               fontSize: 20,
               fontWeight: 600,
-              color: "#1A1A1A",
+              color: "var(--ws-text, #1A1A1A)",
               letterSpacing: "-0.03em",
               margin: "0 0 8px",
             }}
@@ -120,7 +120,7 @@ export function UpgradeGate({
           <p
             style={{
               fontSize: 14,
-              color: "#7A7A7A",
+              color: "var(--ws-text-muted, #7A7A7A)",
               letterSpacing: "-0.02em",
               margin: "0 0 20px",
               lineHeight: 1.5,
@@ -142,14 +142,14 @@ export function UpgradeGate({
                 key={item}
                 style={{
                   fontSize: 13,
-                  color: "#1A1A1A",
+                  color: "var(--ws-text, #1A1A1A)",
                   letterSpacing: "-0.02em",
                   marginBottom: 8,
                   paddingLeft: 22,
                   position: "relative",
                 }}
               >
-                <span style={{ position: "absolute", left: 0, top: 2, color: "#9A9A9A" }} aria-hidden>
+                <span style={{ position: "absolute", left: 0, top: 2, color: "var(--ws-text-dim, #9A9A9A)" }} aria-hidden>
                   ✓
                 </span>
                 {item}
@@ -173,9 +173,9 @@ export function UpgradeGate({
                 onClick={onViewPricing}
                 style={{
                   ...btnPrimary,
-                  background: "#FFFFFF",
-                  color: "#1A1A1A",
-                  border: "1px solid #E5E5E5",
+                  background: "var(--ws-surface, #FFFFFF)",
+                  color: "var(--ws-text, #1A1A1A)",
+                  border: "1px solid var(--ws-border, #E5E5E5)",
                 }}
               >
                 {pricingLabel}

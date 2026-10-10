@@ -6,6 +6,7 @@ import { creatorKey, knownKeys, normalizePlatform } from "@/lib/scraper/identity
 import { AllProvidersFailed } from "@/lib/scraper/sources";
 import { ProviderError } from "@/lib/scraper/http";
 import { CallMeter, type CreatorSource, type ScrapedProfile } from "@/lib/scraper/types";
+import { LIVE_LOOKUP_MAX_PER_HOUR } from "@/lib/plan-limits";
 import {
   isLookupFresh,
   lookupErrorMessage,
@@ -30,8 +31,8 @@ import {
 //      and flagged (is_brand) like any refresh; private accounts are reported,
 //      not stored (their posts can't be read).
 //
-// Cost guards: live lookups per user per hour (CREATOR_LOOKUP_MAX_PER_HOUR,
-// default 20), counted in scrape_runs (trigger "lookup:<user id>", with the
+// Cost guards: live lookups per workspace owner per hour (CREATOR_LOOKUP_MAX_PER_HOUR,
+// default LIVE_LOOKUP_MAX_PER_HOUR = 60, lib/plan-limits), counted in scrape_runs (trigger "lookup:<user id>", with the
 // calls per provider, so the Instagram call caps of the worker see them too)
 // and in memory as a fallback; concurrent lookups of the same creator share
 // one refresh (per server instance); the answer waits at most 25 s.
@@ -61,7 +62,7 @@ export type LookupOutcome = { status: number; body: LookupResponse };
 const STATUS: Record<LookupErrorCode, number> = {
   invalid: 400,
   unauthorized: 401,
-  plan_required: 403,
+  plan_required: 402,
   not_found: 404,
   conflict: 409,
   private: 422,
@@ -78,7 +79,7 @@ function envInt(name: string, fallback: number): number {
   return raw != null && raw !== "" && Number.isFinite(n) && n >= 0 ? Math.floor(n) : fallback;
 }
 
-export const lookupMaxPerHour = () => envInt("CREATOR_LOOKUP_MAX_PER_HOUR", 20);
+export const lookupMaxPerHour = () => envInt("CREATOR_LOOKUP_MAX_PER_HOUR", LIVE_LOOKUP_MAX_PER_HOUR);
 
 // Per instance: live lookups running now (shared by concurrent callers) and recent ones per user.
 const inflight = new Map<string, Promise<LookupOutcome>>();

@@ -15,6 +15,9 @@ export type ContactCreatorTarget = {
   followersCount?: number | null;
   engagementRate?: number | null;
   bio?: string | null;
+  /** The plan hides creator emails (Free): `hasEmail` says whether one exists. */
+  hasEmail?: boolean;
+  emailLocked?: boolean;
   /** Already written (e.g. by the Outreach AI panel): shown as is, no new draft. */
   draft?: { subject: string; body: string } | null;
 };

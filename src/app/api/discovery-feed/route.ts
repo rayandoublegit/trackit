@@ -1,5 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { buildFeedPage, type FeedFilters } from "@/lib/discovery-feed";
+import { getAuthedUserId } from "@/lib/api-auth";
+import { canSeeCreatorEmails } from "@/lib/plan-limits";
+import { creatorsForPlan } from "@/lib/plan-paywall";
+import { resolveOwnerPlan } from "@/lib/plan-gate-server";
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -30,7 +35,11 @@ export async function GET(req: NextRequest) {
 
   try {
     const { creators, hasMore } = await buildFeedPage(filters, offset, limit);
-    return NextResponse.json({ creators, hasMore, count: creators.length });
+    // Emails only for signed-in workspaces on Growth and above.
+    const ownerId = await getAuthedUserId(req).catch(() => null);
+    const emails = ownerId ? canSeeCreatorEmails(await resolveOwnerPlan(getSupabaseAdmin(), ownerId)) : false;
+    const visible = creatorsForPlan(creators, emails);
+    return NextResponse.json({ creators: visible, hasMore, count: visible.length });
   } catch (e) {
     return NextResponse.json({ creators: [], hasMore: false, error: e instanceof Error ? e.message : "feed failed" });
   }

@@ -28,6 +28,7 @@ import { dispatchOutreachHistoryUpdated, followUpIn3Days } from "@/lib/outreach-
 import { notifyOutreachSent } from "@/lib/notifications-storage";
 import { canUseAIOutreach, canUseAutoFollowUp, type PlanTier } from "@/lib/plan-limits";
 import { useLang } from "@/lib/useLang";
+import { LockedEmailChip, UpgradeNudge } from "@/components/PlanLock";
 
 type Lang = "en" | "fr";
 
@@ -49,6 +50,12 @@ function copy(lang: Lang) {
     writing: fr ? "Rédaction d’un e-mail personnalisé…" : "Writing a personalised email…",
     aiDraft: fr ? "Brouillon rédigé par l’IA à partir du profil. Relisez avant d’envoyer." : "AI draft based on the profile. Review it before sending.",
     templateDraft: fr ? "Modèle rempli avec les infos du profil. Modifiez-le librement." : "Template filled from the profile. Edit it freely.",
+    aiUpsellTitle: fr ? "Rédiger avec l’IA — Pro" : "Write it with AI — Pro",
+    aiUpsellBody: fr
+      ? "Avec Pro, Mino écrit un premier e-mail personnalisé à partir du profil du créateur."
+      : "With Pro, Mino writes a personalised first email from the creator’s profile.",
+    aiUpsellCta: fr ? "Passer à Pro" : "Upgrade to Pro",
+    lockedEmail: fr ? "Ce créateur a un e-mail de contact, visible dès Growth." : "This creator has a contact email, visible from Growth.",
     open: (app: string) => (fr ? `Ouvrir dans ${app}` : `Open in ${app}`),
     openDefault: fr ? "Ouvrir dans l’app mail" : "Open in mail app",
     changeApp: fr ? "Changer d’app mail" : "Change mail app",
@@ -361,7 +368,12 @@ export function ContactCreatorHost({
                 onChange={(e) => setTo(e.target.value)}
               />
             </label>
-            {!knownEmail && (
+            {!knownEmail && target.emailLocked && target.hasEmail ? (
+              <div className="cc-note">
+                <strong>{t.lockedEmail}</strong>
+                <span><LockedEmailChip lang={lang} /></span>
+              </div>
+            ) : !knownEmail && (
               <div className="cc-note">
                 <strong>{t.noEmail(handle)}</strong>
                 <span>{t.noEmailHint}</span>
@@ -391,6 +403,9 @@ export function ContactCreatorHost({
                   <textarea className="cc-textarea" rows={11} value={body} onChange={(e) => setBody(e.target.value)} />
                 </label>
                 {draftSource && <div className="cc-hint">{draftSource === "ai" ? t.aiDraft : t.templateDraft}</div>}
+                {!canUseAIOutreach(plan) && (
+                  <UpgradeNudge lang={lang} feature="ai-outreach" title={t.aiUpsellTitle} body={t.aiUpsellBody} cta={t.aiUpsellCta} />
+                )}
                 {link?.truncated && <div className="cc-hint">{t.longWarning}</div>}
               </>
             )}

@@ -21,6 +21,17 @@ import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { generateGiftShareToken, parseGiftCampaignInput, todayIso } from "@/lib/gift-share";
 import { brandPublicIdentity, giftProductImagePrefix } from "@/lib/gift-share-server";
 import { activateGiftCreatorLink } from "@/lib/gift-apply-server";
+import { canPublishGiftLinks, lowestTierFor } from "@/lib/plan-limits";
+import { paywallResponse, resolveOwnerPlan } from "@/lib/plan-gate-server";
+
+/** Gifting share links, missions by handle and application approvals are Pro and above. */
+async function giftLinksPaywall(admin: NonNullable<ReturnType<typeof getSupabaseAdmin>>, ownerId: string) {
+  if (canPublishGiftLinks(await resolveOwnerPlan(admin, ownerId))) return null;
+  return paywallResponse("gifting-links", lowestTierFor(canPublishGiftLinks), {
+    code: "paywall",
+    message: "Upgrade to Pro to publish the creator link.",
+  });
+}
 
 export const dynamic = "force-dynamic";
 
@@ -339,6 +350,10 @@ export async function POST(request: NextRequest) {
         patch = { status };
       } else {
         const action = String(body.action ?? "");
+        if (action === "regenerate" || action === "enable") {
+          const wall = await giftLinksPaywall(admin, ownerId);
+          if (wall) return wall;
+        }
         if (action === "regenerate") patch = { share_token: generateGiftShareToken(), share_enabled: true };
         else if (action === "disable") patch = { share_enabled: false };
         else if (action === "enable") patch = { share_enabled: true };
@@ -356,14 +371,8 @@ export async function POST(request: NextRequest) {
     }
 
     if (op === "invite") {
-      const { data: payer } = await admin
-        .from("profiles")
-        .select("plan")
-        .eq("id", ownerId)
-        .maybeSingle();
-      if (!payer || payer.plan === "free" || !payer.plan) {
-        return NextResponse.json({ error: "Upgrade to publish and send the creator link.", code: "paywall" }, { status: 402 });
-      }
+      const wall = await giftLinksPaywall(admin, ownerId);
+      if (wall) return wall;
       const handle = normalizeHandle(String(body.handle ?? ""));
       const platform = body.platform === "instagram" ? "instagram" : "tiktok";
       const { data: campaign } = await admin
@@ -473,6 +482,10 @@ async function actOnMission(
   }
 
   if (REVIEW_ACTIONS.has(raw.type)) {
+    if (raw.type === "approve_application") {
+      const wall = await giftLinksPaywall(admin, mission.user_id);
+      if (wall) return wall;
+    }
     return reviewApplication(admin, mission, raw.type as "approve_application" | "decline_application");
   }
 

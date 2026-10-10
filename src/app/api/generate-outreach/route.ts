@@ -5,7 +5,8 @@ import {
   buildOutreachGenerationPrompt,
   parseOutreachGenerationResponse,
 } from "@/lib/outreach-ai-prompt";
-import { canUseAIOutreach, normalizePlan } from "@/lib/plan-limits";
+import { canUseAIOutreach, lowestTierFor, normalizePlan } from "@/lib/plan-limits";
+import { paywallResponse } from "@/lib/plan-gate-server";
 import { resolveWorkspaceContextForUser } from "@/lib/workspace-access";
 
 const getAnthropic = () => new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -41,10 +42,8 @@ export async function POST(request: NextRequest) {
     .maybeSingle();
   const plan = normalizePlan(profile?.plan);
   if (!canUseAIOutreach(plan)) {
-    return NextResponse.json(
-      { error: "AI outreach requires Pro or Scale" },
-      { status: 403 }
-    );
+    // Free / Growth: the composer keeps its template draft and shows the Pro upsell.
+    return paywallResponse("ai-outreach", lowestTierFor(canUseAIOutreach), { message: "AI outreach requires Pro or Scale" });
   }
 
   const { creator, brand, tone, platform, lang } = await request.json();

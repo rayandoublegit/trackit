@@ -641,10 +641,7 @@ export function CatalogFilterBar({
       setNotice(fr ? "La recherche YouTube arrive bientôt. TikTok et Instagram sont disponibles." : "YouTube search is coming soon. TikTok and Instagram are live.");
       return;
     }
-    if (id === "instagram" && isFree) {
-      onLocked();
-      return;
-    }
+    // Instagram follows the same plan rules as TikTok (Free: first results of each search).
     setNotice(null);
     onChange({ platform: id });
   };
@@ -763,20 +760,18 @@ export function CatalogFilterBar({
           {(["tiktok", "instagram", "youtube"] as const).map((id) => {
             const active = filters.platform === id;
             const soon = id === "youtube";
-            const locked = id === "instagram" && isFree;
             return (
               <button
                 key={id}
                 type="button"
                 role="tab"
                 aria-selected={active}
-                className={`cf-tab${active ? " is-on" : ""}${soon || locked ? " is-muted" : ""}`}
+                className={`cf-tab${active ? " is-on" : ""}${soon ? " is-muted" : ""}`}
                 onClick={() => pickPlatform(id)}
               >
                 <PlatformLogo platform={id} size={16} />
                 {id === "tiktok" ? "TikTok" : id === "instagram" ? "Instagram" : "YouTube"}
                 {soon ? <span className="cf-tab__badge">{fr ? "Bientôt" : "Soon"}</span> : null}
-                {locked ? <span className="cf-tab__badge">Pro</span> : null}
               </button>
             );
           })}

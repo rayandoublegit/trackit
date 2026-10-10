@@ -154,7 +154,7 @@ export function lookupErrorMessage(code: LookupErrorCode, lang: "en" | "fr", ctx
     case "unauthorized":
       return fr ? "Connectez-vous pour chercher un créateur." : "Sign in to look up a creator.";
     case "plan_required":
-      return fr ? `${who} n'est pas encore dans la base. La recherche en direct est incluse dans les offres payantes.` : `${who} is not in the database yet. Live lookup comes with the paid plans.`;
+      return fr ? `${who} n'est pas encore dans la base. La recherche en direct est incluse dès le plan Growth.` : `${who} is not in the database yet. Live lookup comes with the Growth plan and above.`;
     case "not_found":
       return fr ? `Aucun compte ${who}${on}. Vérifiez l'orthographe du pseudo.` : `No account ${who}${on}. Check the spelling of the handle.`;
     case "private":

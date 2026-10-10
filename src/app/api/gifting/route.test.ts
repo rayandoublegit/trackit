@@ -452,8 +452,33 @@ describe("gift campaigns with a share link and applications", () => {
     expect(commit).not.toHaveBeenCalled();
   });
 
+  it("approving an application is Pro: Free and Growth get the 402 paywall, nothing is committed", async () => {
+    for (const plan of ["free", "basic"]) {
+      tables.profiles = [{ id: actorId, account_type: "brand", plan }];
+      vi.mocked(requireBrandSpace).mockResolvedValue({ ownerId: actorId, spaceId });
+      commit.mockClear();
+      const response = await post({ op: "act", missionId: application.id, action: { type: "approve_application" } });
+      expect(response.status).toBe(402);
+      expect(await response.json()).toMatchObject({ ok: false, error: "plan_required", feature: "gifting-links", requiredTier: "pro", used: null, limit: null, resetsAt: null });
+      expect(commit).not.toHaveBeenCalled();
+    }
+  });
+
+  it("publishing a share link (enable / regenerate) is Pro; pausing it stays allowed", async () => {
+    tables.profiles = [{ id: actorId, account_type: "brand", plan: "basic" }];
+    vi.mocked(requireBrandSpace).mockResolvedValue({ ownerId: actorId, spaceId });
+    for (const action of ["enable", "regenerate"]) {
+      const res = await post({ op: "share_link", campaignId: unclaimedMission.campaign_id, action });
+      expect(res.status).toBe(402);
+      expect((await res.json()).feature).toBe("gifting-links");
+    }
+    expect((await post({ op: "share_link", campaignId: unclaimedMission.campaign_id, action: "disable" })).status).toBe(200);
+    tables.profiles = [{ id: actorId, account_type: "brand", plan: "pro" }];
+    expect((await post({ op: "share_link", campaignId: unclaimedMission.campaign_id, action: "regenerate" })).status).toBe(200);
+  });
+
   it("brand approval goes through the locked review function with the revision, then activates the creator link", async () => {
-    tables.profiles = [{ id: actorId, account_type: "brand" }];
+    tables.profiles = [{ id: actorId, account_type: "brand", plan: "pro" }];
     vi.mocked(requireBrandSpace).mockResolvedValue({ ownerId: actorId, spaceId });
     commit.mockResolvedValueOnce({ data: "ok" as never, error: null });
     const response = await post({ op: "act", missionId: application.id, action: { type: "approve_application" } });
@@ -463,7 +488,7 @@ describe("gift campaigns with a share link and applications", () => {
   });
 
   it("maps a full campaign and a stale review to 409, and refuses reviewing a non-application", async () => {
-    tables.profiles = [{ id: actorId, account_type: "brand" }];
+    tables.profiles = [{ id: actorId, account_type: "brand", plan: "scale" }];
     vi.mocked(requireBrandSpace).mockResolvedValue({ ownerId: actorId, spaceId });
     commit.mockResolvedValueOnce({ data: "full" as never, error: null });
     const full = await post({ op: "act", missionId: application.id, action: { type: "approve_application" } });

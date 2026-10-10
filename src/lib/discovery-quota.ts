@@ -14,8 +14,9 @@ export type DiscoveryQuotaState = {
   blocked: boolean;
 };
 
+/** Monthly discovery pools are gone: Free keeps a lifetime teaser pool, paid plans are unlimited. */
 export function isMonthlyDiscoveryPlan(plan: PlanTier): boolean {
-  return plan === "basic" || plan === "pro";
+  return plan !== "free" && hasDiscoveryDailyCap(plan);
 }
 
 export async function syncDiscoveryQuota(

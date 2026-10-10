@@ -282,7 +282,7 @@ describe("looking up a creator", () => {
 
   it("free plan: catalog answers only, never a live call", async () => {
     const { status, body } = await runCreatorLookup(deps(), { userId: "u1", query: "@luna.beauty", platform: "tiktok", allowLive: false, lang: "fr" });
-    expect(status).toBe(403);
+    expect(status).toBe(402);
     expect(!body.ok && body.code).toBe("plan_required");
     expect(sources.tiktok!.calls).toEqual([]);
     db.put("creators_index", { username: "luna.beauty", platform: "tiktok", followers: 1, last_scraped_at: new Date(NOW - DAY).toISOString() });

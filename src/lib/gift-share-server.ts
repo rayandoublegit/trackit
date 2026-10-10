@@ -2,6 +2,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { publicBrandName } from "@/lib/creator-brand-join";
 import { GIFT_PRODUCT_BUCKET, giftTakesSpot, isGiftShareToken, toPublicGiftCampaign, todayIso, type PublicGiftCampaign } from "@/lib/gift-share";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { canPublishGiftLinks } from "@/lib/plan-limits";
+import { resolveOwnerPlan } from "@/lib/plan-gate-server";
 
 // Server-side reads behind the public gift page and the apply route.
 // Always the service role, always filtered to public fields before leaving.
@@ -46,11 +48,12 @@ export async function countTakenSpots(admin: SupabaseClient, campaignId: string)
   return (data ?? []).filter((row) => giftTakesSpot(String((row as { status?: string }).status ?? ""))).length;
 }
 
-/** Paid plans only publish creator links (same rule as sending a mission by handle). */
+/**
+ * Pro and above publish creator links (same rule as sending a mission by handle).
+ * Below Pro the public page shows the campaign as closed, never the brand's plan.
+ */
 export async function brandCanPublish(admin: SupabaseClient, ownerId: string): Promise<boolean> {
-  const { data } = await admin.from("profiles").select("plan").eq("id", ownerId).maybeSingle();
-  const plan = (data as { plan?: string | null } | null)?.plan;
-  return Boolean(plan) && plan !== "free";
+  return canPublishGiftLinks(await resolveOwnerPlan(admin, ownerId));
 }
 
 /** Brand name and logo as creators see them: the workspace first, then the profile. */

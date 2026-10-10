@@ -9,6 +9,7 @@ import { videoFiltersToParams } from "@/lib/catalog-filter-params";
 import { createFetchCache } from "@/lib/client-fetch-cache";
 import { CoverImage } from "./CoverImage";
 import "./video-library.css";
+import { UpgradeNudge } from "@/components/PlanLock";
 
 // Creators > Videos: every tracked video, like an ad library. Filters come from
 // the catalog bar; this component fetches /api/videos and renders the cards.
@@ -216,6 +217,7 @@ export function VideoLibrary({
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState(false);
   const [needsTracking, setNeedsTracking] = useState(false);
+  const [teaserLocked, setTeaserLocked] = useState(false);
   const gen = useRef(0);
   const firstLoad = useRef(true);
   const moreBusy = useRef(false);
@@ -237,6 +239,7 @@ export function VideoLibrary({
       setHasMore(d.hasMore);
       setSource(d.source);
       setNeedsTracking(Boolean(d.needsTracking));
+      setTeaserLocked(Boolean(d.teaserLocked));
       setLoading(false);
     };
     setError(false);
@@ -354,6 +357,16 @@ export function VideoLibrary({
             {loadingMore ? (fr ? "Chargement…" : "Loading…") : fr ? "Charger plus de vidéos" : "Load more videos"}
           </button>
         </>
+      ) : null}
+      {teaserLocked ? (
+        <div style={{ maxWidth: 560, margin: "20px auto 0" }}>
+          <UpgradeNudge
+            lang={lang}
+            feature="discovery"
+            title={fr ? "Plus de vidéos avec Growth" : "More videos with Growth"}
+            body={fr ? "Le plan Gratuit affiche les premières vidéos de chaque recherche. Growth débloque toute la bibliothèque." : "Free shows the first videos of each search. Growth unlocks the whole library."}
+          />
+        </div>
       ) : null}
     </>
   );

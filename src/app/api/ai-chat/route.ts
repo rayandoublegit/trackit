@@ -3,6 +3,10 @@ import { NextResponse } from "next/server";
 import { getAuthedUserId } from "@/lib/api-auth";
 import { cardCreator, describeSearch, parseCreatorSearch, runCreatorSearch, type MinoSearchResult } from "@/lib/mino-creator-search";
 import { searchToCatalogFilters } from "@/lib/mino-filters";
+import { canSeeCreatorEmails, canUseLiveSearch, getResultsPerSearchLimit } from "@/lib/plan-limits";
+import { creatorsForPlan } from "@/lib/plan-paywall";
+import { resolveOwnerPlan } from "@/lib/plan-gate-server";
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -110,10 +114,12 @@ export async function POST(request: Request) {
     if (!last) return NextResponse.json({ ok: false, error: "Empty message" }, { status: 400 });
 
     const parsed = role === "brand" ? parseCreatorSearch(last) : null;
-    const result = parsed ? await runCreatorSearch(parsed, 12) : null;
+    // Free: catalog only, first results only, no emails (Growth and above: everything).
+    const plan = parsed ? await resolveOwnerPlan(getSupabaseAdmin(), userId) : "free";
+    const result = parsed ? await runCreatorSearch(parsed, Math.min(12, getResultsPerSearchLimit(plan) ?? 12), { allowLive: canUseLiveSearch(plan) }) : null;
     const extra = result
       ? {
-          creators: result.creators.map(cardCreator),
+          creators: creatorsForPlan(result.creators.map(cardCreator), canSeeCreatorEmails(plan)),
           search: { label: describeSearch(result.search, lang), sources: result.sources, filters: searchToCatalogFilters(result.search) },
         }
       : {};

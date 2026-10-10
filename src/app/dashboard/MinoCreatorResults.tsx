@@ -1,5 +1,6 @@
 "use client";
 
+import { LockedEmailChip } from "@/components/PlanLock";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import type { FeedCreator } from "@/lib/discovery-feed";
@@ -310,7 +311,7 @@ function ProfileCard({
         ) : null}
       </div>
 
-      {creator.email ? <EmailRow email={creator.email} fr={fr} /> : null}
+      {creator.email ? <EmailRow email={creator.email} fr={fr} /> : creator.emailLocked && creator.hasEmail ? <div className="mino-card__locked"><LockedEmailChip lang={fr ? "fr" : "en"} /></div> : null}
 
       <dl className="mino-card__stats">
         <div>
@@ -530,7 +531,7 @@ export function MinoCreatorResults({
     const reach = creators.reduce((s, c) => s + (Number(c.followersCount) || 0), 0);
     const rates = creators.map((c) => Number(c.engagementRate) || 0).filter((n) => n > 0);
     const engagement = rates.length ? rates.reduce((s, n) => s + n, 0) / rates.length : 0;
-    const withEmail = creators.filter((c) => c.email).length;
+    const withEmail = creators.filter((c) => c.email || c.hasEmail).length;
     const videos = creators.reduce((s, c) => s + creatorVideos(c).length, 0);
     const platforms = [...new Set(creators.map((c) => platformKey(c.platform)))];
     return { reach, engagement, withEmail, videos, platforms };

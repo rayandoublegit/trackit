@@ -50,7 +50,7 @@ export function emailFirst(creators: FeedCreator[]): FeedCreator[] {
 export async function runCreatorSearch(
   search: MinoCreatorSearch,
   limit = 12,
-  opts: { preferEmail?: boolean } = {},
+  opts: { preferEmail?: boolean; /** False (Free): catalog only, never a live platform search. Default true. */ allowLive?: boolean } = {},
 ): Promise<MinoSearchResult> {
   const sources: MinoSearchResult["sources"] = [];
   let creators: FeedCreator[] = [];
@@ -80,7 +80,7 @@ export async function runCreatorSearch(
   if (creators.length) sources.push("catalog");
 
   const livePlatform: CatalogPlatform = search.platform === "Instagram" ? "Instagram" : "TikTok";
-  if (creators.length < Math.min(6, limit) && search.niche && search.platform !== "YouTube" && liveSearchAvailable(livePlatform)) {
+  if (opts.allowLive !== false && creators.length < Math.min(6, limit) && search.niche && search.platform !== "YouTube" && liveSearchAvailable(livePlatform)) {
     const seen = new Set(creators.map((c) => `${c.platform}:${c.username}`.toLowerCase()));
     const live = (
       await liveCreatorSearch(search.niche, livePlatform, limit, {

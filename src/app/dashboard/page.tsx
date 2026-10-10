@@ -40,6 +40,8 @@ import { CreatorSettings } from "./CreatorSettings";
 import { CreatorAffiliateReadPanel } from "./CreatorAffiliateReadPanel";
 import { NewCreatorModal } from "./NewCreatorModal";
 import { ContactCreatorHost } from "./ContactCreatorSheet";
+import { PlanUpgradeHost } from "@/components/PlanLock";
+import { PlanGate } from "@/components/PlanGate";
 import { requestContactCreator } from "@/lib/contact-creator-events";
 import { InvitationsView } from "./InvitationsView";
 import { BrandContentView } from "./BrandContentView";
@@ -1061,7 +1063,9 @@ function DashboardPageContent() {
         )}
         {keep("findit-inbox") && (
           <KeepAlivePane active={view === "findit-inbox"}>
+          <PlanGate feature="findit" plan={plan} lang={lang} isMobile={isMobile} enabled={!isCreator} onViewPricing={openWebsitePricing}>
           <FinditInboxView userId={user?.id} isMobile={isMobile} />
+            </PlanGate>
           </KeepAlivePane>
         )}
         {keep("my-creators") && (
@@ -1098,35 +1102,41 @@ function DashboardPageContent() {
         )}
         {keep("campaigns") && user && (
           <KeepAlivePane active={view === "campaigns"}>
+          <PlanGate feature="campaigns" plan={plan} lang={lang} isMobile={isMobile} enabled={!isCreator} onViewPricing={openWebsitePricing}>
             <CampaignsView
               isMobile={isMobile}
               plan={plan}
-              onUpgrade={handleUpgradeBasic}
+              onUpgrade={handleUpgradePro}
               onUpgradePro={handleUpgradePro}
               onUpgradeScale={handleUpgradeScale}
               userId={user.id}
               shopifyStore={shopifyStore ?? profile?.shopify_store}
             />
+            </PlanGate>
           </KeepAlivePane>
         )}
         {keep("links") && user && !isCreator && (
           <KeepAlivePane active={view === "links"}>
+          <PlanGate feature="affiliates" plan={plan} lang={lang} isMobile={isMobile} enabled={!isCreator} onViewPricing={openWebsitePricing}>
           <AffiliateLinksView
             userId={user.id}
             isMobile={isMobile}
             plan={plan}
-            onUpgrade={handleUpgradeBasic}
+            onUpgrade={handleUpgradePro}
           />
+            </PlanGate>
           </KeepAlivePane>
         )}
         {keep("affiliates") && user && (
           <KeepAlivePane active={view === "affiliates"}>
+          <PlanGate feature="affiliates" plan={plan} lang={lang} isMobile={isMobile} enabled={!isCreator} onViewPricing={openWebsitePricing}>
             <AffiliatesView
               userId={user.id}
               isMobile={isMobile}
               plan={plan}
-              onUpgrade={handleUpgradeBasic}
+              onUpgrade={handleUpgradePro}
             />
+            </PlanGate>
           </KeepAlivePane>
         )}
         {keep("outreach") && (
@@ -1150,6 +1160,7 @@ function DashboardPageContent() {
         )}
         {keep("payouts") && user && (
           <KeepAlivePane active={view === "payouts"}>
+          <PlanGate feature="payouts" plan={plan} lang={lang} isMobile={isMobile} enabled={!isCreator} onViewPricing={openWebsitePricing}>
             <PayoutsView
               userId={user.id}
               isMobile={isMobile}
@@ -1157,50 +1168,58 @@ function DashboardPageContent() {
               isCreator={isCreator}
               shopifyStore={shopifyStore ?? profile?.shopify_store ?? undefined}
               onConnectShopify={() => setView("integrations")}
-              onUpgrade={handleUpgradeBasic}
+              onUpgrade={handleUpgradePro}
               onUpgradePro={handleUpgradePro}
               onUpgradeScale={handleUpgradeScale}
             />
+            </PlanGate>
           </KeepAlivePane>
         )}
         {keep("balance") && user && (
           <KeepAlivePane active={view === "balance"}>
+          <PlanGate feature="balance" plan={plan} lang={lang} isMobile={isMobile} enabled={!isCreator} onViewPricing={openWebsitePricing}>
             <BalanceView
               userId={user.id}
               isMobile={isMobile}
               isCreator={isCreator}
               plan={plan}
-              onUpgrade={handleUpgradeScale}
+              onUpgrade={handleUpgradePro}
               onUpgradePro={handleUpgradePro}
               onUpgradeScale={handleUpgradeScale}
             />
+            </PlanGate>
           </KeepAlivePane>
         )}
         {keep("transactions") && user && (
           <KeepAlivePane active={view === "transactions"}>
+          <PlanGate feature="transactions" plan={plan} lang={lang} isMobile={isMobile} enabled={!isCreator} onViewPricing={openWebsitePricing}>
             <TransactionsView
               userId={user.id}
               isMobile={isMobile}
               isCreator={isCreator}
               plan={plan}
-              onUpgrade={handleUpgradeBasic}
+              onUpgrade={handleUpgradePro}
               onUpgradePro={handleUpgradePro}
               onUpgradeScale={handleUpgradeScale}
             />
+            </PlanGate>
           </KeepAlivePane>
         )}
         {keep("invitations") && user && (
           <KeepAlivePane active={view === "invitations"}>
+          <PlanGate feature="invitations" plan={plan} lang={lang} isMobile={isMobile} enabled={!isCreator} onViewPricing={openWebsitePricing}>
             <InvitationsView
               userId={user.id}
               isMobile={isMobile}
               plan={plan}
               onUpgrade={handleUpgradePro}
             />
+            </PlanGate>
           </KeepAlivePane>
         )}
         {keep("scripts") && user && (
           <KeepAlivePane active={view === "scripts"}>
+          <PlanGate feature="scripts" plan={plan} lang={lang} isMobile={isMobile} enabled={!isCreator} onViewPricing={openWebsitePricing}>
           {isCreator ? (
             <CreatorScripts userId={user.id} isMobile={isMobile} />
           ) : (
@@ -1214,16 +1233,21 @@ function DashboardPageContent() {
               />
         </div>
           )}
+            </PlanGate>
           </KeepAlivePane>
         )}
         {keep("brand-content") && user && !isCreator && (
           <KeepAlivePane active={view === "brand-content"}>
+          <PlanGate feature="creator-content" plan={plan} lang={lang} isMobile={isMobile} enabled={!isCreator} onViewPricing={openWebsitePricing}>
           <BrandContentView userId={user.id} isMobile={isMobile} />
+            </PlanGate>
           </KeepAlivePane>
         )}
         {keep("rpm") && user && !isCreator && (
           <KeepAlivePane active={view === "rpm"}>
+          <PlanGate feature="campaigns" plan={plan} lang={lang} isMobile={isMobile} enabled={!isCreator} onViewPricing={openWebsitePricing}>
             <RpmView userId={user.id} isMobile={isMobile} plan={plan} />
+            </PlanGate>
           </KeepAlivePane>
         )}
         {keep("hooks") && user && (
@@ -1275,6 +1299,7 @@ function DashboardPageContent() {
         )}
         {keep("analytics") && user && (
           <KeepAlivePane active={view === "analytics"}>
+          <PlanGate feature="analytics" plan={plan} lang={lang} isMobile={isMobile} enabled={!isCreator} onViewPricing={openWebsitePricing}>
             <AnalyticsView
               userId={user.id}
               isMobile={isMobile}
@@ -1284,6 +1309,7 @@ function DashboardPageContent() {
               onUpgradePro={handleUpgradePro}
               onConnectShopify={() => setView("integrations")}
             />
+            </PlanGate>
           </KeepAlivePane>
         )}
         {keep("integrations") && user && (
@@ -1339,6 +1365,7 @@ function DashboardPageContent() {
         )}
         {keep("automation") && (
           <KeepAlivePane active={view === "automation"}>
+          <PlanGate feature="automation" plan={plan} lang={lang} isMobile={isMobile} enabled={!isCreator} onViewPricing={openWebsitePricing}>
             <AutomationView
               isMobile={isMobile}
               plan={plan}
@@ -1346,6 +1373,7 @@ function DashboardPageContent() {
               onUpgradePro={handleUpgradePro}
               onUpgradeScale={handleUpgradeScale}
             />
+            </PlanGate>
           </KeepAlivePane>
         )}
         {keep("workspace") && user && (
@@ -1379,6 +1407,7 @@ function DashboardPageContent() {
               isMobile={isMobile}
               actorUserId={actorProfile?.id ?? user.id}
               actorEmail={actorEmail}
+              plan={plan}
               onProfileUpdate={() => {
                 if (workspaceDelegated) {
                   void reloadActorProfile();
@@ -1409,7 +1438,10 @@ function DashboardPageContent() {
         )}
       {user && !isCreator && <NewCreatorModal brandId={user.id} />}
       {user && !isCreator && (
-        <ContactCreatorHost userId={user.id} userEmail={user.email ?? ""} brandName={profile?.business_name ?? ""} plan={plan} />
+        <>
+          <ContactCreatorHost userId={user.id} userEmail={user.email ?? ""} brandName={profile?.business_name ?? ""} plan={plan} />
+          <PlanUpgradeHost lang={lang} plan={plan} />
+        </>
       )}
     </WorkspaceShell>
     </DashboardThemeProvider>
@@ -3746,7 +3778,7 @@ function IntegrationsView({
   const activeShop = connectedShop || shopifyStore || null;
   const isShopifyConnected = !!activeShop && !changingStore;
   const storeLimit = maxShopifyStores(plan);
-  const isMultiStore = isScalePlan(plan);
+  const isMultiStore = storeLimit > 1;
 
   useEffect(() => {
     if (!user?.id || !supabase) return;
@@ -3884,11 +3916,14 @@ function IntegrationsView({
     if (!canAddAnotherShopifyStore(plan, storeCount) && !changingStore) {
       setShopError(
         lang === "fr"
-          ? `Limite de ${storeLimit} boutique(s) atteinte. Passez à Scale pour jusqu'à 3 boutiques.`
-          : `Store limit of ${storeLimit} reached. Upgrade to Scale for up to 3 stores.`
+          ? storeLimit > 0
+            ? `Limite de ${storeLimit} boutiques atteinte.`
+            : "Shopify est inclus dans le plan Pro."
+          : storeLimit > 0
+            ? `Store limit of ${storeLimit} reached.`
+            : "Shopify comes with the Pro plan."
       );
-      if (plan === "pro") void onUpgradeScale?.();
-      else if (plan === "basic") void onUpgradePro?.();
+      if (storeLimit === 0) void onUpgradePro?.();
       return;
     }
     if (!shopDomain.trim()) {
@@ -4249,20 +4284,11 @@ function IntegrationsView({
                                 {lang === "fr" ? "Changer de boutique" : "Change my store"}
                               </button>
                             )}
-                            {plan === "free" ? (
+                            {!canUseShopify(plan) ? (
                               <p style={{ fontSize: 12, color: mutedColor, margin: 0 }}>
-                                {lang === "fr" ? "Le plan Free inclut les ventes manuelles. Shopify nécessite le plan Growth. " : "Free includes manual sales. Shopify requires the Growth plan. "}
-                                <button type="button" onClick={() => void onUpgrade?.()} style={{ background: "none", border: "none", color: dark ? "#8AB4FF" : "var(--ws-accent)", fontSize: 12, cursor: "pointer", padding: 0, fontFamily: "inherit" }}>
-                                  {lang === "fr" ? "Passer à Growth →" : "Upgrade to Growth →"}
-                                </button>
-                              </p>
-                            ) : (plan === "basic" || plan === "pro") ? (
-                              <p style={{ fontSize: 12, color: mutedColor, margin: 0 }}>
-                                {lang === "fr"
-                                  ? `Jusqu'à ${SCALE_MAX_SHOPIFY_STORES} boutiques sur Scale. `
-                                  : `Up to ${SCALE_MAX_SHOPIFY_STORES} stores on Scale. `}
-                                <button type="button" onClick={() => void onUpgradeScale?.()} style={{ background: "none", border: "none", color: dark ? "#8AB4FF" : "var(--ws-accent)", fontSize: 12, cursor: "pointer", padding: 0, fontFamily: "inherit" }}>
-                                  {lang === "fr" ? "Passer à Scale →" : "Upgrade to Scale →"}
+                                {lang === "fr" ? `Shopify est inclus dans le plan Pro (jusqu'à ${SCALE_MAX_SHOPIFY_STORES} boutiques). ` : `Shopify comes with the Pro plan (up to ${SCALE_MAX_SHOPIFY_STORES} stores). `}
+                                <button type="button" onClick={() => void onUpgradePro?.()} style={{ background: "none", border: "none", color: dark ? "#8AB4FF" : "var(--ws-accent)", fontSize: 12, cursor: "pointer", padding: 0, fontFamily: "inherit" }}>
+                                  {lang === "fr" ? "Passer à Pro →" : "Upgrade to Pro →"}
                                 </button>
                               </p>
                             ) : null}
@@ -4716,8 +4742,8 @@ function AffiliatesView({
           title={lang === "fr" ? "Affiliés" : "Affiliates"}
           subtitle={
             lang === "fr"
-              ? "Les liens trackés sont bloqués sur Free — Growth débloque clics, ventes et CA."
-              : "Tracked links are locked on Free — Growth unlocks clicks, sales, and revenue."
+              ? "Les liens trackés sont inclus dans Pro : clics, ventes et CA."
+              : "Tracked links come with Pro: clicks, sales and revenue."
           }
         />
         <div style={{ padding: isMobile ? 16 : 40 }}>

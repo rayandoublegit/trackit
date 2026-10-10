@@ -1,5 +1,7 @@
 "use client";
 
+import { handlePaywallResponse } from "@/lib/plan-upgrade-events";
+import { UpgradeNudge } from "@/components/PlanLock";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLang } from "@/lib/useLang";
 import { getCampaigns } from "@/lib/db";
@@ -189,6 +191,14 @@ const hostOf = (url: string) => {
 /** What the user sees when the analysis route answers with a known error (no fake output). */
 function analyzeErrorText(code: string, fr: boolean, siteHost?: string): string | null {
   switch (code) {
+    case "plan_required":
+      return fr
+        ? "L’analyse de votre site ou de votre photo est incluse dès le plan Growth (analyses illimitées). Vous pouvez quand même me décrire votre marque, par exemple « créatrices skincare en France »."
+        : "Site and photo analysis comes with the Growth plan (unlimited analyses). You can still describe your brand, for example “skincare creators in France”.";
+    case "rate_limited":
+      return fr
+        ? "Vous avez lancé beaucoup d’analyses en une heure. Réessayez dans quelques minutes."
+        : "You ran a lot of analyses within an hour. Try again in a few minutes.";
     case "ai_unavailable":
       return fr
         ? `L’analyse par l’IA n’est pas disponible sur ce serveur pour l’instant (clé Anthropic absente)${siteHost ? `. J’ai bien pu lire votre site (${siteHost})` : ""}. Vous pouvez quand même me décrire votre marque, par exemple « créatrices skincare en France avec un email ».`
@@ -752,6 +762,7 @@ export function AiChatView({
       site?: { host?: string } | null;
     };
     if (!res.ok || !data.ok) {
+      handlePaywallResponse(res.status, data);
       const known = data.error ? analyzeErrorText(data.error, fr, data.site?.host) : null;
       if (known) return { content: known };
       throw new Error(`analyze ${res.status}`);
@@ -1083,6 +1094,15 @@ export function AiChatView({
           </div>
           <div className="mtg-promptbox__inner">
             {!isCreator ? <MinoAttachChips att={att} /> : null}
+            {!isCreator && isPaid === false && (att.image || att.site) ? (
+              <div style={{ margin: "0 0 8px" }}>
+                <UpgradeNudge
+                  lang={fr ? "fr" : "en"}
+                  feature="mino-analysis"
+                  body={fr ? "L’analyse de site et de photo est illimitée dès Growth." : "Site and photo analysis is unlimited from Growth."}
+                />
+              </div>
+            ) : null}
             <div className="mtg-promptbox__row">
               <svg className="mtg-promptbox__search" viewBox="0 0 24 24" width="18" height="18" aria-hidden>
                 <circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" strokeWidth="1.6" />
