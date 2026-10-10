@@ -39,6 +39,7 @@ import { supabase } from "@/lib/supabase";
 import { formatCurrencyWithCode } from "@/lib/useCurrency";
 import { hideCreator, isCreatorHidden, unhideCreator } from "@/lib/hidden-creators-storage";
 import { dispatchCampaignsUpdated } from "@/lib/outreach-history-events";
+import { requestContactCreator } from "@/lib/contact-creator-events";
 
 type CampaignOption = { id: string; name: string; status: string };
 
@@ -1163,6 +1164,11 @@ export function CreatorDetailDrawer({ creator, plan, lang, onClose, onUpgrade, o
             {d.email ? (
               <a
                 href={`mailto:${d.email}`}
+                onClick={(e) => {
+                  // Opens the composer with a ready draft instead of an empty mail.
+                  e.preventDefault();
+                  requestContactCreator(d);
+                }}
                 style={{
                   display: "block",
                   fontSize: 13,
@@ -1401,6 +1407,9 @@ export function CreatorDetailDrawer({ creator, plan, lang, onClose, onUpgrade, o
                 </div>
               )}
             </div>
+            <button type="button" onClick={() => requestContactCreator(d)} style={{ ...drawerBtnSecondary, fontWeight: 650 }}>
+              {fr ? "Contacter" : "Contact"}
+            </button>
             <button type="button" onClick={openCampaignPicker} style={{ ...drawerBtnSecondary, fontWeight: 650 }}>
               {fr ? "Ajouter à une campagne" : "Add to a campaign"}
             </button>

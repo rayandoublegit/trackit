@@ -12,14 +12,15 @@ export const maxDuration = 60;
 
 /**
  * /api/cron/scrape/weekly-discovery — Mondays. Queues this week's keyword
- * searches (the next slice of the niche tree on TikTok, Instagram and
- * YouTube), up to what is left of SCRAPE_WEEKLY_MAX_DISCOVERY_KEYWORDS.
+ * searches (the next slice of the niche tree on TikTok and YouTube), up to
+ * what is left of SCRAPE_WEEKLY_MAX_DISCOVERY_KEYWORDS. Instagram discovery
+ * is queued by /api/cron/scrape/instagram-seed (its own queries and call caps).
  * No API call here: /api/cron/scrape runs the searches (1 call each) and
  * queues a first refresh for every new creator (within
  * SCRAPE_WEEKLY_MAX_NEW_CREATORS).
  *
  *   ?discover=a,b          extra keywords, searched first on every platform
- *   ?platforms=tiktok,…    limit to these platforms
+ *   ?platforms=tiktok,…    limit to these platforms (instagram only when named here)
  *   ?max=100               fewer searches than the weekly cap
  */
 export async function GET(request: Request) {
@@ -34,14 +35,18 @@ export async function GET(request: Request) {
     .split(",")
     .map((p) => normalizePlatform(p))
     .filter((p): p is ScrapePlatform => p !== null);
-  const platforms = enabledPlatforms().filter((p) => !params.get("platforms") || asked.includes(p));
+  // Instagram has its own backlog and call caps (/api/cron/scrape/instagram-seed):
+  // it is left out of the shared search plan unless asked for with ?platforms=.
+  const platforms = enabledPlatforms().filter((p) => (params.get("platforms") ? asked.includes(p) : p !== "instagram"));
   if (!platforms.length) return NextResponse.json({ ok: true, queued: 0, reason: "no scraping provider configured" });
 
-  // Searches already queued but not run count against this week's cap too.
+  // Searches already queued but not run count against this week's cap too
+  // (Instagram ones do not: they are bounded by the Instagram call caps).
   const { count: waiting } = await admin
     .from("scrape_jobs")
     .select("id", { count: "exact", head: true })
     .eq("kind", "creator_discover")
+    .neq("platform", "instagram")
     .in("status", ["queued", "running"]);
   const left = remaining(weeklyCaps(), await weeklyUsage(admin)).discoveryKeywords - Number(waiting ?? 0);
   let max = Math.max(0, Math.min(left, Number(params.get("max") || left)));

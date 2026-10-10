@@ -54,7 +54,7 @@ function MiniCard({ lang, r, onOpen, draggable }: { lang: "en" | "fr"; r: SavedR
       draggable={draggable}
       onDragStart={draggable ? (e) => e.dataTransfer.setData("text/plain", r.creator_username) : undefined}
       onClick={onOpen}
-      style={{ background: "#FFF", border: "0.5px solid #EFEFEF", borderRadius: 12, padding: 12, cursor: "pointer", display: "flex", flexDirection: "column", gap: 8 }}>
+      style={{ background: "var(--ws-surface)", border: "0.5px solid var(--ws-border)", borderRadius: 12, padding: 12, cursor: "pointer", display: "flex", flexDirection: "column", gap: 8 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
         <CreatorAvatar
           username={r.creator_username}
@@ -64,14 +64,14 @@ function MiniCard({ lang, r, onOpen, draggable }: { lang: "en" | "fr"; r: SavedR
           alt={r.display_name}
         />
         <div style={{ minWidth: 0, flex: 1 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1A1A", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.display_name}</div>
-          <div style={{ fontSize: 11, color: "#9A9A9A", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>@{r.creator_username}</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ws-text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.display_name}</div>
+          <div style={{ fontSize: 11, color: "var(--ws-text-dim)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>@{r.creator_username}</div>
         </div>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
         <span style={{ fontSize: 11, fontWeight: 600, color: r.value_score >= 70 ? "#15803D" : r.value_score >= 40 ? "#B45309" : "#9A1F1F" }}>{t.valueScore} {r.value_score}</span>
-        <span style={{ fontSize: 10, color: "#7A7A7A" }}>· {fmt(r.followers, lang)} {t.followersAbbr}</span>
-        {r.primary_niche && <span style={{ fontSize: 10, color: "#0047FF", background: "#E8EEFC", padding: "1px 7px", borderRadius: 20, textTransform: "capitalize" }}>{lang === "fr" ? nicheLabel(r.primary_niche, lang) : r.primary_niche}</span>}
+        <span style={{ fontSize: 10, color: "var(--ws-text-muted)" }}>· {fmt(r.followers, lang)} {t.followersAbbr}</span>
+        {r.primary_niche && <span style={{ fontSize: 10, color: "var(--ws-accent)", background: "var(--ws-accent-soft)", padding: "1px 7px", borderRadius: 20, textTransform: "capitalize" }}>{lang === "fr" ? nicheLabel(r.primary_niche, lang) : r.primary_niche}</span>}
       </div>
       <span style={{ alignSelf: "flex-start", fontSize: 10, fontWeight: 600, color: sc.color, background: sc.bg, padding: "2px 8px", borderRadius: 20 }}>
         {stageLabel}
@@ -145,27 +145,27 @@ export function MyCreatorsView({ plan, isMobile, onUpgrade, onReachOut }: { plan
 
   if (!isPaid) {
     return (
-      <div style={{ padding: pad, background: "#FFF", minHeight: "100vh" }}>
-        <h1 style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", margin: 0 }}>{t.myCreators}</h1>
-        <p style={{ fontSize: 14, color: "#7A7A7A", margin: "6px 0 24px" }}>{t.myCreatorsSubtitle}</p>
-        <div style={{ border: "1px solid #EFEFEF", borderRadius: 16, padding: "32px 28px", textAlign: "center", maxWidth: 420 }}>
-          <div style={{ fontSize: 18, fontWeight: 600, color: "#1A1A1A", marginBottom: 8 }}>{t.paidOnly}</div>
-          <div style={{ fontSize: 14, color: "#7A7A7A", marginBottom: 18, lineHeight: 1.5 }}>{t.paidOnlyBody}</div>
-          <button type="button" onClick={onUpgrade} style={{ background: "#0047FF", color: "#FFF", border: "none", borderRadius: 12, padding: "12px 22px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>{t.upgradePlan}</button>
+      <div style={{ padding: pad, background: "var(--ws-surface)", minHeight: "100vh" }}>
+        <h1 style={{ fontSize: 28, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.04em", margin: 0 }}>{t.myCreators}</h1>
+        <p style={{ fontSize: 14, color: "var(--ws-text-muted)", margin: "6px 0 24px" }}>{t.myCreatorsSubtitle}</p>
+        <div style={{ border: "1px solid var(--ws-border)", borderRadius: 16, padding: "32px 28px", textAlign: "center", maxWidth: 420 }}>
+          <div style={{ fontSize: 18, fontWeight: 600, color: "var(--ws-text)", marginBottom: 8 }}>{t.paidOnly}</div>
+          <div style={{ fontSize: 14, color: "var(--ws-text-muted)", marginBottom: 18, lineHeight: 1.5 }}>{t.paidOnlyBody}</div>
+          <button type="button" onClick={onUpgrade} style={{ background: "var(--ws-accent)", color: "#FFF", border: "none", borderRadius: 12, padding: "12px 22px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>{t.upgradePlan}</button>
         </div>
       </div>
     );
   }
 
   return (
-    <div style={{ padding: pad, background: "#FFF", minHeight: "100vh" }}>
+    <div style={{ padding: pad, background: "var(--ws-surface)", minHeight: "100vh" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
-        <h1 style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", margin: 0 }}>{t.myCreators}</h1>
-        <div style={{ display: "flex", gap: 6, background: "#F5F5F5", borderRadius: 10, padding: 3 }}>
+        <h1 style={{ fontSize: 28, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.04em", margin: 0 }}>{t.myCreators}</h1>
+        <div style={{ display: "flex", gap: 6, background: "var(--ws-hover)", borderRadius: 10, padding: 3 }}>
           {(["board", "list"] as const).map((m) => (
             <button key={m} type="button" onClick={() => setMode(m)}
               style={{ fontSize: 13, fontWeight: 600, padding: "7px 14px", borderRadius: 8, border: "none", cursor: "pointer",
-                background: mode === m ? "#FFF" : "transparent", color: mode === m ? "#1A1A1A" : "#7A7A7A", boxShadow: mode === m ? "0 1px 3px rgba(0,0,0,0.1)" : "none" }}>
+                background: mode === m ? "var(--ws-surface)" : "transparent", color: mode === m ? "var(--ws-text)" : "var(--ws-text-muted)", boxShadow: mode === m ? "0 1px 3px rgba(0,0,0,0.1)" : "none" }}>
               {m === "board" ? t.pipeline : t.list}
             </button>
           ))}
@@ -175,26 +175,26 @@ export function MyCreatorsView({ plan, isMobile, onUpgrade, onReachOut }: { plan
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", margin: "18px 0 22px" }}>
         <button type="button" onClick={() => setActiveFolder(null)}
           style={{ fontSize: 12, fontWeight: 600, padding: "5px 12px", borderRadius: 20, cursor: "pointer", border: "none",
-            background: activeFolder === null ? "#E8EEFC" : "#F5F5F5", color: activeFolder === null ? "#0047FF" : "#7A7A7A" }}>
+            background: activeFolder === null ? "var(--ws-accent-soft)" : "var(--ws-hover)", color: activeFolder === null ? "var(--ws-accent)" : "var(--ws-text-muted)" }}>
           {t.allCount(rows.length)}
         </button>
         {folders.map((f) => {
           const count = items.filter((i) => i.folder_id === f.id).length;
           const active = activeFolder === f.id;
           return (
-            <span key={f.id} style={{ display: "inline-flex", alignItems: "center", gap: 4, background: active ? "#E8EEFC" : "#F5F5F5", borderRadius: 20, padding: "0 4px 0 0" }}>
+            <span key={f.id} style={{ display: "inline-flex", alignItems: "center", gap: 4, background: active ? "var(--ws-accent-soft)" : "var(--ws-hover)", borderRadius: 20, padding: "0 4px 0 0" }}>
               <button type="button" onClick={() => setActiveFolder(f.id)}
-                style={{ fontSize: 12, fontWeight: 600, padding: "5px 6px 5px 12px", borderRadius: 20, cursor: "pointer", border: "none", background: "transparent", color: active ? "#0047FF" : "#7A7A7A" }}>
+                style={{ fontSize: 12, fontWeight: 600, padding: "5px 6px 5px 12px", borderRadius: 20, cursor: "pointer", border: "none", background: "transparent", color: active ? "var(--ws-accent)" : "var(--ws-text-muted)" }}>
                 {f.name} ({count})
               </button>
               <button type="button" aria-label={t.deleteFolder(f.name)} onClick={() => onDeleteFolder(f.id)}
-                style={{ fontSize: 12, color: "#B0B0B0", border: "none", background: "transparent", cursor: "pointer", padding: "0 4px" }}>×</button>
+                style={{ fontSize: 12, color: "var(--ws-text-dim)", border: "none", background: "transparent", cursor: "pointer", padding: "0 4px" }}>×</button>
             </span>
           );
         })}
         <span style={{ display: "inline-flex", gap: 4 }}>
           <input value={newFolder} onChange={(e) => setNewFolder(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") onCreateFolder(); }}
-            placeholder={t.folderPlaceholder} style={{ fontSize: 12, padding: "5px 10px", borderRadius: 20, border: "1px solid #E5E5E5", width: 110, fontFamily: "inherit" }} />
+            placeholder={t.folderPlaceholder} style={{ fontSize: 12, padding: "5px 10px", borderRadius: 20, border: "1px solid var(--ws-border)", width: 110, fontFamily: "inherit" }} />
         </span>
       </div>
 
@@ -235,10 +235,10 @@ export function MyCreatorsView({ plan, isMobile, onUpgrade, onReachOut }: { plan
             const colRows = visibleRows.filter((r) => r.pipeline_status === s.key);
             return (
               <div key={s.key} onDragOver={(e) => e.preventDefault()} onDrop={onDrop(s.key)}
-                style={{ flex: "0 0 240px", background: "#FAFAFA", borderRadius: 12, padding: 10, minHeight: 120 }}>
+                style={{ flex: "0 0 240px", background: "var(--ws-surface-2)", borderRadius: 12, padding: 10, minHeight: 120 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10, padding: "0 2px" }}>
                   <span style={{ fontSize: 13, fontWeight: 600, color: s.color }}>{s.label}</span>
-                  <span style={{ fontSize: 12, color: "#B0B0B0" }}>{colRows.length}</span>
+                  <span style={{ fontSize: 12, color: "var(--ws-text-dim)" }}>{colRows.length}</span>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   {colRows.map((r) => <MiniCard key={r.creator_username} lang={lang} r={r} draggable onOpen={() => openCreator(rowToCreator(r))} />)}

@@ -60,12 +60,43 @@ export type ProviderRequest = {
   timeoutMs?: number;
 };
 
+/** "Please try again later", "Received 429 Too Many Requests": the provider is busy, not the account gone. */
+const TRANSIENT_TEXT = /try again later|too many requests|\b429\b|rate.?limit|temporarily/i;
+/** "Endpoint '/x.php' does not exist": our mistake, never "account not found". */
+const ENDPOINT_TEXT = /endpoint\b.*(does not exist|not found)/i;
+
+/**
+ * Error carried in a 200 answer ({ error } or { message }), as the RapidAPI
+ * Instagram scraper does. Transient text wins over "not found" ("data not
+ * found. Please try again later." is a busy upstream, not a missing account).
+ */
+export function classifyBodyError(text: string): ProviderErrorKind {
+  if (CREDIT_TEXT.test(text) && !/won'?t be charged|wont be charged/i.test(text)) return "no_credits";
+  if (TRANSIENT_TEXT.test(text)) return "rate_limited";
+  if (ENDPOINT_TEXT.test(text)) return "bad_response";
+  if (NOT_FOUND_TEXT.test(text)) return "not_found";
+  return "bad_response";
+}
+
 /** GET JSON from a provider, or throw a ProviderError. */
-export async function providerGet(req: ProviderRequest): Promise<any> {
+export function providerGet(req: ProviderRequest): Promise<any> {
+  return providerFetch(req, { method: "GET" });
+}
+
+/** POST a form (application/x-www-form-urlencoded) to a provider, same error rules as providerGet. */
+export function providerPostForm(req: ProviderRequest & { form: Record<string, string> }): Promise<any> {
+  const body = new URLSearchParams();
+  for (const [k, v] of Object.entries(req.form)) if (v !== "") body.set(k, v);
+  return providerFetch(req, { method: "POST", body: body.toString(), contentType: "application/x-www-form-urlencoded" });
+}
+
+async function providerFetch(req: ProviderRequest, init: { method: "GET" | "POST"; body?: string; contentType?: string }): Promise<any> {
   let res: Response;
   try {
     res = await fetch(req.url, {
-      headers: { Accept: "application/json", ...req.headers },
+      method: init.method,
+      headers: { Accept: "application/json", ...(init.contentType ? { "Content-Type": init.contentType } : {}), ...req.headers },
+      ...(init.body != null ? { body: init.body } : {}),
       cache: "no-store",
       signal: AbortSignal.timeout(req.timeoutMs ?? 30_000),
     });
@@ -85,7 +116,10 @@ export async function providerGet(req: ProviderRequest): Promise<any> {
 
   const detail = String(body?.error ?? body?.message ?? body?.msg ?? body?.detail ?? text.slice(0, 200) ?? res.statusText);
   if (!res.ok) {
-    throw new ProviderError(req.provider, classifyHttpFailure(res.status, detail), `HTTP ${res.status} ${detail}`.slice(0, 300), res.status);
+    // Statuses with a fixed meaning first; any other 4xx is read from its text.
+    const fixed = [401, 402, 403, 404, 429].includes(res.status) || res.status >= 500;
+    const kind = fixed ? classifyHttpFailure(res.status, detail) : classifyBodyError(detail);
+    throw new ProviderError(req.provider, kind, `HTTP ${res.status} ${detail}`.slice(0, 300), res.status);
   }
   if (body == null || typeof body !== "object") {
     throw new ProviderError(req.provider, "bad_response", "response is not JSON", res.status);

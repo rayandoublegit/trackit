@@ -692,8 +692,8 @@ export function CatalogFilterBar({
                   : "Search video captions, hashtags…"
                 : instagram
                   ? fr
-                    ? "Recherche Instagram en direct : une niche, un nom ou un @pseudo"
-                    : "Search Instagram live: a niche, a name or @handle"
+                    ? "Rechercher des créateurs Instagram, @pseudos, e-mails…"
+                    : "Search Instagram creators, @handles, emails…"
                   : fr
                     ? "Rechercher des créateurs, @pseudos, e-mails…"
                     : "Search creators, @handles, emails…"
@@ -997,8 +997,9 @@ export function CatalogFilterBar({
           )}
         </label>
         {notice ? <p className="cf-notice">{notice}</p> : null}
-        {instagram && !filters.search.trim() && !filters.niche ? (
-          <p className="cf-notice">{fr ? "Instagram est recherché en direct : choisissez une niche ou tapez un mot-clé pour commencer." : "Instagram is searched live: pick a niche or type a keyword to start."}</p>
+        {/* Instagram creators are stored like TikTok ones (ig_ keys); a keyword with no stored match is searched live by /api/catalog. */}
+        {instagram && !loading && count === 0 && !(total ?? 0) && !filters.search.trim() && !filters.niche ? (
+          <p className="cf-notice">{fr ? "Les créateurs Instagram arrivent au fil des analyses : tapez un mot-clé pour chercher en direct." : "Instagram creators are being added as they are analysed: type a keyword to search live."}</p>
         ) : null}
       </div>
     </div>

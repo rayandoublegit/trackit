@@ -11,6 +11,7 @@ import { CreatorAvatar } from "./CreatorAvatar";
 import { PlatformBrandIcon } from "./PlatformBrandIcon";
 import type { discoveryCopy } from "@/lib/discovery-copy";
 import { useLang } from "@/lib/useLang";
+import { requestContactCreator } from "@/lib/contact-creator-events";
 
 type Copy = ReturnType<typeof discoveryCopy>;
 
@@ -632,6 +633,18 @@ export function CreatorListTable({
                   {convoEmail ? (
                     <a
                       href={`mailto:${convoEmail}`}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        requestContactCreator({
+                          username: r.creator_username,
+                          displayName: r.display_name,
+                          platform,
+                          avatarUrl: r.avatar_url,
+                          email: convoEmail,
+                          niche: r.primary_niche,
+                          followersCount: r.followers,
+                        });
+                      }}
                       style={{ fontSize: 14, color: "var(--ws-text)", textDecoration: "none", fontWeight: 500 }}
                     >
                       {t.sendEmail}

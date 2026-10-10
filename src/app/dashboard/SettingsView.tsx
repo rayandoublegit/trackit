@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { selectProfileRow, updateProfileRow } from "@/lib/profile-row";
 import { BillingPaymentMethodSummary, PaymentMethodsBillingSection } from "./PayoutsView";
+import { MailboxList } from "./auto-outreach/MailboxList";
+import { MailClientSetting } from "./MailClientSetting";
+import { AUTO_OUTREACH_ENABLED } from "@/lib/auto-outreach-flag";
 import type { User } from "@supabase/supabase-js";
 import { useLang, type Lang } from "@/lib/useLang";
 import {
@@ -350,6 +353,8 @@ export function SettingsView({
                 }}
               />
             )}
+            {tab === "general" && user && profile && <MailClientSetting email={user.email ?? ""} />}
+            {tab === "general" && user && profile && AUTO_OUTREACH_ENABLED && <MailboxList />}
             {tab === "profile" && user && profile && (
               <ProfileSettings
                 userId={user.id}
@@ -459,7 +464,7 @@ function SettingsToggle({ on, onToggle }: { on: boolean; onToggle: () => void })
           left: on ? 20 : 2,
           width: 18,
           height: 18,
-          background: "#FFFFFF",
+          background: "var(--ws-surface)",
           borderRadius: "50%",
           transition: "left 0.2s",
           boxShadow: "0 1px 2px rgba(0,0,0,0.1)",

@@ -1,5 +1,5 @@
-import { compactNumber, firstUrlIn, http, isoDate, num, scrapeCreatorsGet, str } from "./sc-client";
-import { hashtagsOf, type CreatorSource, type ScrapedProfile, type ScrapedSearchHit, type ScrapedVideo } from "./types";
+import { compactNumber, emailIn, firstUrlIn, http, isoDate, num, scrapeCreatorsGet, str } from "./sc-client";
+import { hashtagsOf, type CreatorSource, type RelatedAccount, type ScrapedProfile, type ScrapedSearchHit, type ScrapedVideo } from "./types";
 
 // Instagram through ScrapeCreators (1 credit per call):
 //   profile  GET /v1/instagram/profile?handle=         data.user (followers, bio, links…)
@@ -7,6 +7,43 @@ import { hashtagsOf, type CreatorSource, type ScrapedProfile, type ScrapedSearch
 //   search   GET /v1/instagram/search/profiles?query=  profiles[] (follower counts for the first 10)
 // One refresh = profile + posts = 2 calls. Instagram does not expose saves;
 // shares only when the post carries them. Video ids are the public shortcode.
+// The parsers below are shared with the RapidAPI Instagram source
+// (sources-instagram-rapid.ts): both read Instagram's own objects, so both
+// providers write the same rows.
+
+const HANDLE = /^[a-z0-9._]{1,30}$/;
+const cleanHandle = (v: unknown) => str(v).trim().replace(/^@+/, "").replace(/\.+$/, "").toLowerCase();
+
+/** Public e-mail of an Instagram account: the one Instagram shows, else one written in the bio. */
+export function instagramEmail(u: any): string | null {
+  const listed = Array.isArray(u?.email_from_biography) ? u.email_from_biography.find((e: unknown) => typeof e === "string" && e.includes("@")) : null;
+  return emailIn(u?.public_email) ?? emailIn(u?.business_email) ?? emailIn(listed) ?? emailIn(u?.biography);
+}
+
+/** @mentions in a caption or bio ("collab with @mia.style." → ["mia.style"]). */
+export function mentionsIn(text: unknown): string[] {
+  const out = new Set<string>();
+  for (const m of str(text).matchAll(/(?:^|[^\w.@])@([A-Za-z0-9._]{2,30})/g)) {
+    const h = cleanHandle(m[1]);
+    if (HANDLE.test(h)) out.add(h);
+  }
+  return [...out];
+}
+
+/** Accounts next to a post: co-authors, the owner of a collab post, tagged people, caption mentions. */
+export function relatedOfPost(item: any): RelatedAccount[] {
+  const out = new Map<string, RelatedAccount>();
+  const add = (username: unknown, displayName: unknown, via: RelatedAccount["via"]) => {
+    const h = cleanHandle(username);
+    if (!HANDLE.test(h) || out.has(h)) return;
+    out.set(h, { username: h, displayName: str(displayName), via });
+  };
+  for (const c of Array.isArray(item?.coauthor_producers) ? item.coauthor_producers : []) add(c?.username, c?.full_name, "coauthor");
+  if (item?.user?.username) add(item.user.username, item.user.full_name, "coauthor");
+  for (const t of Array.isArray(item?.usertags?.in) ? item.usertags.in : []) add(t?.user?.username, t?.user?.full_name, "tag");
+  for (const h of mentionsIn(item?.caption?.text ?? item?.caption)) add(h, "", "mention");
+  return [...out.values()];
+}
 
 export function parseInstagramProfile(raw: any, handle: string): ScrapedProfile | null {
   const u = raw?.data?.user ?? raw?.user;
@@ -24,6 +61,8 @@ export function parseInstagramProfile(raw: any, handle: string): ScrapedProfile 
     videoCount: u.edge_owner_to_timeline_media?.count != null || u.media_count != null ? num(u.edge_owner_to_timeline_media?.count ?? u.media_count) : null,
     verified: Boolean(u.is_verified),
     category: str(u.category_name ?? u.business_category_name ?? u.category) || null,
+    email: instagramEmail(u),
+    isPrivate: Boolean(u.is_private),
   };
 }
 
@@ -68,6 +107,7 @@ export function parseInstagramPosts(raw: any): ScrapedVideo[] {
       comments: num(item?.comment_count ?? item?.edge_media_to_comment?.count),
       shares: num(item?.share_count ?? item?.reshare_count),
       saves: 0,
+      related: relatedOfPost(item),
     });
   }
   return out;

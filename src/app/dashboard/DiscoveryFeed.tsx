@@ -32,8 +32,20 @@ import { discoveryCopy } from "@/lib/discovery-copy";
 import { logCreatorLookupRequest } from "@/lib/creator-lookup-requests";
 import { submitNicheRequest } from "@/lib/niche-requests";
 import { NICHE_TREE, nicheLabel } from "@/lib/niche-tree";
-import { prefetchCreatorMedia } from "@/lib/avatar-url-cache";
-import { prefetchCreatorDetail } from "@/lib/creator-detail-cache";
+import { prefetchCreatorProfile, refreshCreatorProfile } from "@/lib/creator-profile-cache";
+import {
+  isExplicitLookup,
+  lookupCreatorLive,
+  lookupPlatformLabel,
+  normalizeLookupPlatform,
+  parseCreatorLookup,
+  type LookupFailure,
+  type LookupPlatform,
+  type LookupSuccess,
+} from "@/lib/creator-live-lookup";
+import { creatorStorageKey } from "@/lib/creator-storage-key";
+import { videoCover } from "@/lib/video-cover";
+import { CoverImage } from "@/app/dashboard/CoverImage";
 import {
   HIDDEN_CREATORS_EVENT,
   loadHiddenCreators,
@@ -44,7 +56,7 @@ import { CatalogFilterBar, type CatalogMode, type CatalogPreset, type CatalogSor
 import { COUNT_VAL, ENGAGEMENT_VAL, VIEWS_VAL, creatorFiltersToParams } from "@/lib/catalog-filter-params";
 import { PlatformLogo, platformKey } from "@/components/PlatformLogo";
 import { detectBrand } from "@/lib/brand-detect";
-import { isStablePublicImageUrl } from "@/lib/client-image-url";
+import { MINO_CATALOG_FILTERS_EVENT, takePendingCatalogFilters } from "@/lib/mino-attachments";
 
 function fmt(n: number, lang: "en" | "fr" = "en"): string {
   if (lang === "fr") {
@@ -130,6 +142,15 @@ const EMPTY_FILTERS: FilterState = {
   viral: false,
   excludeBrands: true,
 };
+
+/** Live lookup of the searched handle (lib/creator-live-lookup), per handle and platform. */
+type LookupView =
+  | { status: "offer" | "loading"; handle: string; platform: LookupPlatform }
+  | { status: "found"; handle: string; platform: LookupPlatform; result: LookupSuccess }
+  | { status: "error"; handle: string; platform: LookupPlatform; error: LookupFailure };
+
+/** Failures worth asking again later (not "no such account"). */
+const RETRYABLE_LOOKUP = new Set(["timeout", "failed", "no_credits", "unavailable", "rate_limited"]);
 
 /** Catalogue sans niche choisie : pas de cap plan ni quota decouverte. */
 function isAllNichesBrowse(f: FilterState): boolean {
@@ -367,31 +388,26 @@ function ViewsSpark({ values }: { values: number[] }) {
   );
 }
 
-type RowVideo = { cover: string; views: number; url: string };
+type RowVideo = { cover: string; fallback?: string; views: number; url: string };
 
 /**
- * TikTok cover links expire. Stored covers are served as is; anything else goes
- * through /api/creator-video-thumbs, which refetches the video once and stores
- * the cover for good.
+ * TikTok cover links expire. Stored covers are served as is, CDN covers through
+ * the image proxy; only a cover that fails to load goes to
+ * /api/creator-video-thumbs, which refetches the videos once and stores the
+ * covers for good (lib/video-cover.ts).
  */
-function coverSrc(c: FeedCreator, cover: string, index: number): string {
-  if (isStablePublicImageUrl(cover)) return cover;
-  if (platformKey(c.platform) === "tiktok" && index < 3) {
-    return `/api/creator-video-thumbs?username=${encodeURIComponent(c.username)}&i=${index}`;
-  }
-  return cover;
-}
-
 function rowVideos(c: FeedCreator): RowVideo[] {
+  const platform = platformKey(c.platform) || "tiktok";
   const top = (c.topVideos ?? [])
-    .filter((v) => v.cover)
+    .map((v, i) => ({ v, i }))
+    .filter(({ v }) => v.cover)
     .slice(0, 3)
-    .map((v, i) => ({ cover: coverSrc(c, v.cover, i), views: v.playCount, url: v.shareUrl }));
+    .map(({ v, i }) => ({ ...videoCover({ platform, username: c.username, raw: v.cover, topIndex: i }), views: v.playCount, url: v.shareUrl }));
   if (top.length) return top;
   return (c.videoThumbnails ?? [])
     .filter((v) => v.thumbnail)
     .slice(0, 3)
-    .map((v) => ({ cover: v.thumbnail as string, views: v.views, url: v.url ?? "" }));
+    .map((v) => ({ ...videoCover({ platform, username: c.username, raw: v.thumbnail }), views: v.views, url: v.url ?? "" }));
 }
 
 function FeedListRow({
@@ -409,9 +425,12 @@ function FeedListRow({
   avatarPriority,
   dimmed,
   index,
+  badge,
 }: {
   lang: "en" | "fr";
   creator: FeedCreator;
+  /** Small label next to the meta line ("Nouveau" after a live lookup). */
+  badge?: string;
   saved: boolean;
   inFolders: Set<string>;
   folders: FolderRow[];
@@ -432,18 +451,24 @@ function FeedListRow({
   const videos = rowVideos(c);
   const views = (c.videoThumbnails ?? []).map((v) => v.views).filter((v) => v > 0).slice(0, 10);
   const posted = ago(c.lastPostAt, lang);
+  const hoverTimer = useRef<number | undefined>(undefined);
 
   return (
     <div
       className={`cf-row${dimmed ? " is-dimmed" : ""}`}
       style={{ ["--i" as string]: index }}
-      onMouseEnter={() => prefetchCreatorDetail(c.username)}
+      onMouseEnter={() => {
+        // A short hover (not a mouse sweeping across the list) prefetches the creator page.
+        hoverTimer.current = window.setTimeout(() => prefetchCreatorProfile(creatorStorageKey(c.username, c.platform)), 120);
+      }}
+      onMouseLeave={() => window.clearTimeout(hoverTimer.current)}
+      onFocus={() => prefetchCreatorProfile(creatorStorageKey(c.username, c.platform))}
     >
       <div className="cf-row__who" onClick={onOpen} role="button" tabIndex={0} onKeyDown={(e) => e.key === "Enter" && onOpen()}>
         <span className="cf-row__face">
           {instagram && c.avatarUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={c.avatarUrl} alt={c.displayName} width={52} height={52} style={{ width: 52, height: 52, borderRadius: "50%", objectFit: "cover" }} referrerPolicy="no-referrer" />
+            <img src={c.avatarUrl} alt={c.displayName} width={52} height={52} style={{ width: 52, height: 52, borderRadius: "50%", objectFit: "cover" }} loading={avatarPriority ? "eager" : "lazy"} decoding="async" referrerPolicy="no-referrer" />
           ) : (
             <CreatorAvatar username={c.username} src={c.avatarUrl} displayName={c.displayName} size={52} alt={c.displayName} priority={avatarPriority} />
           )}
@@ -463,6 +488,7 @@ function FeedListRow({
           </strong>
           <span>@{c.username}</span>
           <span className="cf-row__meta">
+            {badge ? <span className="cf-new">{badge}</span> : null}
             {c.countryCode ? <span className="cf-geo">{c.countryCode}</span> : null}
             {posted ? <span>{fr ? "Publié" : "Posted"} {posted}</span> : null}
           </span>
@@ -472,8 +498,7 @@ function FeedListRow({
         {videos.length ? (
           videos.map((v, k) => (
             <a key={`${v.cover}-${k}`} className="cf-vid" href={v.url || undefined} target="_blank" rel="noreferrer" onClick={(e) => { if (!v.url) e.preventDefault(); }}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={v.cover} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" />
+              <CoverImage src={v.cover} fallback={v.fallback} width={56} height={74} />
               <span className="cf-vid__play" aria-hidden>
                 <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4v16l13-8z" /></svg>
               </span>
@@ -528,6 +553,72 @@ function FeedListRow({
         <button type="button" className="cf-view" onClick={onOpen}>
           {t.view}
         </button>
+      </div>
+    </div>
+  );
+}
+
+/** Live lookup in progress, offered, or failed (the found creator is a regular row). */
+function LookupStatus({
+  lang,
+  view,
+  otherPlatform,
+  onRun,
+}: {
+  lang: "en" | "fr";
+  view: Exclude<LookupView, { status: "found" }>;
+  otherPlatform: LookupPlatform;
+  onRun: (platform: LookupPlatform) => void;
+}) {
+  const fr = lang === "fr";
+  const at = `@${view.handle}`;
+  const on = lookupPlatformLabel(view.platform);
+  const liveButton = (platform: LookupPlatform, primary: boolean) => (
+    <button key={platform} type="button" className={`cf-lookup__btn${primary ? " is-primary" : ""}`} onClick={() => onRun(platform)}>
+      <PlatformLogo platform={platform} size={14} />
+      {fr ? `Chercher ${at} en direct sur ${lookupPlatformLabel(platform)}` : `Search ${at} live on ${lookupPlatformLabel(platform)}`}
+    </button>
+  );
+  if (view.status === "loading") {
+    return (
+      <div className="cf-lookup is-loading" role="status" aria-live="polite">
+        <span className="cf-lookup__spin" aria-hidden />
+        <div className="cf-lookup__text">
+          <strong>{fr ? `Recherche de ${at} sur ${on}…` : `Looking up ${at} on ${on}…`}</strong>
+          <small>{fr ? "Profil, dernières vidéos et statistiques : quelques secondes." : "Profile, latest videos and stats: a few seconds."}</small>
+        </div>
+      </div>
+    );
+  }
+  if (view.status === "offer") {
+    return (
+      <div className="cf-lookup" role="status">
+        <div className="cf-lookup__text">
+          <strong>{fr ? `Vous cherchez le compte ${at} ?` : `Looking for the account ${at}?`}</strong>
+          <small>{fr ? "Aucun pseudo exact dans la base : on peut le récupérer en direct." : "No exact handle in the database: we can fetch it live."}</small>
+        </div>
+        <div className="cf-lookup__actions">
+          {liveButton(view.platform, true)}
+          {liveButton(otherPlatform, false)}
+        </div>
+      </div>
+    );
+  }
+  if (view.status !== "error") return null;
+  const err = view.error;
+  const retry = RETRYABLE_LOOKUP.has(err.code) && err.code !== "rate_limited";
+  return (
+    <div className="cf-lookup is-error" role="alert">
+      <div className="cf-lookup__text">
+        <strong>{err.message}</strong>
+      </div>
+      <div className="cf-lookup__actions">
+        {retry ? (
+          <button type="button" className="cf-lookup__btn is-primary" onClick={() => onRun(view.platform)}>
+            {fr ? "Réessayer" : "Try again"}
+          </button>
+        ) : null}
+        {err.code === "not_found" || err.code === "private" ? liveButton(otherPlatform, false) : null}
       </div>
     </div>
   );
@@ -694,7 +785,7 @@ export function DiscoveryFeed({ plan, workspaceUserId, isMobile, onUpgrade, onRe
 
   const openCreator = (creator: FeedCreator) => {
     setSelected(creator);
-    navigate({ view: "discovery", creator: creator.username });
+    navigate({ view: "discovery", creator: creatorStorageKey(creator.username, creator.platform) });
   };
   // The creator page follows navigation, so Back (in-app or browser) closes it.
   const profileHandle = navState.view === "discovery" && navState.creator ? navState.creator.replace(/^@/, "") : null;
@@ -704,6 +795,17 @@ export function DiscoveryFeed({ plan, workspaceUserId, isMobile, onUpgrade, onRe
     refreshHidden();
     window.addEventListener(HIDDEN_CREATORS_EVENT, refreshHidden);
     return () => window.removeEventListener(HIDDEN_CREATORS_EVENT, refreshHidden);
+  }, []);
+
+  // Mino's "Open in Creators with these filters" (lib/mino-attachments).
+  useEffect(() => {
+    const applyMinoFilters = () => {
+      const f = takePendingCatalogFilters();
+      if (f) setFilters({ ...EMPTY_FILTERS, ...f });
+    };
+    applyMinoFilters();
+    window.addEventListener(MINO_CATALOG_FILTERS_EVENT, applyMinoFilters);
+    return () => window.removeEventListener(MINO_CATALOG_FILTERS_EVENT, applyMinoFilters);
   }, []);
 
   useEffect(() => {
@@ -790,7 +892,10 @@ export function DiscoveryFeed({ plan, workspaceUserId, isMobile, onUpgrade, onRe
     unlockFreeDiscoveryGate();
   }, [plan, unlockFreeDiscoveryGate]);
 
-  const apiParams = useMemo(() => toParams(filters, debouncedSearch, sort), [filters, debouncedSearch, sort]);
+  // A pasted profile link searches the catalog by its handle.
+  const parsedLookup = useMemo(() => parseCreatorLookup(debouncedSearch), [debouncedSearch]);
+  const catalogSearch = parsedLookup?.kind === "url" ? parsedLookup.handle : debouncedSearch;
+  const apiParams = useMemo(() => toParams(filters, catalogSearch, sort), [filters, catalogSearch, sort]);
   const isGlobalSearch = debouncedSearch.trim().replace(/^@/, "").length >= 2;
   const shouldShowAllNichesTeaser = !isPaid && allNichesBrowse;
 
@@ -1104,17 +1209,102 @@ export function DiscoveryFeed({ plan, workspaceUserId, isMobile, onUpgrade, onRe
   const isCreatorSearchMiss =
     !loading && !error && !discoveryGateActive && searchQuery.replace(/^@/, "").length >= 2 && filtered.length === 0;
 
+  // ── Live lookup ─────────────────────────────────────────────────────────────
+  // A handle or profile link the catalog doesn't hold is fetched from the
+  // platform (/api/creators/lookup) and shown as the first row. "@name" and
+  // links are looked up at once; a bare word only when the catalog found
+  // nobody, otherwise a button offers it (each live lookup costs API calls).
+  const [lookup, setLookup] = useState<LookupView | null>(null);
+  const lookupCacheRef = useRef(new Map<string, LookupSuccess | LookupFailure>());
+  const lookupAbortRef = useRef<AbortController | null>(null);
+  const tabPlatform: LookupPlatform = normalizeLookupPlatform(filters.platform) ?? "tiktok";
+  const lookupTarget =
+    parsedLookup && mode === "creators" && isPaid && !discoveryGateActive
+      ? { handle: parsedLookup.handle, platform: parsedLookup.platform ?? tabPlatform, explicit: isExplicitLookup(parsedLookup) }
+      : null;
+  const lookupKey = lookupTarget ? `${lookupTarget.platform}:${lookupTarget.handle}` : "";
+  const exactMatch = lookupTarget
+    ? creators.some((c) => c.username.replace(/^@/, "").toLowerCase() === lookupTarget.handle && platformKey(c.platform) === lookupTarget.platform)
+    : false;
+
+  const runLookup = useCallback(
+    async (handle: string, platform: LookupPlatform, opts: { force?: boolean } = {}) => {
+      const key = `${platform}:${handle}`;
+      const cached = opts.force ? undefined : lookupCacheRef.current.get(key);
+      if (cached) {
+        setLookup(cached.ok ? { status: "found", handle, platform, result: cached } : { status: "error", handle, platform, error: cached });
+        return;
+      }
+      lookupAbortRef.current?.abort();
+      const ctrl = new AbortController();
+      lookupAbortRef.current = ctrl;
+      setLookup({ status: "loading", handle, platform });
+      try {
+        const res = await lookupCreatorLive(`@${handle}`, { platform, tab: platform, lang, signal: ctrl.signal });
+        if (ctrl.signal.aborted) return;
+        if (res.ok || !RETRYABLE_LOOKUP.has(res.code)) lookupCacheRef.current.set(key, res);
+        if (res.ok) {
+          // The creator page must open on the data just stored, not a cached copy.
+          if (res.source === "live") refreshCreatorProfile(res.storageKey);
+          setLookup({ status: "found", handle, platform, result: res });
+        } else {
+          setLookup({ status: "error", handle, platform, error: res });
+        }
+      } catch {
+        // Aborted: a newer search took over.
+      }
+    },
+    [lang],
+  );
+
+  const lookupStatus = lookup?.status;
+  const lookupHandle = lookup?.handle;
   useEffect(() => {
-    if (items.length === 0) return;
-    prefetchCreatorMedia(
-      items.slice(0, 48).map((c) => ({
-        username: c.username,
-        avatarUrl: c.avatarUrl,
-        topVideos: c.topVideos,
-        videoThumbnails: c.videoThumbnails,
-      })),
-    );
-  }, [items]);
+    if (!lookupTarget) {
+      lookupAbortRef.current?.abort();
+      setLookup(null);
+      return;
+    }
+    // Wait for the catalog's answer to this search (the timer is cleared while it loads).
+    if (loading) return;
+    if (lookupHandle === lookupTarget.handle && lookupStatus !== "offer") return;
+    const timer = setTimeout(() => {
+      const cached = lookupCacheRef.current.has(lookupKey);
+      if (exactMatch && !cached) {
+        setLookup(null);
+        return;
+      }
+      if (lookupTarget.explicit || filtered.length === 0 || cached) {
+        void runLookup(lookupTarget.handle, lookupTarget.platform);
+        return;
+      }
+      setLookup({ status: "offer", handle: lookupTarget.handle, platform: lookupTarget.platform });
+    }, 300);
+    return () => clearTimeout(timer);
+    // lookupTarget is rebuilt each render; lookupKey stands for it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lookupKey, loading, exactMatch, filtered.length, lookupHandle, lookupStatus, runLookup]);
+
+  useEffect(() => () => lookupAbortRef.current?.abort(), []);
+
+  const lookupShown = lookup && lookupTarget && lookup.handle === lookupTarget.handle ? lookup : null;
+  const lookupFound = lookupShown?.status === "found" ? lookupShown.result : null;
+  const listItems = lookupFound
+    ? [lookupFound.creator, ...items.filter((c) => creatorStorageKey(c.username, c.platform) !== lookupFound.storageKey)]
+    : items;
+  const lookupBadge = lookupFound
+    ? [
+        lookupFound.isNew ? (lang === "fr" ? "Nouveau" : "Just added") : lookupFound.source === "live" ? (lang === "fr" ? "Mis à jour" : "Updated now") : lang === "fr" ? "Trouvé" : "Found",
+        lookupFound.isBrand ? (lang === "fr" ? "Marque" : "Brand") : "",
+      ]
+        .filter(Boolean)
+        .join(" · ")
+    : undefined;
+  const otherLookupPlatform = (p: LookupPlatform): LookupPlatform => (p === "instagram" ? "tiktok" : "instagram");
+
+  // No eager media prefetch here: rows load their avatar and covers lazily as
+  // they scroll in (an eager warm-up requested every stored cover of 48 creators
+  // at once, raw CDN links included, ahead of the visible images).
 
   const refreshWorkspace = useCallback(async () => {
     const [rows, f] = await Promise.all([listSaved(), listFolders()]);
@@ -1190,7 +1380,7 @@ export function DiscoveryFeed({ plan, workspaceUserId, isMobile, onUpgrade, onRe
           filters={filters}
           sort={sort}
           mode={mode}
-          count={filtered.length}
+          count={filtered.length + (lookupFound && listItems.length > items.length ? 1 : 0)}
           // Client-only filters (saved / hidden) aren't in the database count.
           total={filters.hideSaved || filters.showHidden ? null : catalogTotal}
           loading={loading}
@@ -1242,7 +1432,15 @@ export function DiscoveryFeed({ plan, workspaceUserId, isMobile, onUpgrade, onRe
               ))}
             </div>
           ) : null}
-          {mode === "creators" && !loading && !error && isCreatorSearchMiss && (
+          {mode === "creators" && lookupShown && lookupShown.status !== "found" ? (
+            <LookupStatus
+              lang={lang}
+              view={lookupShown}
+              onRun={(platform) => void runLookup(lookupShown.handle, platform, { force: lookupShown.status === "error" && lookupShown.platform === platform })}
+              otherPlatform={otherLookupPlatform(lookupShown.platform)}
+            />
+          ) : null}
+          {mode === "creators" && !loading && !error && isCreatorSearchMiss && !lookupFound && lookupShown?.status !== "loading" && (
             <div
               style={{
                 background: "var(--ws-surface)",
@@ -1282,7 +1480,7 @@ export function DiscoveryFeed({ plan, workspaceUserId, isMobile, onUpgrade, onRe
               </p>
             </div>
           )}
-          {mode === "creators" && !loading && !error && filtered.length === 0 && !discoveryGateActive && !isCreatorSearchMiss && (
+          {mode === "creators" && !loading && !error && filtered.length === 0 && !discoveryGateActive && !isCreatorSearchMiss && !lookupFound && (
             <div className="sp-empty">
               <div className="df-empty__orbit" aria-hidden>
                 <span /><span /><span />
@@ -1311,10 +1509,10 @@ export function DiscoveryFeed({ plan, workspaceUserId, isMobile, onUpgrade, onRe
             style={{
               position: "relative",
               minHeight: feedGateActive && items.length === 0 ? 320 : undefined,
-              display: mode === "videos" || (items.length === 0 && !feedGateActive) ? "none" : undefined,
+              display: mode === "videos" || (listItems.length === 0 && !feedGateActive) ? "none" : undefined,
             }}
           >
-            {items.length > 0 ? (
+            {listItems.length > 0 ? (
               <div className="cf-head" aria-hidden>
                 <span>{lang === "fr" ? "Créateur" : "Creator"}</span>
                 <span>{lang === "fr" ? "Meilleures vidéos" : "Top videos"}</span>
@@ -1326,13 +1524,15 @@ export function DiscoveryFeed({ plan, workspaceUserId, isMobile, onUpgrade, onRe
               </div>
             ) : null}
             <div className="cf-list">
-              {items.map((c, i) => {
-                const rowStyle = feedRowGateStyle(i, items.length, feedGateActive);
+              {listItems.map((c, i) => {
+                const rowStyle = feedRowGateStyle(i, listItems.length, feedGateActive);
+                const isLookupRow = Boolean(lookupFound) && i === 0;
                 return (
-                  <div key={c.username} aria-hidden={rowStyle ? true : undefined} style={rowStyle}>
+                  <div key={isLookupRow ? `lookup:${lookupFound!.storageKey}` : c.username} aria-hidden={rowStyle ? true : undefined} style={rowStyle} className={isLookupRow ? "cf-lookup-row" : undefined}>
                     <FeedListRow
                       lang={lang}
                       creator={c}
+                      badge={isLookupRow ? lookupBadge : undefined}
                       saved={savedUsernames.has(c.username)}
                       inFolders={folderIdsFor(c.username)}
                       folders={folders}
@@ -1376,7 +1576,7 @@ export function DiscoveryFeed({ plan, workspaceUserId, isMobile, onUpgrade, onRe
           <CreatorProfilePage
             key={profileHandle}
             username={profileHandle}
-            preview={selected && selected.username.toLowerCase() === profileHandle.toLowerCase() ? selected : null}
+            preview={selected && creatorStorageKey(selected.username, selected.platform) === creatorStorageKey(profileHandle, selected.platform) ? selected : null}
             onBack={goBack}
             onOpenCreator={openCreator}
             onReachOut={onReachOut}

@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { FeedCreator } from "@/lib/discovery-feed";
 import type { Lang } from "@/lib/useLang";
 import { discoveryCopy } from "@/lib/discovery-copy";
@@ -14,6 +15,12 @@ import {
 } from "@/lib/workspace-client";
 
 const actionFont = "'InterDisplay', 'Inter Display', sans-serif";
+
+const MENU_WIDTH = 248;
+const MENU_GAP = 6;
+const VIEWPORT_PAD = 8;
+
+type MenuPos = { left: number; top?: number; bottom?: number; maxHeight: number };
 
 export function SaveCreatorDropdown({
   lang,
@@ -45,6 +52,9 @@ export function SaveCreatorDropdown({
   const [savedLocal, setSavedLocal] = useState(saved);
   const [inFoldersLocal, setInFoldersLocal] = useState(inFolders);
   const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<MenuPos | null>(null);
   const pendingRef = useRef(0);
   const savedPropRef = useRef(saved);
   const foldersKeyRef = useRef("");
@@ -101,14 +111,61 @@ export function SaveCreatorDropdown({
     }
   }, []);
 
+  // The open menu is portaled to <body> with position: fixed, so animated rows/cards
+  // (which create stacking contexts) can never paint over it.
+  const placeMenu = useCallback(() => {
+    const trigger = triggerRef.current;
+    if (!trigger) return;
+    const r = trigger.getBoundingClientRect();
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const menuH = menuRef.current?.scrollHeight ?? 320;
+    const below = vh - r.bottom - MENU_GAP - VIEWPORT_PAD;
+    const above = r.top - MENU_GAP - VIEWPORT_PAD;
+    const left = Math.min(Math.max(VIEWPORT_PAD, r.right - MENU_WIDTH), vw - MENU_WIDTH - VIEWPORT_PAD);
+    if (below >= menuH || below >= above) {
+      setPos({ left, top: r.bottom + MENU_GAP, maxHeight: Math.max(160, below) });
+    } else {
+      setPos({ left, bottom: vh - r.top + MENU_GAP, maxHeight: Math.max(160, above) });
+    }
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!open) {
+      setPos(null);
+      return;
+    }
+    placeMenu();
+    // Second pass once the menu has rendered and its real height is known.
+    const raf = requestAnimationFrame(placeMenu);
+    return () => cancelAnimationFrame(raf);
+  }, [open, placeMenu, isPaid, folders.length, savedLocal]);
+
   useEffect(() => {
     if (!open) return;
     const onDoc = (e: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node;
+      if (rootRef.current?.contains(target) || menuRef.current?.contains(target)) return;
+      setOpen(false);
     };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setOpen(false);
+        triggerRef.current?.focus();
+      }
+    };
+    const onMove = () => placeMenu();
     document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
-  }, [open]);
+    document.addEventListener("keydown", onKey);
+    window.addEventListener("scroll", onMove, true);
+    window.addEventListener("resize", onMove);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+      window.removeEventListener("scroll", onMove, true);
+      window.removeEventListener("resize", onMove);
+    };
+  }, [open, placeMenu]);
 
   const ensureSaved = useCallback(async (): Promise<boolean> => {
     if (savedLocal) return true;
@@ -286,6 +343,7 @@ export function SaveCreatorDropdown({
   return (
     <div ref={rootRef} style={{ position: "relative" }}>
       <button
+        ref={triggerRef}
         type="button"
         onClick={(e) => {
           e.stopPropagation();
@@ -316,24 +374,32 @@ export function SaveCreatorDropdown({
         <span style={{ fontSize: 10, opacity: 0.75 }}>▾</span>
       </button>
 
-      {open && (
+      {open && typeof document !== "undefined" && createPortal(
         <div
+          ref={menuRef}
+          role="dialog"
+          aria-label={t.saveToList}
           onClick={(e) => e.stopPropagation()}
           style={{
-            position: "absolute",
-            top: "calc(100% + 6px)",
-            right: 0,
-            zIndex: 200,
-            width: 248,
-            maxWidth: 248,
+            position: "fixed",
+            left: pos?.left ?? -9999,
+            top: pos?.top,
+            bottom: pos?.bottom,
+            maxHeight: pos?.maxHeight,
+            visibility: pos ? "visible" : "hidden",
+            zIndex: 1500,
+            width: MENU_WIDTH,
+            maxWidth: MENU_WIDTH,
             background: "var(--ws-surface)",
+            color: "var(--ws-text)",
             border: "1px solid var(--ws-border)",
             borderRadius: 12,
             boxShadow: "var(--ws-shadow)",
             padding: "10px 0",
             fontFamily: actionFont,
             boxSizing: "border-box",
-            overflow: "hidden",
+            overflowX: "hidden",
+            overflowY: "auto",
           }}
         >
           <div style={{ fontSize: 11, fontWeight: 600, color: "var(--ws-text-dim)", textTransform: "uppercase", letterSpacing: "0.04em", padding: "4px 14px 8px" }}>
@@ -361,7 +427,7 @@ export function SaveCreatorDropdown({
               type="checkbox"
               checked={savedLocal}
               onChange={() => void toggleSaved(!savedLocal)}
-              style={{ width: 15, height: 15, cursor: "pointer", flexShrink: 0 }}
+              style={{ width: 15, height: 15, cursor: "pointer", flexShrink: 0, accentColor: "var(--ws-accent)" }}
             />
             <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.saveWithoutList}</span>
           </label>
@@ -404,7 +470,7 @@ export function SaveCreatorDropdown({
                           type="checkbox"
                           checked={checked}
                           onChange={() => void toggleFolder(f.id, !checked)}
-                          style={{ width: 15, height: 15, cursor: "pointer", flexShrink: 0 }}
+                          style={{ width: 15, height: 15, cursor: "pointer", flexShrink: 0, accentColor: "var(--ws-accent)" }}
                         />
                         <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={f.name}>{f.name}</span>
                       </label>
@@ -413,7 +479,7 @@ export function SaveCreatorDropdown({
                 </div>
               )}
 
-              <div style={{ borderTop: "1px solid #F0F0F0", margin: "8px 6px 0", padding: "10px 8px 6px", boxSizing: "border-box" }}>
+              <div style={{ borderTop: "1px solid var(--ws-border)", margin: "8px 6px 0", padding: "10px 8px 6px", boxSizing: "border-box" }}>
                 <div
                   style={{
                     display: "grid",
@@ -438,6 +504,9 @@ export function SaveCreatorDropdown({
                       padding: "7px 8px",
                       border: "1px solid var(--ws-border)",
                       borderRadius: 8,
+                      background: "var(--ws-input)",
+                      color: "var(--ws-text)",
+                      outline: "none",
                       fontFamily: actionFont,
                       letterSpacing: "-0.01em",
                       boxSizing: "border-box",
@@ -452,8 +521,8 @@ export function SaveCreatorDropdown({
                       fontSize: 11,
                       fontWeight: 600,
                       lineHeight: 1.2,
-                      color: "#0047FF",
-                      background: "#E8EEFC",
+                      color: "var(--ws-accent)",
+                      background: "var(--ws-accent-soft)",
                       border: "none",
                       borderRadius: 8,
                       padding: "7px 10px",
@@ -470,12 +539,12 @@ export function SaveCreatorDropdown({
               </div>
             </>
           ) : (
-            <div style={{ fontSize: 12, color: "#7A7A7A", padding: "4px 14px 10px", lineHeight: 1.5 }}>
+            <div style={{ fontSize: 12, color: "var(--ws-text-muted)", padding: "4px 14px 10px", lineHeight: 1.5 }}>
               {t.listsPaidOnly}{" "}
               <button
                 type="button"
                 onClick={() => { onUpgrade?.(); setOpen(false); }}
-                style={{ background: "none", border: "none", color: "#0047FF", fontWeight: 600, cursor: "pointer", padding: 0, fontFamily: actionFont, fontSize: 12 }}
+                style={{ background: "none", border: "none", color: "var(--ws-accent)", fontWeight: 600, cursor: "pointer", padding: 0, fontFamily: actionFont, fontSize: 12 }}
               >
                 {t.upgradePlan}
               </button>
@@ -483,14 +552,14 @@ export function SaveCreatorDropdown({
           )}
 
           {savedLocal && (
-            <div style={{ borderTop: "1px solid #F0F0F0", marginTop: 8, padding: "8px 14px 2px" }}>
+            <div style={{ borderTop: "1px solid var(--ws-border)", marginTop: 8, padding: "8px 14px 2px" }}>
               <button
                 type="button"
                 onClick={() => void onRemoveSaved()}
                 style={{
                   background: "none",
                   border: "none",
-                  color: "#9A1F1F",
+                  color: "var(--ws-danger)",
                   fontSize: 12,
                   fontWeight: 500,
                   cursor: "pointer",
@@ -503,7 +572,8 @@ export function SaveCreatorDropdown({
               </button>
             </div>
           )}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

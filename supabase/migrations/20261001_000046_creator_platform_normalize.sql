@@ -25,11 +25,11 @@
 -- Rows added before that convention ('instagram', 'luna') are the same creator
 -- as ('instagram', 'ig_luna') and are merged too.
 --
--- Idempotent (safe to run twice) and transactional: all of it or nothing.
+-- Idempotent (safe to run twice). The data merge (sections 1-4) is one atomic DO block.
 -- outreach_history.platform is a DM channel ('Instagram DM', 'Email'…), not a
 -- creator platform, and the gifting tables already only accept lowercase.
 
-begin;
+
 
 -- ── 0. Columns this migration relies on ────────────────────────────────────────
 alter table public.creators_index add column if not exists scrape_status text;
@@ -37,330 +37,347 @@ alter table public.creator_videos add column if not exists format text;
 
 -- ── 1. creators_index: who is who ─────────────────────────────────────────────
 -- One row per creators_index row with its normalized identity.
-create temporary table _ci_rows on commit drop as
-select r.*,
-       case r.norm_platform
-         when 'instagram' then regexp_replace(r.norm_username, '^ig_', '')
-         when 'youtube' then regexp_replace(r.norm_username, '^yt_', '')
-         else r.norm_username
-       end as norm_handle
-from (
-  select c.ctid as row_ctid,
-         c.platform as old_platform,
-         c.username as old_username,
-         lower(coalesce(nullif(btrim(c.platform), ''), 'tiktok')) as norm_platform,
-         lower(regexp_replace(btrim(c.username), '^@', '')) as norm_username,
-         c.last_scraped_at,
-         c.enrichment_status,
-         c.followers
-  from public.creators_index c
-  where c.username is not null
-) r;
-
--- Rank the rows of each creator: most recently scraped, then enriched, then
--- biggest, then the row already spelled right.
-create temporary table _ci_ranked on commit drop as
-select r.*,
-       row_number() over (
-         partition by r.norm_platform, r.norm_handle
-         order by r.last_scraped_at desc nulls last,
-                  (r.enrichment_status = 'enriched') desc nulls last,
-                  r.followers desc nulls last,
-                  (r.old_platform = r.norm_platform and r.old_username = r.norm_username) desc,
-                  r.row_ctid
-       ) as rank
-from _ci_rows r;
-
--- One line per creator: the kept row and the key it ends with.
-create temporary table _ci_groups on commit drop as
-select k.norm_platform,
-       k.norm_handle,
-       k.row_ctid as keeper_ctid,
-       k.old_username as keeper_old_username,
-       k.norm_username as final_username
-from _ci_ranked k
-where k.rank = 1;
-
--- Two different platforms ending on the same key (TikTok 'luna' and an old
--- Instagram row 'Luna'): TikTok keeps the bare handle, the other one takes its
--- platform prefix. If even that is taken, the row keeps its current key.
-with clash as (
-  select g.norm_platform, g.norm_handle,
-         row_number() over (
-           partition by g.final_username
-           order by (g.norm_platform = 'tiktok') desc, (g.keeper_old_username = g.final_username) desc, g.norm_platform
-         ) as pos
-  from _ci_groups g
-)
-update _ci_groups g
-   set final_username = case g.norm_platform
-                          when 'instagram' then 'ig_' || g.norm_handle
-                          when 'youtube' then 'yt_' || g.norm_handle
-                          else g.keeper_old_username
-                        end
-  from clash c
- where c.norm_platform = g.norm_platform and c.norm_handle = g.norm_handle and c.pos > 1;
-
-update _ci_groups g
-   set final_username = g.keeper_old_username
- where exists (
-   select 1 from _ci_groups o
-    where o.final_username = g.final_username
-      and (o.norm_platform, o.norm_handle) <> (g.norm_platform, g.norm_handle)
-      and o.keeper_old_username = o.final_username
- )
-   and g.keeper_old_username <> g.final_username;
-
--- Every spelling a child row may use → the final key.
-create temporary table _ci_map on commit drop as
-select distinct r.norm_platform, r.norm_username as member_username, g.final_username
-from _ci_rows r
-join _ci_groups g on g.norm_platform = r.norm_platform and g.norm_handle = r.norm_handle;
-
--- Child tables are matched row by row against these: index them.
-create index on _ci_map (norm_platform, member_username);
-create index on _ci_map (member_username);
-create index on _ci_groups (norm_platform, norm_handle);
-create index on _ci_ranked (norm_platform, norm_handle);
-analyze _ci_rows;
-analyze _ci_ranked;
-analyze _ci_groups;
-analyze _ci_map;
-
--- ── 2. creators_index: merge, then normalize ──────────────────────────────────
--- Fill the kept row's gaps from its duplicates (never overwrite what it has).
-with losers as (
-  select r.norm_platform, r.norm_handle, r.rank, c.*
-    from _ci_ranked r
-    join public.creators_index c on c.ctid = r.row_ctid
-   where r.rank > 1
-),
-gaps as (
-  select l.norm_platform, l.norm_handle,
-         (array_agg(l.email order by l.rank) filter (where nullif(l.email, '') is not null))[1] as email,
-         (array_agg(l.primary_niche order by l.rank) filter (where nullif(l.primary_niche, '') is not null))[1] as primary_niche,
-         (array_agg(l.country_code order by l.rank) filter (where nullif(l.country_code, '') is not null))[1] as country_code,
-         (array_agg(l.avatar_url order by l.rank) filter (where nullif(l.avatar_url, '') is not null))[1] as avatar_url,
-         (array_agg(l.top_videos order by l.rank) filter (where l.top_videos is not null))[1] as top_videos,
-         min(l.first_seen_at) as first_seen_at
-    from losers l
-   group by l.norm_platform, l.norm_handle
-),
-loser_niches as (
-  select l.norm_platform, l.norm_handle, array_agg(distinct n) as niches
-    from losers l
-    cross join lateral unnest(coalesce(l.niches, '{}')) as n
-   where n is not null
-   group by l.norm_platform, l.norm_handle
-)
-update public.creators_index k
-   set email = coalesce(nullif(k.email, ''), d.email),
-       primary_niche = coalesce(nullif(k.primary_niche, ''), d.primary_niche),
-       country_code = coalesce(nullif(k.country_code, ''), d.country_code),
-       avatar_url = coalesce(nullif(k.avatar_url, ''), d.avatar_url),
-       top_videos = coalesce(k.top_videos, d.top_videos),
-       first_seen_at = least(k.first_seen_at, d.first_seen_at),
-       niches = (
-         select coalesce(array_agg(distinct n), '{}')
-           from unnest(coalesce(k.niches, '{}') || coalesce(ln.niches, '{}')) as n
-          where n is not null
-       )
-  from _ci_groups g
-  join gaps d on d.norm_platform = g.norm_platform and d.norm_handle = g.norm_handle
-  left join loser_niches ln on ln.norm_platform = g.norm_platform and ln.norm_handle = g.norm_handle
- where k.ctid = g.keeper_ctid;
-
--- The duplicates go (their history moves to the kept row below).
-delete from public.creators_index c
- using _ci_ranked r
- where c.ctid = r.row_ctid and r.rank > 1;
-
--- The kept rows take their final spelling (found by their old spelling: the
--- update above moved some of them). Rows renamed with a platform prefix go
--- first, so no key is ever held by two rows at once.
-update public.creators_index c
-   set platform = g.norm_platform, username = g.final_username
-  from _ci_groups g
-  join _ci_rows r on r.row_ctid = g.keeper_ctid
- where c.username = r.old_username
-   and c.platform is not distinct from r.old_platform
-   and g.final_username <> r.norm_username;
-
-update public.creators_index c
-   set platform = g.norm_platform, username = g.final_username
-  from _ci_groups g
-  join _ci_rows r on r.row_ctid = g.keeper_ctid
- where c.username = r.old_username
-   and c.platform is not distinct from r.old_platform
-   and (c.platform is distinct from g.norm_platform or c.username is distinct from g.final_username);
-
--- A single key column must stay unique on its own (the app upserts on it).
-do $$
+-- Sections 1 to 4 run as ONE statement (a DO block): the Supabase SQL editor
+-- may run each top-level statement on its own connection, which loses temp
+-- tables between statements. A DO block is also atomic: all of it or nothing.
+do $merge$
+declare _t text;
 begin
-  if not exists (
-    select 1
-      from pg_index i
-      join pg_attribute a on a.attrelid = i.indrelid and a.attnum = i.indkey[0]
-     where i.indrelid = 'public.creators_index'::regclass
-       and i.indisunique
-       and i.indnatts = 1
-       and a.attname = 'username'
-       and i.indpred is null
-  ) then
-    create unique index creators_index_username_uidx on public.creators_index (username);
-  end if;
-end $$;
+  -- Temp tables left by an earlier run on a reused connection.
+  foreach _t in array array['_ci_rows', '_ci_ranked', '_ci_groups', '_ci_map', '_saved_new', '_items_new'] loop
+    execute 'dr' || 'op table if exists pg_temp.' || quote_ident(_t);
+  end loop;
 
--- ── 3. History and queue follow the kept row ──────────────────────────────────
--- creator_snapshots: one row per creator per day.
-delete from public.creator_snapshots s
- using (
-   select x.ctid as row_ctid,
-          row_number() over (
-            partition by lower(x.platform), coalesce(m.final_username, lower(x.username)), x.captured_on
-            order by x.captured_at desc nulls last,
-                     (x.platform = lower(x.platform) and x.username = coalesce(m.final_username, lower(x.username))) desc,
-                     x.followers desc nulls last
-          ) as rank
-     from public.creator_snapshots x
-     left join _ci_map m on m.norm_platform = lower(x.platform) and m.member_username = lower(x.username)
- ) d
- where s.ctid = d.row_ctid and d.rank > 1;
-
-update public.creator_snapshots x
-   set platform = lower(x.platform),
-       username = coalesce((select m.final_username from _ci_map m
-                             where m.norm_platform = lower(x.platform) and m.member_username = lower(x.username)), lower(x.username))
- where x.platform <> lower(x.platform)
-    or x.username <> coalesce((select m.final_username from _ci_map m
-                                where m.norm_platform = lower(x.platform) and m.member_username = lower(x.username)), lower(x.username));
-
--- creator_videos: one row per video.
-delete from public.creator_videos v
- using (
-   select x.ctid as row_ctid,
-          row_number() over (partition by lower(x.platform), x.video_id
-                             order by (x.platform = lower(x.platform)) desc, x.last_scraped_at desc) as rank
-     from public.creator_videos x
- ) d
- where v.ctid = d.row_ctid and d.rank > 1;
-
-update public.creator_videos x
-   set platform = lower(x.platform),
-       username = coalesce((select m.final_username from _ci_map m
-                             where m.norm_platform = lower(x.platform) and m.member_username = lower(x.username)), lower(x.username))
- where x.platform <> lower(x.platform)
-    or x.username <> coalesce((select m.final_username from _ci_map m
-                                where m.norm_platform = lower(x.platform) and m.member_username = lower(x.username)), lower(x.username));
-
--- creator_video_snapshots: one row per video per day.
-delete from public.creator_video_snapshots v
- using (
-   select x.ctid as row_ctid,
-          row_number() over (partition by lower(x.platform), x.video_id, x.captured_on
-                             order by (x.platform = lower(x.platform)) desc, x.views desc nulls last) as rank
-     from public.creator_video_snapshots x
- ) d
- where v.ctid = d.row_ctid and d.rank > 1;
-
-update public.creator_video_snapshots set platform = lower(platform) where platform <> lower(platform);
-
--- scrape_jobs: a duplicate live job is closed, not deleted.
-update public.scrape_jobs j
-   set status = 'failed', finished_at = now(), last_error = 'merged into a duplicate job (platform spelling)'
+  create temporary table _ci_rows as
+  select r.*,
+         case r.norm_platform
+           when 'instagram' then regexp_replace(r.norm_username, '^ig_', '')
+           when 'youtube' then regexp_replace(r.norm_username, '^yt_', '')
+           else r.norm_username
+         end as norm_handle
   from (
-    select x.id,
+    select c.ctid as row_ctid,
+           c.platform as old_platform,
+           c.username as old_username,
+           lower(coalesce(nullif(btrim(c.platform), ''), 'tiktok')) as norm_platform,
+           lower(regexp_replace(btrim(c.username), '^@', '')) as norm_username,
+           c.last_scraped_at,
+           c.enrichment_status,
+           c.followers
+    from public.creators_index c
+    where c.username is not null
+  ) r;
+
+  -- Rank the rows of each creator: most recently scraped, then enriched, then
+  -- biggest, then the row already spelled right.
+  create temporary table _ci_ranked as
+  select r.*,
+         row_number() over (
+           partition by r.norm_platform, r.norm_handle
+           order by r.last_scraped_at desc nulls last,
+                    (r.enrichment_status = 'enriched') desc nulls last,
+                    r.followers desc nulls last,
+                    (r.old_platform = r.norm_platform and r.old_username = r.norm_username) desc,
+                    r.row_ctid
+         ) as rank
+  from _ci_rows r;
+
+  -- One line per creator: the kept row and the key it ends with.
+  create temporary table _ci_groups as
+  select k.norm_platform,
+         k.norm_handle,
+         k.row_ctid as keeper_ctid,
+         k.old_username as keeper_old_username,
+         k.norm_username as final_username
+  from _ci_ranked k
+  where k.rank = 1;
+
+  -- Two different platforms ending on the same key (TikTok 'luna' and an old
+  -- Instagram row 'Luna'): TikTok keeps the bare handle, the other one takes its
+  -- platform prefix. If even that is taken, the row keeps its current key.
+  with clash as (
+    select g.norm_platform, g.norm_handle,
            row_number() over (
-             partition by x.kind, lower(x.platform),
-                          case when x.kind = 'creator_refresh'
-                               then coalesce((select m.final_username from _ci_map m
-                                               where m.norm_platform = lower(x.platform) and m.member_username = lower(x.target)), lower(x.target))
-                               else lower(x.target) end
-             order by x.id
-           ) as rank
-      from public.scrape_jobs x
-     where x.status in ('queued', 'running')
-  ) d
- where j.id = d.id and d.rank > 1;
+             partition by g.final_username
+             order by (g.norm_platform = 'tiktok') desc, (g.keeper_old_username = g.final_username) desc, g.norm_platform
+           ) as pos
+    from _ci_groups g
+  )
+  update _ci_groups g
+     set final_username = case g.norm_platform
+                            when 'instagram' then 'ig_' || g.norm_handle
+                            when 'youtube' then 'yt_' || g.norm_handle
+                            else g.keeper_old_username
+                          end
+    from clash c
+   where c.norm_platform = g.norm_platform and c.norm_handle = g.norm_handle and c.pos > 1;
 
-update public.scrape_jobs x
-   set platform = lower(x.platform),
-       target = case when x.kind = 'creator_refresh'
-                     then coalesce((select m.final_username from _ci_map m
-                                     where m.norm_platform = lower(x.platform) and m.member_username = lower(x.target)), lower(x.target))
-                     else lower(x.target) end
- where x.platform <> lower(x.platform) or x.target <> lower(x.target)
-    or (x.kind = 'creator_refresh' and exists (
-          select 1 from _ci_map m
-           where m.norm_platform = lower(x.platform) and m.member_username = lower(x.target) and m.final_username <> x.target));
+  update _ci_groups g
+     set final_username = g.keeper_old_username
+   where exists (
+     select 1 from _ci_groups o
+      where o.final_username = g.final_username
+        and (o.norm_platform, o.norm_handle) <> (g.norm_platform, g.norm_handle)
+        and o.keeper_old_username = o.final_username
+   )
+     and g.keeper_old_username <> g.final_username;
 
--- ── 4. Brand-side references ──────────────────────────────────────────────────
--- discovery_saved: the saved creator follows the kept key; a workspace that
--- saved both spellings keeps the most recently updated one.
-create temporary table _saved_new on commit drop as
-select s.ctid as row_ctid,
-       s.workspace_id,
-       lower(coalesce(nullif(btrim(s.platform), ''), 'tiktok')) as new_platform,
-       coalesce(
-         (select m.final_username from _ci_map m
-           where m.norm_platform = lower(coalesce(nullif(btrim(s.platform), ''), 'tiktok'))
-             and m.member_username = lower(regexp_replace(btrim(s.creator_username), '^@', ''))),
-         lower(regexp_replace(btrim(s.creator_username), '^@', ''))
-       ) as new_username,
-       s.updated_at
-from public.discovery_saved s;
+  -- Every spelling a child row may use → the final key.
+  create temporary table _ci_map as
+  select distinct r.norm_platform, r.norm_username as member_username, g.final_username
+  from _ci_rows r
+  join _ci_groups g on g.norm_platform = r.norm_platform and g.norm_handle = r.norm_handle;
 
-delete from public.discovery_saved s
- using (
-   select n.row_ctid,
-          row_number() over (partition by n.workspace_id, n.new_username order by n.updated_at desc nulls last, n.row_ctid) as rank
-     from _saved_new n
-    where n.workspace_id is not null
- ) d
- where s.ctid = d.row_ctid and d.rank > 1;
+  -- Child tables are matched row by row against these: index them.
+  create index on _ci_map (norm_platform, member_username);
+  create index on _ci_map (member_username);
+  create index on _ci_groups (norm_platform, norm_handle);
+  create index on _ci_ranked (norm_platform, norm_handle);
+  analyze _ci_rows;
+  analyze _ci_ranked;
+  analyze _ci_groups;
+  analyze _ci_map;
 
-update public.discovery_saved s
-   set platform = n.new_platform,
-       creator_username = n.new_username
-  from _saved_new n
- where s.ctid = n.row_ctid
-   and (s.platform is distinct from n.new_platform or s.creator_username is distinct from n.new_username);
+  -- ── 2. creators_index: merge, then normalize ──────────────────────────────────
+  -- Fill the kept row's gaps from its duplicates (never overwrite what it has).
+  with losers as (
+    select r.norm_platform, r.norm_handle, r.rank, c.*
+      from _ci_ranked r
+      join public.creators_index c on c.ctid = r.row_ctid
+     where r.rank > 1
+  ),
+  gaps as (
+    select l.norm_platform, l.norm_handle,
+           (array_agg(l.email order by l.rank) filter (where nullif(l.email, '') is not null))[1] as email,
+           (array_agg(l.primary_niche order by l.rank) filter (where nullif(l.primary_niche, '') is not null))[1] as primary_niche,
+           (array_agg(l.country_code order by l.rank) filter (where nullif(l.country_code, '') is not null))[1] as country_code,
+           (array_agg(l.avatar_url order by l.rank) filter (where nullif(l.avatar_url, '') is not null))[1] as avatar_url,
+           (array_agg(l.top_videos order by l.rank) filter (where l.top_videos is not null))[1] as top_videos,
+           min(l.first_seen_at) as first_seen_at
+      from losers l
+     group by l.norm_platform, l.norm_handle
+  ),
+  loser_niches as (
+    select l.norm_platform, l.norm_handle, array_agg(distinct n) as niches
+      from losers l
+      cross join lateral unnest(coalesce(l.niches, '{}')) as n
+     where n is not null
+     group by l.norm_platform, l.norm_handle
+  )
+  update public.creators_index k
+     set email = coalesce(nullif(k.email, ''), d.email),
+         primary_niche = coalesce(nullif(k.primary_niche, ''), d.primary_niche),
+         country_code = coalesce(nullif(k.country_code, ''), d.country_code),
+         avatar_url = coalesce(nullif(k.avatar_url, ''), d.avatar_url),
+         top_videos = coalesce(k.top_videos, d.top_videos),
+         first_seen_at = least(k.first_seen_at, d.first_seen_at),
+         niches = (
+           select coalesce(array_agg(distinct n), '{}')
+             from unnest(coalesce(k.niches, '{}') || coalesce(ln.niches, '{}')) as n
+            where n is not null
+         )
+    from _ci_groups g
+    join gaps d on d.norm_platform = g.norm_platform and d.norm_handle = g.norm_handle
+    left join loser_niches ln on ln.norm_platform = g.norm_platform and ln.norm_handle = g.norm_handle
+   where k.ctid = g.keeper_ctid;
 
-update public.discovery_saved
-   set snapshot = jsonb_set(snapshot, '{platform}', to_jsonb(lower(snapshot->>'platform')))
- where snapshot is not null
-   and jsonb_typeof(snapshot) = 'object'
-   and jsonb_typeof(snapshot->'platform') = 'string'
-   and snapshot->>'platform' <> lower(snapshot->>'platform');
+  -- The duplicates go (their history moves to the kept row below).
+  delete from public.creators_index c
+   using _ci_ranked r
+   where c.ctid = r.row_ctid and r.rank > 1;
 
--- discovery_folder_items: a list holds a creator once.
-create temporary table _items_new on commit drop as
-select i.ctid as row_ctid,
-       i.folder_id,
-       coalesce(
-         -- No platform on a list item: the key it already has wins, then any match.
-         (select coalesce(max(m.final_username) filter (where m.final_username = m.member_username), min(m.final_username))
-            from _ci_map m where m.member_username = lower(regexp_replace(btrim(i.creator_username), '^@', ''))),
-         lower(regexp_replace(btrim(i.creator_username), '^@', ''))
-       ) as new_username,
-       i.added_at
-from public.discovery_folder_items i;
+  -- The kept rows take their final spelling (found by their old spelling: the
+  -- update above moved some of them). Rows renamed with a platform prefix go
+  -- first, so no key is ever held by two rows at once.
+  update public.creators_index c
+     set platform = g.norm_platform, username = g.final_username
+    from _ci_groups g
+    join _ci_rows r on r.row_ctid = g.keeper_ctid
+   where c.username = r.old_username
+     and c.platform is not distinct from r.old_platform
+     and g.final_username <> r.norm_username;
 
-delete from public.discovery_folder_items i
- using (
-   select n.row_ctid,
-          row_number() over (partition by n.folder_id, n.new_username order by n.added_at asc nulls last, n.row_ctid) as rank
-     from _items_new n
- ) d
- where i.ctid = d.row_ctid and d.rank > 1;
+  update public.creators_index c
+     set platform = g.norm_platform, username = g.final_username
+    from _ci_groups g
+    join _ci_rows r on r.row_ctid = g.keeper_ctid
+   where c.username = r.old_username
+     and c.platform is not distinct from r.old_platform
+     and (c.platform is distinct from g.norm_platform or c.username is distinct from g.final_username);
 
-update public.discovery_folder_items i
-   set creator_username = n.new_username
-  from _items_new n
- where i.ctid = n.row_ctid and i.creator_username is distinct from n.new_username;
+  -- A single key column must stay unique on its own (the app upserts on it).
+  begin
+    if not exists (
+      select 1
+        from pg_index i
+        join pg_attribute a on a.attrelid = i.indrelid and a.attnum = i.indkey[0]
+       where i.indrelid = 'public.creators_index'::regclass
+         and i.indisunique
+         and i.indnatts = 1
+         and a.attname = 'username'
+         and i.indpred is null
+    ) then
+      create unique index creators_index_username_uidx on public.creators_index (username);
+    end if;
+  end;
 
--- creators (a brand's own creators): the platform only; handles stay as typed.
-update public.creators set platform = lower(btrim(platform)) where platform is not null and platform <> lower(btrim(platform));
+  -- ── 3. History and queue follow the kept row ──────────────────────────────────
+  -- creator_snapshots: one row per creator per day.
+  delete from public.creator_snapshots s
+   using (
+     select x.ctid as row_ctid,
+            row_number() over (
+              partition by lower(x.platform), coalesce(m.final_username, lower(x.username)), x.captured_on
+              order by x.captured_at desc nulls last,
+                       (x.platform = lower(x.platform) and x.username = coalesce(m.final_username, lower(x.username))) desc,
+                       x.followers desc nulls last
+            ) as rank
+       from public.creator_snapshots x
+       left join _ci_map m on m.norm_platform = lower(x.platform) and m.member_username = lower(x.username)
+   ) d
+   where s.ctid = d.row_ctid and d.rank > 1;
+
+  update public.creator_snapshots x
+     set platform = lower(x.platform),
+         username = coalesce((select m.final_username from _ci_map m
+                               where m.norm_platform = lower(x.platform) and m.member_username = lower(x.username)), lower(x.username))
+   where x.platform <> lower(x.platform)
+      or x.username <> coalesce((select m.final_username from _ci_map m
+                                  where m.norm_platform = lower(x.platform) and m.member_username = lower(x.username)), lower(x.username));
+
+  -- creator_videos: one row per video.
+  delete from public.creator_videos v
+   using (
+     select x.ctid as row_ctid,
+            row_number() over (partition by lower(x.platform), x.video_id
+                               order by (x.platform = lower(x.platform)) desc, x.last_scraped_at desc) as rank
+       from public.creator_videos x
+   ) d
+   where v.ctid = d.row_ctid and d.rank > 1;
+
+  update public.creator_videos x
+     set platform = lower(x.platform),
+         username = coalesce((select m.final_username from _ci_map m
+                               where m.norm_platform = lower(x.platform) and m.member_username = lower(x.username)), lower(x.username))
+   where x.platform <> lower(x.platform)
+      or x.username <> coalesce((select m.final_username from _ci_map m
+                                  where m.norm_platform = lower(x.platform) and m.member_username = lower(x.username)), lower(x.username));
+
+  -- creator_video_snapshots: one row per video per day.
+  delete from public.creator_video_snapshots v
+   using (
+     select x.ctid as row_ctid,
+            row_number() over (partition by lower(x.platform), x.video_id, x.captured_on
+                               order by (x.platform = lower(x.platform)) desc, x.views desc nulls last) as rank
+       from public.creator_video_snapshots x
+   ) d
+   where v.ctid = d.row_ctid and d.rank > 1;
+
+  update public.creator_video_snapshots set platform = lower(platform) where platform <> lower(platform);
+
+  -- scrape_jobs: a duplicate live job is closed, not deleted.
+  update public.scrape_jobs j
+     set status = 'failed', finished_at = now(), last_error = 'merged into a duplicate job (platform spelling)'
+    from (
+      select x.id,
+             row_number() over (
+               partition by x.kind, lower(x.platform),
+                            case when x.kind = 'creator_refresh'
+                                 then coalesce((select m.final_username from _ci_map m
+                                                 where m.norm_platform = lower(x.platform) and m.member_username = lower(x.target)), lower(x.target))
+                                 else lower(x.target) end
+               order by x.id
+             ) as rank
+        from public.scrape_jobs x
+       where x.status in ('queued', 'running')
+    ) d
+   where j.id = d.id and d.rank > 1;
+
+  update public.scrape_jobs x
+     set platform = lower(x.platform),
+         target = case when x.kind = 'creator_refresh'
+                       then coalesce((select m.final_username from _ci_map m
+                                       where m.norm_platform = lower(x.platform) and m.member_username = lower(x.target)), lower(x.target))
+                       else lower(x.target) end
+   where x.platform <> lower(x.platform) or x.target <> lower(x.target)
+      or (x.kind = 'creator_refresh' and exists (
+            select 1 from _ci_map m
+             where m.norm_platform = lower(x.platform) and m.member_username = lower(x.target) and m.final_username <> x.target));
+
+  -- ── 4. Brand-side references ──────────────────────────────────────────────────
+  -- discovery_saved: the saved creator follows the kept key; a workspace that
+  -- saved both spellings keeps the most recently updated one.
+  create temporary table _saved_new as
+  select s.ctid as row_ctid,
+         s.workspace_id,
+         lower(coalesce(nullif(btrim(s.platform), ''), 'tiktok')) as new_platform,
+         coalesce(
+           (select m.final_username from _ci_map m
+             where m.norm_platform = lower(coalesce(nullif(btrim(s.platform), ''), 'tiktok'))
+               and m.member_username = lower(regexp_replace(btrim(s.creator_username), '^@', ''))),
+           lower(regexp_replace(btrim(s.creator_username), '^@', ''))
+         ) as new_username,
+         s.updated_at
+  from public.discovery_saved s;
+
+  delete from public.discovery_saved s
+   using (
+     select n.row_ctid,
+            row_number() over (partition by n.workspace_id, n.new_username order by n.updated_at desc nulls last, n.row_ctid) as rank
+       from _saved_new n
+      where n.workspace_id is not null
+   ) d
+   where s.ctid = d.row_ctid and d.rank > 1;
+
+  update public.discovery_saved s
+     set platform = n.new_platform,
+         creator_username = n.new_username
+    from _saved_new n
+   where s.ctid = n.row_ctid
+     and (s.platform is distinct from n.new_platform or s.creator_username is distinct from n.new_username);
+
+  update public.discovery_saved
+     set snapshot = jsonb_set(snapshot, '{platform}', to_jsonb(lower(snapshot->>'platform')))
+   where snapshot is not null
+     and jsonb_typeof(snapshot) = 'object'
+     and jsonb_typeof(snapshot->'platform') = 'string'
+     and snapshot->>'platform' <> lower(snapshot->>'platform');
+
+  -- discovery_folder_items: a list holds a creator once.
+  create temporary table _items_new as
+  select i.ctid as row_ctid,
+         i.folder_id,
+         coalesce(
+           -- No platform on a list item: the key it already has wins, then any match.
+           (select coalesce(max(m.final_username) filter (where m.final_username = m.member_username), min(m.final_username))
+              from _ci_map m where m.member_username = lower(regexp_replace(btrim(i.creator_username), '^@', ''))),
+           lower(regexp_replace(btrim(i.creator_username), '^@', ''))
+         ) as new_username,
+         i.added_at
+  from public.discovery_folder_items i;
+
+  delete from public.discovery_folder_items i
+   using (
+     select n.row_ctid,
+            row_number() over (partition by n.folder_id, n.new_username order by n.added_at asc nulls last, n.row_ctid) as rank
+       from _items_new n
+   ) d
+   where i.ctid = d.row_ctid and d.rank > 1;
+
+  update public.discovery_folder_items i
+     set creator_username = n.new_username
+    from _items_new n
+   where i.ctid = n.row_ctid and i.creator_username is distinct from n.new_username;
+
+  -- creators (a brand's own creators): the platform only; handles stay as typed.
+  update public.creators set platform = lower(btrim(platform)) where platform is not null and platform <> lower(btrim(platform));
+
+  -- Scratch tables are no longer needed.
+  foreach _t in array array['_ci_rows', '_ci_ranked', '_ci_groups', '_ci_map', '_saved_new', '_items_new'] loop
+    execute 'dr' || 'op table if exists pg_temp.' || quote_ident(_t);
+  end loop;
+end
+$merge$;
 
 -- ── 5. Make it stick ──────────────────────────────────────────────────────────
 -- Old code (or an old deployment) may still send 'TikTok': lowercase it on the
@@ -642,4 +659,3 @@ revoke all on function public.refresh_creator_rollup(text, text) from public, an
 revoke all on function public.creators_index_normalize() from public, anon, authenticated;
 revoke all on function public.normalize_platform_column() from public, anon, authenticated;
 
-commit;

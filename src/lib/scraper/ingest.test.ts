@@ -190,9 +190,14 @@ describe("discovery", () => {
     db.put("creators_index", { username: "mia.style", platform: "instagram" }); // stored before the ig_ prefix
     db.put("creators_index", { username: "new.ig", platform: "tiktok" }); // a TikTok creator: not the same person
     const r = await discoverKeyword(db.asClient(), sourceFor("instagram")!, "Gym Workout", { minFollowers: 5_000 });
-    expect(r).toMatchObject({ found: 2, added: 1, apiCalls: 1, addedKeys: ["ig_new.ig"] });
+    expect(r).toMatchObject({ found: 2, added: 1, apiCalls: 1, addedKeys: ["ig_new.ig"], leads: 1 });
     expect(db.table("creators_index").find((c) => c.username === "ig_new.ig")).toMatchObject({ platform: "instagram", followers: 80_000, niches: ["fitness"] });
-    expect(db.table("scrape_jobs").map((j) => [j.kind, j.platform, j.target, j.status])).toEqual([["creator_refresh", "instagram", "ig_new.ig", "queued"]]);
+    // The hit without a follower count is not added: it is queued as a lead (no row yet).
+    expect(db.table("scrape_jobs").map((j) => [j.kind, j.platform, j.target, j.status])).toEqual([
+      ["creator_refresh", "instagram", "ig_no.count", "queued"],
+      ["creator_refresh", "instagram", "ig_new.ig", "queued"],
+    ]);
+    expect(db.table("creators_index").some((c) => c.username === "ig_no.count")).toBe(false);
   });
 
   it("respects the number of new creators left this week", async () => {

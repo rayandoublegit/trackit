@@ -305,7 +305,7 @@ export function WorkspaceInfoView({
               height: 72,
               borderRadius: 16,
               border: `1px solid ${cardBorder}`,
-              background: dark ? "#2A2B30" : "#F5F5F5",
+              background: dark ? "#2A2B30" : "var(--ws-hover)",
               padding: 0,
               overflow: "hidden",
               cursor: "pointer",
@@ -453,7 +453,7 @@ export function WorkspaceInfoView({
             disabled={saving || !workspace}
             style={{
               border: "none",
-              background: dark ? "#f5f5f6" : "#111",
+              background: dark ? "#f5f5f6" : "var(--ws-btn)",
               color: dark ? "#111" : "#fff",
               borderRadius: 12,
               padding: "11px 16px",

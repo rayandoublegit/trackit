@@ -17,6 +17,15 @@
     },
     "src/app/api/cron/scrape/weekly-discovery/route.ts": {
       "maxDuration": 60
+    },
+    "src/app/api/cron/scrape/instagram-seed/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/cron/outreach-send/route.ts": {
+      "maxDuration": 300
+    },
+    "src/app/api/cron/outreach-replies/route.ts": {
+      "maxDuration": 300
     }
   },
   "crons": [
@@ -33,12 +42,24 @@
       "schedule": "5 0 * * 1"
     },
     {
+      "path": "/api/cron/scrape/instagram-seed?searches=700",
+      "schedule": "10 0 * * 1"
+    },
+    {
       "path": "/api/cron/scrape/weekly-refresh",
       "schedule": "15 0 * * 1"
     },
     {
-      "path": "/api/cron/scrape?budget=150",
+      "path": "/api/cron/scrape?budget=240",
       "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/cron/outreach-send",
+      "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/cron/outreach-replies",
+      "schedule": "*/20 * * * *"
     }
   ]
 }

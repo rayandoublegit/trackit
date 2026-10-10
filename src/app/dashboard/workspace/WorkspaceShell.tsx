@@ -51,8 +51,11 @@ import {
   buildDashboardSearchCatalog,
   highlightSearchMatch,
   searchDashboardCatalog,
+  withCreatorLookup,
   type DashboardSearchHit,
 } from "@/lib/dashboard-search";
+import { lookupCreatorLive } from "@/lib/creator-live-lookup";
+import { refreshCreatorProfile } from "@/lib/creator-profile-cache";
 import { useDashboardTheme } from "../DashboardThemeProvider";
 import { useDashboardNavigationOptional } from "../DashboardNavigationProvider";
 import { PersonGlyph, WorkspaceGlyph } from "@/components/FallbackGlyphs";
@@ -127,6 +130,9 @@ export function WorkspaceShell({
   const [search, setSearch] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchIndex, setSearchIndex] = useState(0);
+  /** "Find @x" from the top search: the lookup running, or its failure message. */
+  const [creatorLookup, setCreatorLookup] = useState<{ id: string; status: "loading" | "error"; message?: string } | null>(null);
+  const creatorLookupAbort = useRef<AbortController | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const [stripeConnectActive, setStripeConnectActive] = useState(false);
   const [campaigns, setCampaigns] = useState<Array<{ id: string; name: string; status: string }>>([]);
@@ -739,14 +745,49 @@ export function WorkspaceShell({
       boards: wbBoards,
       chats: minoChats.map((c) => ({ id: c.id, title: c.title })),
     });
-    return searchDashboardCatalog(catalog, search);
+    const pages = searchDashboardCatalog(catalog, search);
+    // Brands can look a creator up by @handle or profile link.
+    return isCreator ? pages : withCreatorLookup(pages, search, lang);
   }, [campaigns, isCreator, lang, minoChats, search, wbBoards]);
 
   useEffect(() => {
     setSearchIndex(0);
+    creatorLookupAbort.current?.abort();
+    setCreatorLookup(null);
   }, [search]);
 
+  const runCreatorLookup = async (item: DashboardSearchHit) => {
+    const target = item.creatorLookup;
+    if (!target || creatorLookup?.status === "loading") return;
+    creatorLookupAbort.current?.abort();
+    const ctrl = new AbortController();
+    creatorLookupAbort.current = ctrl;
+    setCreatorLookup({ id: item.id, status: "loading" });
+    try {
+      const res = await lookupCreatorLive(target.query, { platform: target.platform ?? "auto", lang, signal: ctrl.signal });
+      if (ctrl.signal.aborted) return;
+      if (!res.ok) {
+        setCreatorLookup({ id: item.id, status: "error", message: res.message });
+        return;
+      }
+      // The creator page opens on what was just stored.
+      refreshCreatorProfile(res.storageKey);
+      setCreatorLookup(null);
+      setSearch("");
+      setSearchOpen(false);
+      if (isMobile) setSidebarOpen(false);
+      if (dashNav) dashNav.navigate({ view: "discovery", creator: res.storageKey });
+      else onNavigate("discovery");
+    } catch {
+      // Aborted: the query changed.
+    }
+  };
+
   const goToSearchHit = (item: DashboardSearchHit) => {
+    if (item.creatorLookup) {
+      void runCreatorLookup(item);
+      return;
+    }
     if (item.campaignId) {
       rememberLastCampaignId(userId, item.campaignId);
       dashNav?.navigate({
@@ -956,7 +997,9 @@ export function WorkspaceShell({
                       className={`ws-search-panel__item${i === searchIndex ? " is-active" : ""}`}
                       onMouseEnter={() => setSearchIndex(i)}
                       onClick={() => goToSearchHit(item)}
+                      aria-busy={creatorLookup?.id === item.id && creatorLookup.status === "loading" ? true : undefined}
                     >
+                      {item.creatorLookup ? <span className={`ws-search-panel__find${creatorLookup?.id === item.id && creatorLookup.status === "loading" ? " is-loading" : ""}`} aria-hidden>@</span> : null}
                       <span>
                         {parts.match ? (
                           <>
@@ -968,10 +1011,21 @@ export function WorkspaceShell({
                           item.label
                         )}
                       </span>
-                      <span className="ws-search-panel__meta">{item.group}</span>
+                      <span className="ws-search-panel__meta">
+                        {item.creatorLookup && creatorLookup?.id === item.id && creatorLookup.status === "loading"
+                          ? lang === "fr"
+                            ? "Recherche…"
+                            : "Looking up…"
+                          : item.group}
+                      </span>
                     </button>
                   );
                 })}
+                {creatorLookup?.status === "error" && creatorLookup.message ? (
+                  <div className="ws-search-panel__note" role="alert">
+                    {creatorLookup.message}
+                  </div>
+                ) : null}
                 {searchResults.length === 0 && (
                   <div style={{ padding: 14, color: "var(--ws-text-muted)", fontSize: 13 }}>
                     {lang === "fr" ? "Aucun résultat" : "No results"}

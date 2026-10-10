@@ -10,8 +10,11 @@ import { appendStoredOutreachEntry } from "@/lib/outreach-history-storage";
 import { avatarUrlForCreatorHandle, buildCreatorAvatarMap, normalizeCreatorHandle } from "@/lib/creator-avatar";
 import { buildCreatorEmailMap } from "@/lib/creator-crm";
 import {
+  buildEmailComposeUrl,
   buildOutreachMailtoUrl,
+  fetchDirectSendAvailable,
   isValidEmailAddress,
+  openComposeLink,
   resolveCreatorEmail,
   resolveSelectedCreatorEmails,
   sendOutreachEmail,
@@ -36,6 +39,8 @@ import { SettingsView } from "./SettingsView";
 import { CreatorSettings } from "./CreatorSettings";
 import { CreatorAffiliateReadPanel } from "./CreatorAffiliateReadPanel";
 import { NewCreatorModal } from "./NewCreatorModal";
+import { ContactCreatorHost } from "./ContactCreatorSheet";
+import { requestContactCreator } from "@/lib/contact-creator-events";
 import { InvitationsView } from "./InvitationsView";
 import { BrandContentView } from "./BrandContentView";
 import { RpmView } from "./RpmView";
@@ -888,23 +893,12 @@ function DashboardPageContent() {
     goToSidebarItem("discovery");
   };
 
-  const navigateToOutreachSend = (creator?: FeedCreator | { username: string; platform: string; email?: string | null }) => {
-    const handle = creator ? creatorHandleForOutreach(creator.username) : undefined;
-    const creatorEmail = creator?.email?.trim() || undefined;
-    setOutreachSendRequest({
-      key: Date.now(),
-      creatorHandle: handle || undefined,
-      creatorEmail,
-      dmPlatform: creatorEmail ? "Email" : creator ? dmPlatformFromCreatorPlatform(creator.platform) : undefined,
-    });
-    navigate({ view: "outreach" });
-    if (isMobile) setMobileSidebarOpen(false);
-  };
+  // "Contact" buttons open the email composer (ContactCreatorHost) via requestContactCreator.
 
   if (loading) {
     // Fond résolu en CSS via data-dashboard-theme (posé avant hydratation) :
     // le HTML serveur et client restent identiques — pas de mismatch.
-    return <div style={{ minHeight: "100vh", background: "var(--ws-bg, #FAFAFA)" }} />;
+    return <div style={{ minHeight: "100vh", background: "var(--ws-bg, var(--ws-surface-2))" }} />;
   }
 
   if (workspaceAccessError) {
@@ -912,7 +906,7 @@ function DashboardPageContent() {
       <div
         style={{
           minHeight: "100vh",
-          background: "#FAFAFA",
+          background: "var(--ws-surface-2)",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -920,11 +914,11 @@ function DashboardPageContent() {
           fontFamily: "'InterDisplay', 'Inter Display', sans-serif",
         }}
       >
-        <div style={{ maxWidth: 440, textAlign: "center", background: "#FFF", border: "1px solid #EFEFEF", borderRadius: 18, padding: "32px 34px" }}>
-          <h1 style={{ margin: "0 0 10px", fontSize: 22, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em" }}>
+        <div style={{ maxWidth: 440, textAlign: "center", background: "var(--ws-surface)", border: "1px solid var(--ws-border)", borderRadius: 18, padding: "32px 34px" }}>
+          <h1 style={{ margin: "0 0 10px", fontSize: 22, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.03em" }}>
             {lang === "fr" ? "Espace principal indisponible" : "Principal workspace unavailable"}
           </h1>
-          <p style={{ margin: 0, fontSize: 14, color: "#6B7280", lineHeight: 1.55 }}>
+          <p style={{ margin: 0, fontSize: 14, color: "var(--ws-text-muted)", lineHeight: 1.55 }}>
             {workspaceAccessError}
           </p>
         </div>
@@ -1061,7 +1055,7 @@ function DashboardPageContent() {
             plan={plan}
             workspaceUserId={user?.id}
             onUpgrade={openWebsitePricing}
-            onReachOut={(creator) => navigateToOutreachSend(creator)}
+            onReachOut={requestContactCreator}
           />
           </KeepAlivePane>
         )}
@@ -1080,7 +1074,7 @@ function DashboardPageContent() {
               else if (plan === "basic") void handleUpgradePro();
               else void handleUpgradeScale();
             }}
-            onReachOut={(creator) => navigateToOutreachSend(creator)}
+            onReachOut={requestContactCreator}
           />
           </KeepAlivePane>
         )}
@@ -1089,7 +1083,7 @@ function DashboardPageContent() {
           <CreatorsView
             isMobile={isMobile}
             plan={plan}
-            onReachOut={(creator) => navigateToOutreachSend(creator)}
+            onReachOut={requestContactCreator}
             onUpgrade={handleUpgradeBasic}
             onUpgradePro={handleUpgradePro}
             onUpgradeScale={handleUpgradeScale}
@@ -1337,7 +1331,7 @@ function DashboardPageContent() {
             userId={user?.id}
             isCreator={isCreator}
             displayName={actorProfile?.full_name || profile?.full_name || profile?.username}
-            onReachOut={(creator) => navigateToOutreachSend(creator)}
+            onReachOut={requestContactCreator}
             isPaid={!isFree}
             onUpgrade={openWebsitePricing}
           />
@@ -1414,6 +1408,9 @@ function DashboardPageContent() {
           </>
         )}
       {user && !isCreator && <NewCreatorModal brandId={user.id} />}
+      {user && !isCreator && (
+        <ContactCreatorHost userId={user.id} userEmail={user.email ?? ""} brandName={profile?.business_name ?? ""} plan={plan} />
+      )}
     </WorkspaceShell>
     </DashboardThemeProvider>
     </DashboardNavigationProvider>
@@ -1421,7 +1418,7 @@ function DashboardPageContent() {
 }
 
 function DashboardBootFallback() {
-  return <div style={{ minHeight: "100vh", background: "var(--ws-bg, #FAFAFA)" }} />;
+  return <div style={{ minHeight: "100vh", background: "var(--ws-bg, var(--ws-surface-2))" }} />;
 }
 
 export default function DashboardPage() {
@@ -1436,11 +1433,11 @@ function PageHeader({ title, subtitle, right, isMobile, dense }: { title: string
   const { theme } = useDashboardTheme();
   const dark = theme === "dark";
   return (
-    <div style={{ paddingTop: isMobile ? 16 : 40, paddingRight: isMobile ? 16 : 40, paddingBottom: dense ? (isMobile ? 8 : 12) : (isMobile ? 16 : 24), paddingLeft: isMobile ? 16 : 40, background: dark ? "transparent" : "#FFFFFF" }}>
+    <div style={{ paddingTop: isMobile ? 16 : 40, paddingRight: isMobile ? 16 : 40, paddingBottom: dense ? (isMobile ? 8 : 12) : (isMobile ? 16 : 24), paddingLeft: isMobile ? 16 : 40, background: dark ? "transparent" : "var(--ws-surface)" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 24 }}>
         <div>
-          <h1 style={{ fontSize: isMobile ? 30 : 32, fontWeight: 600, color: dark ? "#F3F3F4" : "#1A1A1A", letterSpacing: "-0.04em", margin: 0, marginBottom: subtitle ? 6 : 0 }}>{title}</h1>
-          {subtitle && <p style={{ fontSize: 14, color: dark ? "#9A9AA0" : "#7A7A7A", letterSpacing: "-0.02em", margin: 0 }}>{subtitle}</p>}
+          <h1 style={{ fontSize: isMobile ? 30 : 32, fontWeight: 600, color: dark ? "#F3F3F4" : "var(--ws-text)", letterSpacing: "-0.04em", margin: 0, marginBottom: subtitle ? 6 : 0 }}>{title}</h1>
+          {subtitle && <p style={{ fontSize: 14, color: dark ? "var(--ws-text-dim)" : "var(--ws-text-muted)", letterSpacing: "-0.02em", margin: 0 }}>{subtitle}</p>}
         </div>
         {right && <div style={{ marginTop: 8, flexShrink: 0 }}>{right}</div>}
       </div>
@@ -1500,17 +1497,17 @@ function ShopifyConnectModal({ onClose, userId, lang }: { onClose: () => void; u
       onClick={onClose}
     >
       <div
-        style={{ background: "#FFFFFF", borderRadius: 16, padding: 32, maxWidth: 460, width: "100%", boxShadow: "0 24px 48px rgba(0,0,0,0.12)", maxHeight: "90vh", overflowY: "auto" }}
+        style={{ background: "var(--ws-surface)", borderRadius: 16, padding: 32, maxWidth: 460, width: "100%", boxShadow: "0 24px 48px rgba(0,0,0,0.12)", maxHeight: "90vh", overflowY: "auto" }}
         onClick={(e) => e.stopPropagation()}
       >
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 20 }}>
           <img src="/shopify-logo.svg" alt="Shopify" width={44} height={50} style={{ display: "block" }} />
-          <button type="button" onClick={onClose} aria-label={lang === "fr" ? "Fermer" : "Close"} style={{ background: "#FAFAFA", border: "1px solid #EFEFEF", borderRadius: 8, width: 32, height: 32, cursor: "pointer", fontFamily: "inherit", fontSize: 18, color: "#7A7A7A", lineHeight: 1 }}>×</button>
+          <button type="button" onClick={onClose} aria-label={lang === "fr" ? "Fermer" : "Close"} style={{ background: "var(--ws-surface-2)", border: "1px solid var(--ws-border)", borderRadius: 8, width: 32, height: 32, cursor: "pointer", fontFamily: "inherit", fontSize: 18, color: "var(--ws-text-muted)", lineHeight: 1 }}>×</button>
           </div>
-        <h3 style={{ fontSize: 20, fontWeight: 600, color: "#1A1A1A", margin: "0 0 8px", letterSpacing: "-0.03em" }}>
+        <h3 style={{ fontSize: 20, fontWeight: 600, color: "var(--ws-text)", margin: "0 0 8px", letterSpacing: "-0.03em" }}>
           {lang === "fr" ? "Connecter Shopify" : "Connect Shopify"}
         </h3>
-        <p style={{ fontSize: 14, color: "#7A7A7A", margin: "0 0 20px", lineHeight: 1.5, letterSpacing: "-0.01em" }}>
+        <p style={{ fontSize: 14, color: "var(--ws-text-muted)", margin: "0 0 20px", lineHeight: 1.5, letterSpacing: "-0.01em" }}>
           {lang === "fr"
             ? "Créez une app personnalisée dans l’admin Shopify (Paramètres - Applications et canaux de vente - Développer des applications), activez l’API Admin avec read_orders, puis collez le domaine et le token ci-dessous."
             : "Create a custom app in Shopify Admin (Settings - Apps and sales channels - Develop apps), enable the Admin API with read_orders, then paste the domain + token below."}
@@ -1523,7 +1520,7 @@ function ShopifyConnectModal({ onClose, userId, lang }: { onClose: () => void; u
           </div>
         ) : (
           <>
-            <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6, letterSpacing: "-0.01em" }}>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "var(--ws-text-dim)", marginBottom: 6, letterSpacing: "-0.01em" }}>
               {lang === "fr" ? "Domaine de la boutique" : "Store domain"}
             </label>
             <input
@@ -1531,10 +1528,10 @@ function ShopifyConnectModal({ onClose, userId, lang }: { onClose: () => void; u
               value={shopDomain}
               onChange={(e) => { setShopDomain(e.target.value); setShopError(""); }}
               placeholder="votreboutique.myshopify.com"
-              style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", borderRadius: 10, border: "1px solid #E5E5E5", fontSize: 14, fontFamily: "inherit", color: "#1A1A1A", marginBottom: 14 }}
+              style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", borderRadius: 10, border: "1px solid var(--ws-border)", fontSize: 14, fontFamily: "inherit", color: "var(--ws-text)", marginBottom: 14 }}
               autoFocus
             />
-            <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6, letterSpacing: "-0.01em" }}>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "var(--ws-text-dim)", marginBottom: 6, letterSpacing: "-0.01em" }}>
               {lang === "fr" ? "Token d'API Admin" : "Admin API token"}
             </label>
             <input
@@ -1543,7 +1540,7 @@ function ShopifyConnectModal({ onClose, userId, lang }: { onClose: () => void; u
               onChange={(e) => { setToken(e.target.value); setShopError(""); }}
               placeholder="shpat_..."
               onKeyDown={(e) => e.key === "Enter" && handleConnect()}
-              style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", borderRadius: 10, border: "1px solid #E5E5E5", fontSize: 14, fontFamily: "inherit", color: "#1A1A1A", marginBottom: 16 }}
+              style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", borderRadius: 10, border: "1px solid var(--ws-border)", fontSize: 14, fontFamily: "inherit", color: "var(--ws-text)", marginBottom: 16 }}
             />
             {shopError && <p style={{ color: "#dc2626", fontSize: 12, margin: "0 0 12px" }}>{shopError}</p>}
             <button type="button" className="hero-cta-shopify-dark" onClick={handleConnect} disabled={loading} style={{ width: "100%", justifyContent: "center", opacity: loading ? 0.6 : 1 }}>
@@ -1577,19 +1574,6 @@ type OutreachSendRequest = {
   creatorEmail?: string;
   dmPlatform?: (typeof OUTREACH_DM_PLATFORMS)[number];
 };
-
-function dmPlatformFromCreatorPlatform(platform: string): (typeof OUTREACH_DM_PLATFORMS)[number] {
-  const p = platform.toLowerCase();
-  if (p.includes("tiktok")) return "TikTok";
-  if (p.includes("twitter") || p === "x") return "Twitter";
-  if (p.includes("email")) return "Email";
-  return "Instagram";
-}
-
-function creatorHandleForOutreach(username: string): string {
-  const clean = username.replace(/^@/, "").trim();
-  return clean ? `@${clean}` : "";
-}
 
 function defaultOutreachDraftMessage(lang: "en" | "fr"): string {
   return lang === "fr"
@@ -1779,7 +1763,7 @@ function OutreachMessageEditor({
               </div>
 
       {creatorName ? (
-        <p style={{ fontSize: layout === "page" ? 13 : 11, color: "#6B7280", margin: "0 0 10px", letterSpacing: "-0.01em" }}>
+        <p style={{ fontSize: layout === "page" ? 13 : 11, color: "var(--ws-text-muted)", margin: "0 0 10px", letterSpacing: "-0.01em" }}>
           {lang === "fr" ? `Personnalisé pour @${creatorName}` : `Personalized for @${creatorName}`}
         </p>
       ) : null}
@@ -1878,7 +1862,7 @@ function OutreachEmailEditor({
       />
 
       {creatorName ? (
-        <p style={{ fontSize: layout === "page" ? 13 : 11, color: "#6B7280", margin: "0 0 10px", letterSpacing: "-0.01em" }}>
+        <p style={{ fontSize: layout === "page" ? 13 : 11, color: "var(--ws-text-muted)", margin: "0 0 10px", letterSpacing: "-0.01em" }}>
           {lang === "fr" ? `Personnalisé pour @${creatorName}` : `Personalized for @${creatorName}`}
         </p>
       ) : null}
@@ -1902,10 +1886,10 @@ const panelInputStyle: React.CSSProperties = {
   boxSizing: "border-box",
   padding: "10px 12px",
   borderRadius: 10,
-  border: "1px solid #E5E5E5",
+  border: "1px solid var(--ws-border)",
   fontSize: 14,
   fontFamily: "inherit",
-  color: "#1A1A1A",
+  color: "var(--ws-text)",
   letterSpacing: "-0.02em",
 };
 
@@ -1916,20 +1900,20 @@ const panelMessageStyle: React.CSSProperties = {
   lineHeight: 1.55,
 };
 
-const btnPrimary: React.CSSProperties = { background: "#0047FF", color: "#FFFFFF", border: "none", borderRadius: 10, padding: "10px 18px", fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: "pointer", letterSpacing: "-0.02em" };
-const btnSecondary: React.CSSProperties = { background: "#FFFFFF", color: "#1A1A1A", border: "1px solid #E5E5E5", borderRadius: 10, padding: "10px 16px", fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: "pointer", letterSpacing: "-0.02em" };
+const btnPrimary: React.CSSProperties = { background: "var(--ws-accent)", color: "#FFFFFF", border: "none", borderRadius: 10, padding: "10px 18px", fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: "pointer", letterSpacing: "-0.02em" };
+const btnSecondary: React.CSSProperties = { background: "var(--ws-surface)", color: "var(--ws-text)", border: "1px solid var(--ws-border)", borderRadius: 10, padding: "10px 16px", fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: "pointer", letterSpacing: "-0.02em" };
 
 const outreachFieldInput: React.CSSProperties = {
   width: "100%",
   boxSizing: "border-box",
   padding: "14px 16px",
   borderRadius: 10,
-  border: "1px solid #D1D5DB",
+  border: "1px solid var(--ws-border-strong)",
   fontSize: 15,
   fontFamily: "inherit",
-  color: "#1A1A1A",
+  color: "var(--ws-text)",
   letterSpacing: "-0.02em",
-  background: "#FFF",
+  background: "var(--ws-surface)",
   outline: "none",
 };
 
@@ -1959,10 +1943,10 @@ type OutreachFormLayout = "panel" | "page";
 function outreachFormStyles(layout: OutreachFormLayout) {
   if (layout === "page") {
     return {
-      sectionTitle: { fontSize: 14, fontWeight: 600, color: "#1A1A1A", marginBottom: 10 } as React.CSSProperties,
-      sectionHint: { fontSize: 14, color: "#6B7280", margin: "0 0 12px", lineHeight: 1.5, letterSpacing: "-0.01em" } as React.CSSProperties,
-      fieldLabel: { fontSize: 14, fontWeight: 600, color: "#1A1A1A", marginBottom: 10 } as React.CSSProperties,
-      subtleLabel: { fontSize: 13, fontWeight: 500, color: "#6B7280", marginBottom: 8 } as React.CSSProperties,
+      sectionTitle: { fontSize: 14, fontWeight: 600, color: "var(--ws-text)", marginBottom: 10 } as React.CSSProperties,
+      sectionHint: { fontSize: 14, color: "var(--ws-text-muted)", margin: "0 0 12px", lineHeight: 1.5, letterSpacing: "-0.01em" } as React.CSSProperties,
+      fieldLabel: { fontSize: 14, fontWeight: 600, color: "var(--ws-text)", marginBottom: 10 } as React.CSSProperties,
+      subtleLabel: { fontSize: 13, fontWeight: 500, color: "var(--ws-text-muted)", marginBottom: 8 } as React.CSSProperties,
       input: outreachFieldInput,
       message: outreachMessageStyle,
       sectionGap: 32,
@@ -1976,10 +1960,10 @@ function outreachFormStyles(layout: OutreachFormLayout) {
     };
   }
   return {
-    sectionTitle: { fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6 } as React.CSSProperties,
-    sectionHint: { fontSize: 13, color: "#7A7A7A", margin: "0 0 8px", lineHeight: 1.45 } as React.CSSProperties,
-    fieldLabel: { fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6 } as React.CSSProperties,
-    subtleLabel: { fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6 } as React.CSSProperties,
+    sectionTitle: { fontSize: 12, fontWeight: 500, color: "var(--ws-text-dim)", marginBottom: 6 } as React.CSSProperties,
+    sectionHint: { fontSize: 13, color: "var(--ws-text-muted)", margin: "0 0 8px", lineHeight: 1.45 } as React.CSSProperties,
+    fieldLabel: { fontSize: 12, fontWeight: 500, color: "var(--ws-text-dim)", marginBottom: 6 } as React.CSSProperties,
+    subtleLabel: { fontSize: 12, fontWeight: 500, color: "var(--ws-text-dim)", marginBottom: 6 } as React.CSSProperties,
     input: panelInputStyle,
     message: panelMessageStyle,
     sectionGap: 20,
@@ -2015,7 +1999,7 @@ function OutreachPanelShell({
           right: 0,
           bottom: 0,
           width: "min(480px, 100vw)",
-          background: "#FFFFFF",
+          background: "var(--ws-surface)",
           boxShadow: "-8px 0 32px rgba(0,0,0,0.1)",
           zIndex: 1001,
           display: "flex",
@@ -2024,17 +2008,17 @@ function OutreachPanelShell({
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div style={{ padding: "24px 24px 20px", borderBottom: "1px solid #EFEFEF", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+        <div style={{ padding: "24px 24px 20px", borderBottom: "1px solid var(--ws-border)", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
           <div>
-            <h2 style={{ fontSize: 20, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", margin: 0, marginBottom: 6 }}>{title}</h2>
-            <p style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em", margin: 0, lineHeight: 1.45 }}>{subtitle}</p>
+            <h2 style={{ fontSize: 20, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.03em", margin: 0, marginBottom: 6 }}>{title}</h2>
+            <p style={{ fontSize: 13, color: "var(--ws-text-muted)", letterSpacing: "-0.01em", margin: 0, lineHeight: 1.45 }}>{subtitle}</p>
           </div>
           <button type="button" onClick={onClose} style={{ ...iconBtn, flexShrink: 0 }} aria-label={lang === "fr" ? "Fermer" : "Close"}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="#7A7A7A" strokeWidth="1.8" strokeLinecap="round"/></svg>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="var(--ws-text-muted)" strokeWidth="1.8" strokeLinecap="round"/></svg>
           </button>
           </div>
         <div style={{ flex: 1, overflowY: "auto", padding: 24 }}>{children}</div>
-        {footer && <div style={{ padding: "16px 24px 24px", borderTop: "1px solid #EFEFEF" }}>{footer}</div>}
+        {footer && <div style={{ padding: "16px 24px 24px", borderTop: "1px solid var(--ws-border)" }}>{footer}</div>}
       </aside>
     </>
   );
@@ -2375,20 +2359,20 @@ function ImportTemplatePanel({ onClose, onImport }: { onClose: () => void; onImp
       }
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-        <label style={{ fontSize: 12, fontWeight: 500, color: "#9A9A9A" }}>{lang === "fr" ? "Message" : "Outreach"}</label>
+        <label style={{ fontSize: 12, fontWeight: 500, color: "var(--ws-text-dim)" }}>{lang === "fr" ? "Message" : "Outreach"}</label>
         <button type="button" onClick={() => void handlePaste()} style={{ ...btnSecondary, padding: "6px 14px", fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><rect x="9" y="9" width="11" height="11" rx="2" stroke="currentColor" strokeWidth="1.7"/><path d="M5 15V5a2 2 0 012-2h10" stroke="currentColor" strokeWidth="1.7"/></svg>
           {lang === "fr" ? "Coller" : "Paste"}
         </button>
       </div>
-      {pasteHint && <div style={{ fontSize: 11, color: pasteHint.includes("Pasted") || pasteHint.startsWith("Collé") ? "#1FB567" : "#7A7A7A", marginBottom: 8 }}>{pasteHint}</div>}
+      {pasteHint && <div style={{ fontSize: 11, color: pasteHint.includes("Pasted") || pasteHint.startsWith("Collé") ? "#1FB567" : "var(--ws-text-muted)", marginBottom: 8 }}>{pasteHint}</div>}
       <textarea
         value={raw}
         onChange={(e) => setRaw(e.target.value)}
         placeholder={lang === "fr" ? "Cliquez sur Coller pour ajouter votre modèle depuis le presse-papiers…" : "Click Paste to add your template from the clipboard…"}
         rows={16}
         readOnly={!raw}
-        style={{ ...panelInputStyle, resize: "vertical", minHeight: 280, lineHeight: 1.5, background: raw ? "#FFFFFF" : "#FAFAFA" }}
+        style={{ ...panelInputStyle, resize: "vertical", minHeight: 280, lineHeight: 1.5, background: raw ? "var(--ws-surface)" : "var(--ws-surface-2)" }}
       />
     </OutreachPanelShell>
   );
@@ -2451,7 +2435,7 @@ function BulkImportTemplatesPanel({
       onClose={onClose}
     >
       <div
-        style={{ border: "2px dashed #E5E5E5", borderRadius: 12, padding: 32, textAlign: "center", background: "#FAFAFA", marginBottom: 12 }}
+        style={{ border: "2px dashed var(--ws-border)", borderRadius: 12, padding: 32, textAlign: "center", background: "var(--ws-surface-2)", marginBottom: 12 }}
         onDragOver={(e) => e.preventDefault()}
         onDrop={(e) => {
           e.preventDefault();
@@ -2459,14 +2443,14 @@ function BulkImportTemplatesPanel({
           if (f) void handleFile(f);
         }}
       >
-        <p style={{ fontSize: 14, color: "#1A1A1A", margin: "0 0 8px" }}>{lang === "fr" ? "Glissez votre CSV ici" : "Drag and drop your CSV"}</p>
-        <label style={{ fontSize: 13, color: "#0047FF", cursor: "pointer" }}>
+        <p style={{ fontSize: 14, color: "var(--ws-text)", margin: "0 0 8px" }}>{lang === "fr" ? "Glissez votre CSV ici" : "Drag and drop your CSV"}</p>
+        <label style={{ fontSize: 13, color: "var(--ws-accent)", cursor: "pointer" }}>
           {lang === "fr" ? "ou parcourir" : "or browse"}
           <input type="file" accept=".csv" style={{ display: "none" }} onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleFile(f); }} />
         </label>
-        {fileName && <p style={{ fontSize: 12, color: "#7A7A7A", marginTop: 12 }}>{fileName}</p>}
+        {fileName && <p style={{ fontSize: 12, color: "var(--ws-text-muted)", marginTop: 12 }}>{fileName}</p>}
         </div>
-      <p style={{ fontSize: 12, color: "#9A9A9A", margin: 0 }}>{lang === "fr" ? "Colonnes : name, subject, opening, body, cta" : "Columns: name, subject, opening, body, cta"}</p>
+      <p style={{ fontSize: 12, color: "var(--ws-text-dim)", margin: 0 }}>{lang === "fr" ? "Colonnes : name, subject, opening, body, cta" : "Columns: name, subject, opening, body, cta"}</p>
       {error && <p style={{ fontSize: 12, color: "#DC2626", marginTop: 8 }}>{error}</p>}
     </OutreachPanelShell>
   );
@@ -2497,7 +2481,7 @@ function CreateTemplatePanel({ onClose, onSave }: { onClose: () => void; onSave:
             </div>
       }
     >
-      <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6 }}>{lang === "fr" ? "Nom du modèle" : "Template name"}</label>
+      <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "var(--ws-text-dim)", marginBottom: 6 }}>{lang === "fr" ? "Nom du modèle" : "Template name"}</label>
       <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder={lang === "fr" ? "Intro collaboration" : "Collab intro"} style={{ ...panelInputStyle, marginBottom: 16 }} />
       <OutreachMessageEditor key="create-template" lang={lang} value={fields} onChange={setFields} />
     </OutreachPanelShell>
@@ -2522,7 +2506,7 @@ function SeeTemplatesPanel({
   return (
     <OutreachPanelShell title={lang === "fr" ? "Modèles" : "Templates"} subtitle={lang === "fr" ? "Vos modèles d'outreach sauvegardés et importés." : "Your saved and imported outreach templates."} onClose={onClose}>
       {templates.length === 0 ? (
-        <p style={{ fontSize: 14, color: "#7A7A7A", margin: 0 }}>
+        <p style={{ fontSize: 14, color: "var(--ws-text-muted)", margin: 0 }}>
           {lang === "fr"
             ? "Aucun modèle pour le moment. Créez-en un ou importez-en un pour commencer."
             : "No templates yet. Create or import one to get started."}
@@ -2530,19 +2514,19 @@ function SeeTemplatesPanel({
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {templates.map((t) => (
-            <div key={t.id} style={{ border: "1px solid #EFEFEF", borderRadius: 12, padding: 14, background: "#FAFAFA" }}>
+            <div key={t.id} style={{ border: "1px solid var(--ws-border)", borderRadius: 12, padding: 14, background: "var(--ws-surface-2)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 8 }}>
             <div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em" }}>{templateDisplayName(t.name)}</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.02em" }}>{templateDisplayName(t.name)}</div>
                   {t.imported && (
-                    <span style={{ fontSize: 10, color: "#9A9A9A", marginTop: 2, display: "block" }}>
+                    <span style={{ fontSize: 10, color: "var(--ws-text-dim)", marginTop: 2, display: "block" }}>
                       {lang === "fr" ? "Importé" : "Imported"}
                     </span>
                   )}
             </div>
                 <button type="button" style={{ ...btnPrimary, padding: "6px 12px", fontSize: 12 }} onClick={() => onUse(t.id)}>{lang === "fr" ? "Utiliser" : "Use"}</button>
             </div>
-              <div style={{ fontSize: 12, color: "#7A7A7A", lineHeight: 1.45, maxHeight: 72, overflow: "hidden", whiteSpace: "pre-wrap" }}>
+              <div style={{ fontSize: 12, color: "var(--ws-text-muted)", lineHeight: 1.45, maxHeight: 72, overflow: "hidden", whiteSpace: "pre-wrap" }}>
                 {buildOutreachPreview(messageFromTemplate(t), t.cta, lang === "fr" ? "à vous" : "there", lang)}
           </div>
               </div>
@@ -2599,7 +2583,7 @@ function InfluencerPicker({
 
   if (influencers.length === 0 && selected.length === 0) {
     return (
-      <div style={{ padding: layout === "page" ? 20 : 16, borderRadius: 10, border: "1px dashed #E5E5E5", fontSize: layout === "page" ? 14 : 13, color: "#6B7280", textAlign: "center", lineHeight: 1.5 }}>
+      <div style={{ padding: layout === "page" ? 20 : 16, borderRadius: 10, border: "1px dashed var(--ws-border)", fontSize: layout === "page" ? 14 : 13, color: "var(--ws-text-muted)", textAlign: "center", lineHeight: 1.5 }}>
         {lang === "fr" ? "Aucun créateur sauvegardé. Ajoutez-en depuis Découverte ou Créateurs." : "No saved creators yet. Add creators from Discovery or Creators."}
         </div>
     );
@@ -2614,7 +2598,7 @@ function InfluencerPicker({
         {selectableInfluencers.length > 0 && (
           <button
             type="button"
-            style={{ fontSize: layout === "page" ? 13 : 11, color: "#0047FF", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}
+            style={{ fontSize: layout === "page" ? 13 : 11, color: "var(--ws-accent)", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}
             onClick={() =>
               onChange(
                 selected.length === selectableInfluencers.length
@@ -2685,7 +2669,7 @@ function InfluencerPicker({
               gap: 12,
               padding: "12px 14px",
               borderRadius: 10,
-              ...selectionCardStyle(on, { unselectedBackground: "#FFFFFF" }),
+              ...selectionCardStyle(on, { unselectedBackground: "var(--ws-surface)" }),
               cursor: missingEmail ? "not-allowed" : "pointer",
               opacity: missingEmail ? 0.55 : 1,
               fontFamily: "inherit",
@@ -2703,7 +2687,7 @@ function InfluencerPicker({
         </div>
       </div>
             {!missingEmail && (
-            <div style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${on ? "#FFFFFF" : "#D0D0D0"}`, background: on ? "#FFFFFF" : "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <div style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${on ? "#FFFFFF" : "var(--ws-border-strong)"}`, background: on ? "var(--ws-surface)" : "var(--ws-surface)", display: "flex", alignItems: "center", justifyContent: "center" }}>
               {on && <svg width="10" height="10" viewBox="0 0 24 24" fill="none"><path d="M5 12l5 5L19 7" stroke={TRACKIT_SELECTION_BLUE} strokeWidth="2.5" strokeLinecap="round"/></svg>}
             </div>
             )}
@@ -2747,7 +2731,7 @@ function TemplateSelect({
         ))}
       </select>
       {onCreateNew && (
-        <button type="button" style={{ fontSize: 12, color: "#0047FF", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: 0 }} onClick={onCreateNew}>
+        <button type="button" style={{ fontSize: 12, color: "var(--ws-accent)", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: 0 }} onClick={onCreateNew}>
           {lang === "fr" ? "+ Créer un modèle" : "+ Create new template"}
         </button>
       )}
@@ -2801,6 +2785,18 @@ function SendOutreachPanel({
   const [creatorEmailMap, setCreatorEmailMap] = useState<Record<string, string>>({});
   const [sendingEmail, setSendingEmail] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
+  const [directSend, setDirectSend] = useState(false);
+
+  useEffect(() => {
+    if (!senderEmail) return;
+    let alive = true;
+    void fetchDirectSendAvailable(senderEmail).then((ok) => {
+      if (alive) setDirectSend(ok);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [senderEmail]);
 
   useEffect(() => {
     if (!open) {
@@ -2960,6 +2956,43 @@ function SendOutreachPanel({
   const handleSend = () => {
     if (!canSend) return;
 
+    if (isEmail && !directSend) {
+      // Open the brand's own mailbox with the email ready. Synchronous, before
+      // any await, so the browser does not block the new tab.
+      const compose = buildEmailComposeUrl({
+        fromEmail: senderEmail.trim(),
+        recipients: resolvedRecipients.map((r) => r.email),
+        subject: emailSubjectPreview,
+        body: emailBodyPreview,
+        lang,
+      });
+      if (!compose) {
+        setSendError(lang === "fr" ? outreachSendErrorFr("Could not build email compose link") : "Could not build email compose link");
+        return;
+      }
+      if (compose.truncated) {
+        void navigator.clipboard?.writeText(`${emailSubjectPreview}
+
+${emailBodyPreview}`).catch(() => undefined);
+      }
+      if (openComposeLink(compose.url) === "blocked") {
+        setSendError(
+          lang === "fr"
+            ? "Votre navigateur a bloqué l’ouverture de votre messagerie. Autorisez les pop-ups pour ce site."
+            : "Your browser blocked your mail app from opening. Allow pop-ups for this site.",
+        );
+        return;
+      }
+      setSendError(null);
+      setSendingEmail(true);
+      void (async () => {
+        await persistOutreachHistory();
+        setSendingEmail(false);
+        onSent("email");
+      })();
+      return;
+    }
+
     if (isEmail) {
       setSendingEmail(true);
       setSendError(null);
@@ -3062,7 +3095,7 @@ function SendOutreachPanel({
         style={{
           width: "min(560px, 100%)",
           height: "100%",
-          background: "#FFF",
+          background: "var(--ws-surface)",
           overflowY: "auto",
           transform: shown ? "translateX(0)" : "translateX(40px)",
           opacity: shown ? 1 : 0,
@@ -3083,7 +3116,7 @@ function SendOutreachPanel({
             marginBottom: 20,
             fontSize: 14,
             fontWeight: 500,
-            color: "#6B7280",
+            color: "var(--ws-text-muted)",
             cursor: sendingEmail ? "default" : "pointer",
             fontFamily: "inherit",
             letterSpacing: "-0.02em",
@@ -3092,7 +3125,7 @@ function SendOutreachPanel({
           ← {lang === "fr" ? "Retour à la prospection" : "Back to outreach"}
         </button>
 
-        <h1 style={{ fontSize: isMobile ? 24 : 26, fontWeight: 600, color: "#1A1A1A", margin: "0 0 12px", letterSpacing: "-0.03em" }}>
+        <h1 style={{ fontSize: isMobile ? 24 : 26, fontWeight: 600, color: "var(--ws-text)", margin: "0 0 12px", letterSpacing: "-0.03em" }}>
           {isEmail ? (lang === "fr" ? "Envoyer un email" : "Send email") : lang === "fr" ? "Envoyer un message" : "Send outreach"}
         </h1>
         <p style={{ ...pageStyles.sectionHint, marginBottom: 36 }}>
@@ -3145,7 +3178,7 @@ function SendOutreachPanel({
               style={pageStyles.input}
               autoComplete="email"
             />
-            <p style={{ fontSize: 13, color: "#6B7280", margin: "8px 0 0", lineHeight: 1.5, letterSpacing: "-0.01em" }}>
+            <p style={{ fontSize: 13, color: "var(--ws-text-muted)", margin: "8px 0 0", lineHeight: 1.5, letterSpacing: "-0.01em" }}>
               {lang === "fr"
                 ? "L'envoi se fait depuis cette adresse. Connectez-vous à Gmail ou Outlook avec ce compte si une fenêtre s'ouvre."
                 : "Sending happens from this address. Sign in to Gmail or Outlook with this account if a window opens."}
@@ -3186,8 +3219,8 @@ function SendOutreachPanel({
                     gap: 12,
                     padding: "12px 14px",
                     borderRadius: 10,
-                    border: "1px solid #EFEFEF",
-                    background: "#FAFAFA",
+                    border: "1px solid var(--ws-border)",
+                    background: "var(--ws-surface-2)",
                   }}
                 >
                   <CreatorAvatar
@@ -3198,8 +3231,8 @@ function SendOutreachPanel({
                     alt={row.handle}
                   />
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 500, color: "#1A1A1A" }}>{row.handle}</div>
-                    <div style={{ fontSize: 12, color: "#6B7280" }}>
+                    <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ws-text)" }}>{row.handle}</div>
+                    <div style={{ fontSize: 12, color: "var(--ws-text-muted)" }}>
                       {index === 0
                         ? lang === "fr"
                           ? "À"
@@ -3223,7 +3256,7 @@ function SendOutreachPanel({
               ))}
             </div>
             {isBatchEmail && (
-              <p style={{ fontSize: 13, color: "#6B7280", margin: "10px 0 0", lineHeight: 1.5, letterSpacing: "-0.01em" }}>
+              <p style={{ fontSize: 13, color: "var(--ws-text-muted)", margin: "10px 0 0", lineHeight: 1.5, letterSpacing: "-0.01em" }}>
                 {lang === "fr"
                   ? "Envoi groupé : le premier créateur en destinataire principal, les autres en copie (Cc)."
                   : "Batch send: first creator as primary recipient, others in Cc."}
@@ -3233,7 +3266,7 @@ function SendOutreachPanel({
           )}
 
         {isEmail && missingEmailHandles.length > 0 && (
-          <p style={{ margin: `0 0 ${pageStyles.sectionGap}px`, fontSize: 13, color: "#1A1A1A", lineHeight: 1.5, letterSpacing: "-0.01em" }}>
+          <p style={{ margin: `0 0 ${pageStyles.sectionGap}px`, fontSize: 13, color: "var(--ws-text)", lineHeight: 1.5, letterSpacing: "-0.01em" }}>
             {lang === "fr"
               ? `${missingEmailHandles.length} créateur${missingEmailHandles.length > 1 ? "s" : ""} sélectionné${missingEmailHandles.length > 1 ? "s" : ""} sans email — non inclus dans l'envoi.`
               : `${missingEmailHandles.length} selected creator${missingEmailHandles.length > 1 ? "s" : ""} without email — excluded from send.`}
@@ -3249,32 +3282,32 @@ function SendOutreachPanel({
         )}
 
         {fullPreview && (
-          <div style={{ padding: 18, background: "#FAFAFA", border: "1px solid #EFEFEF", borderRadius: 12, marginBottom: pageStyles.sectionGap }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: "#9A9A9A", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>
+          <div style={{ padding: 18, background: "var(--ws-surface-2)", border: "1px solid var(--ws-border)", borderRadius: 12, marginBottom: pageStyles.sectionGap }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "var(--ws-text-dim)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>
               {lang === "fr" ? "Aperçu" : "Preview"} · {dmPlatform}
             </div>
             {isEmail ? (
               <>
-                <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", marginBottom: 12, letterSpacing: "-0.02em" }}>
+                <div style={{ fontSize: 15, fontWeight: 600, color: "var(--ws-text)", marginBottom: 12, letterSpacing: "-0.02em" }}>
                   {emailSubjectPreview}
                 </div>
-                <div style={{ fontSize: 14, color: "#1A1A1A", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{emailBodyPreview}</div>
+                <div style={{ fontSize: 14, color: "var(--ws-text)", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{emailBodyPreview}</div>
               </>
             ) : (
-              <div style={{ fontSize: 14, color: "#1A1A1A", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{fullPreview}</div>
+              <div style={{ fontSize: 14, color: "var(--ws-text)", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{fullPreview}</div>
             )}
           </div>
         )}
 
         {isBatchEmail && isEmail && (
-          <p style={{ fontSize: 13, color: "#6B7280", margin: "0 0 16px", lineHeight: 1.5, letterSpacing: "-0.01em" }}>
+          <p style={{ fontSize: 13, color: "var(--ws-text-muted)", margin: "0 0 16px", lineHeight: 1.5, letterSpacing: "-0.01em" }}>
             {lang === "fr"
               ? "Mode groupé : le message utilise une formule générique ({{name}} → à vous) pour tous les destinataires."
               : "Batch mode: the message uses a generic greeting ({{name}} → there) for all recipients."}
           </p>
         )}
 
-        <p style={{ fontSize: 14, color: "#6B7280", margin: "0 0 20px", lineHeight: 1.55, letterSpacing: "-0.01em" }}>
+        <p style={{ fontSize: 14, color: "var(--ws-text-muted)", margin: "0 0 20px", lineHeight: 1.55, letterSpacing: "-0.01em" }}>
           {isEmail
             ? lang === "fr"
               ? "En cliquant sur Envoyer, votre messagerie s'ouvre (Gmail, Outlook ou Mail) avec les destinataires et le message pré-remplis — l'email part bien depuis l'adresse de la marque ci-dessus."
@@ -3303,17 +3336,17 @@ const shopifyConnectFieldInput: React.CSSProperties = {
   boxSizing: "border-box",
   padding: "14px 16px",
   borderRadius: 10,
-  border: "1px solid #D1D5DB",
+  border: "1px solid var(--ws-border-strong)",
   fontSize: 15,
   fontFamily: "inherit",
-  color: "#1A1A1A",
+  color: "var(--ws-text)",
   letterSpacing: "-0.02em",
-  background: "#FFF",
+  background: "var(--ws-surface)",
   outline: "none",
 };
 
 const shopifyConnectPrimaryBtn: React.CSSProperties = {
-  background: "#0047FF",
+  background: "var(--ws-accent)",
   color: "#FFFFFF",
   border: "none",
   borderRadius: 10,
@@ -3326,9 +3359,9 @@ const shopifyConnectPrimaryBtn: React.CSSProperties = {
 };
 
 const shopifyConnectSecondaryBtn: React.CSSProperties = {
-  background: "#FFFFFF",
-  color: "#1A1A1A",
-  border: "1px solid #E5E5E5",
+  background: "var(--ws-surface)",
+  color: "var(--ws-text)",
+  border: "1px solid var(--ws-border)",
   borderRadius: 10,
   padding: "12px 20px",
   fontSize: 15,
@@ -3378,8 +3411,8 @@ function ShopifyConnectPage({
               "Dans Shopify Admin, ouvrez Paramètres → Applications et canaux de vente → Développer des apps, puis créez une app dédiée à Trackit.",
             icon: (
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
-                <path d="M12 15a3 3 0 100-6 3 3 0 000 6z" stroke="#1A1A1A" strokeWidth="1.8" />
-                <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" stroke="#1A1A1A" strokeWidth="1.8" strokeLinecap="round" />
+                <path d="M12 15a3 3 0 100-6 3 3 0 000 6z" stroke="var(--ws-text)" strokeWidth="1.8" />
+                <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" stroke="var(--ws-text)" strokeWidth="1.8" strokeLinecap="round" />
               </svg>
             ),
           },
@@ -3389,8 +3422,8 @@ function ShopifyConnectPage({
               "Activez l'API Admin avec la permission read_orders pour autoriser Trackit à lire vos commandes.",
             icon: (
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
-                <rect x="3" y="11" width="18" height="11" rx="2" stroke="#1A1A1A" strokeWidth="1.8" />
-                <path d="M7 11V7a5 5 0 0110 0v4" stroke="#1A1A1A" strokeWidth="1.8" strokeLinecap="round" />
+                <rect x="3" y="11" width="18" height="11" rx="2" stroke="var(--ws-text)" strokeWidth="1.8" />
+                <path d="M7 11V7a5 5 0 0110 0v4" stroke="var(--ws-text)" strokeWidth="1.8" strokeLinecap="round" />
               </svg>
             ),
           },
@@ -3400,8 +3433,8 @@ function ShopifyConnectPage({
               "Copiez le domaine .myshopify.com et le token d'accès de votre app, puis collez-les dans le formulaire à gauche.",
             icon: (
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
-                <rect x="9" y="9" width="13" height="13" rx="2" stroke="#1A1A1A" strokeWidth="1.8" />
-                <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" stroke="#1A1A1A" strokeWidth="1.8" strokeLinecap="round" />
+                <rect x="9" y="9" width="13" height="13" rx="2" stroke="var(--ws-text)" strokeWidth="1.8" />
+                <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" stroke="var(--ws-text)" strokeWidth="1.8" strokeLinecap="round" />
               </svg>
             ),
           },
@@ -3413,8 +3446,8 @@ function ShopifyConnectPage({
               "In Shopify Admin, go to Settings → Apps and sales channels → Develop apps, then create an app for Trackit.",
             icon: (
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
-                <path d="M12 15a3 3 0 100-6 3 3 0 000 6z" stroke="#1A1A1A" strokeWidth="1.8" />
-                <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" stroke="#1A1A1A" strokeWidth="1.8" strokeLinecap="round" />
+                <path d="M12 15a3 3 0 100-6 3 3 0 000 6z" stroke="var(--ws-text)" strokeWidth="1.8" />
+                <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" stroke="var(--ws-text)" strokeWidth="1.8" strokeLinecap="round" />
               </svg>
             ),
           },
@@ -3424,8 +3457,8 @@ function ShopifyConnectPage({
               "Enable the Admin API with the read_orders permission so Trackit can read your orders.",
             icon: (
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
-                <rect x="3" y="11" width="18" height="11" rx="2" stroke="#1A1A1A" strokeWidth="1.8" />
-                <path d="M7 11V7a5 5 0 0110 0v4" stroke="#1A1A1A" strokeWidth="1.8" strokeLinecap="round" />
+                <rect x="3" y="11" width="18" height="11" rx="2" stroke="var(--ws-text)" strokeWidth="1.8" />
+                <path d="M7 11V7a5 5 0 0110 0v4" stroke="var(--ws-text)" strokeWidth="1.8" strokeLinecap="round" />
               </svg>
             ),
           },
@@ -3435,15 +3468,15 @@ function ShopifyConnectPage({
               "Copy your .myshopify.com domain and access token, then paste them into the form on the left.",
             icon: (
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
-                <rect x="9" y="9" width="13" height="13" rx="2" stroke="#1A1A1A" strokeWidth="1.8" />
-                <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" stroke="#1A1A1A" strokeWidth="1.8" strokeLinecap="round" />
+                <rect x="9" y="9" width="13" height="13" rx="2" stroke="var(--ws-text)" strokeWidth="1.8" />
+                <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" stroke="var(--ws-text)" strokeWidth="1.8" strokeLinecap="round" />
               </svg>
             ),
           },
         ];
 
   return (
-    <div style={{ minHeight: "100%", background: "#FFFFFF", padding: pagePad }}>
+    <div style={{ minHeight: "100%", background: "var(--ws-surface)", padding: pagePad }}>
       <div style={{ maxWidth: 1120, margin: "0 auto" }}>
         <div
                   style={{
@@ -3458,7 +3491,7 @@ function ShopifyConnectPage({
               style={{
                 fontSize: isMobile ? 28 : 32,
                 fontWeight: 600,
-                color: "#1A1A1A",
+                color: "var(--ws-text)",
                 margin: "0 0 8px",
                 letterSpacing: "-0.03em",
               }}
@@ -3471,19 +3504,19 @@ function ShopifyConnectPage({
                   ? "Connecter Shopify"
                   : "Connect Shopify"}
             </h1>
-            <p style={{ fontSize: 15, color: "#6B7280", margin: "0 0 36px", lineHeight: 1.55, letterSpacing: "-0.01em" }}>
+            <p style={{ fontSize: 15, color: "var(--ws-text-muted)", margin: "0 0 36px", lineHeight: 1.55, letterSpacing: "-0.01em" }}>
               {lang === "fr"
                 ? "Liez votre boutique Shopify pour synchroniser automatiquement vos ventes dans Trackit."
                 : "Link your Shopify store to automatically sync sales into Trackit."}
             </p>
 
             <div style={{ marginBottom: 28 }}>
-              <label style={{ display: "block", fontSize: 14, fontWeight: 600, color: "#1A1A1A", marginBottom: 10, letterSpacing: "-0.02em" }}>
+              <label style={{ display: "block", fontSize: 14, fontWeight: 600, color: "var(--ws-text)", marginBottom: 10, letterSpacing: "-0.02em" }}>
                 {lang === "fr" ? "Domaine de la boutique" : "Store domain"}
               </label>
               <div
                 style={{
-                  border: "1px solid #0047FF",
+                  border: "1px solid var(--ws-accent)",
                   borderRadius: 10,
                   padding: "4px 14px",
                   boxShadow: "0 0 0 1px rgba(0,71,255,0.08)",
@@ -3503,7 +3536,7 @@ function ShopifyConnectPage({
                     padding: "12px 0",
                     background: "transparent",
                     boxSizing: "border-box",
-                    color: "#1A1A1A",
+                    color: "var(--ws-text)",
                   }}
                   autoFocus
                   onKeyDown={(e) => e.key === "Enter" && onConnect()}
@@ -3512,7 +3545,7 @@ function ShopifyConnectPage({
             </div>
 
             <div style={{ marginBottom: 28 }}>
-              <label style={{ display: "block", fontSize: 14, fontWeight: 600, color: "#1A1A1A", marginBottom: 10, letterSpacing: "-0.02em" }}>
+              <label style={{ display: "block", fontSize: 14, fontWeight: 600, color: "var(--ws-text)", marginBottom: 10, letterSpacing: "-0.02em" }}>
                 {lang === "fr" ? "Token d'API Admin" : "Admin API token"}
               </label>
               <input
@@ -3591,20 +3624,20 @@ function ShopifyConnectPage({
             <div
               style={{
                 position: "relative",
-                background: "#FFFFFF",
+                background: "var(--ws-surface)",
                 borderRadius: 20,
                 boxShadow: "0 24px 48px rgba(0,0,0,0.12), 0 4px 12px rgba(0,0,0,0.06)",
                 padding: isMobile ? "24px 20px" : "32px 28px",
-                border: "1px solid #EFEFEF",
+                border: "1px solid var(--ws-border)",
               }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 20 }}>
                 <img src="/shopify-logo.svg" alt="Shopify" width={40} height={46} style={{ display: "block", flexShrink: 0 }} />
                 <div>
-                  <p style={{ fontSize: 16, fontWeight: 600, color: "#1A1A1A", margin: "0 0 4px", letterSpacing: "-0.02em" }}>
+                  <p style={{ fontSize: 16, fontWeight: 600, color: "var(--ws-text)", margin: "0 0 4px", letterSpacing: "-0.02em" }}>
                     {lang === "fr" ? "Comment connecter Shopify" : "How to connect Shopify"}
                   </p>
-                  <p style={{ fontSize: 13, color: "#6B7280", margin: 0, lineHeight: 1.5 }}>
+                  <p style={{ fontSize: 13, color: "var(--ws-text-muted)", margin: 0, lineHeight: 1.5 }}>
                     {lang === "fr"
                       ? "Créez une app personnalisée dans Shopify Admin (Paramètres → Applications et canaux de vente → Développer des apps), activez l'API Admin avec la permission read_orders, puis collez le domaine .myshopify.com et le token d'accès ci-dessus."
                       : "Create a custom app in Shopify Admin (Settings → Apps and sales channels → Develop apps), enable the Admin API with read_orders, then paste your .myshopify.com domain and access token above."}
@@ -3622,7 +3655,7 @@ function ShopifyConnectPage({
                           height: 36,
                           borderRadius: 10,
                           background: "#F9FAFB",
-                          border: "1px solid #F0F0F0",
+                          border: "1px solid var(--ws-border)",
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
@@ -3635,13 +3668,13 @@ function ShopifyConnectPage({
                       )}
           </div>
                     <div style={{ paddingTop: 2 }}>
-                      <p style={{ fontSize: 12, fontWeight: 600, color: "#0047FF", margin: "0 0 4px", letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                      <p style={{ fontSize: 12, fontWeight: 600, color: "var(--ws-accent)", margin: "0 0 4px", letterSpacing: "0.04em", textTransform: "uppercase" }}>
                         {lang === "fr" ? `Étape ${index + 1}` : `Step ${index + 1}`}
                       </p>
-                      <p style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", margin: "0 0 4px", letterSpacing: "-0.02em" }}>
+                      <p style={{ fontSize: 15, fontWeight: 600, color: "var(--ws-text)", margin: "0 0 4px", letterSpacing: "-0.02em" }}>
                         {step.title}
                       </p>
-                      <p style={{ fontSize: 14, color: "#6B7280", margin: 0, lineHeight: 1.55, letterSpacing: "-0.01em" }}>
+                      <p style={{ fontSize: 14, color: "var(--ws-text-muted)", margin: 0, lineHeight: 1.55, letterSpacing: "-0.01em" }}>
                         {step.description}
                       </p>
         </div>
@@ -3705,9 +3738,9 @@ function IntegrationsView({
   const logoBoxBg = dark ? "transparent" : "#FFFFFF";
   const secondaryBtn: React.CSSProperties = {
     ...btnSecondary,
-    background: dark ? "transparent" : "#FFFFFF",
-    color: dark ? "#E8E8EA" : "#1A1A1A",
-    border: dark ? "1px solid rgba(255,255,255,0.12)" : "1px solid #E5E5E5",
+    background: dark ? "transparent" : "var(--ws-surface)",
+    color: dark ? "#E8E8EA" : "var(--ws-text)",
+    border: dark ? "1px solid rgba(255,255,255,0.12)" : "1px solid var(--ws-border)",
   };
 
   const activeShop = connectedShop || shopifyStore || null;
@@ -4035,7 +4068,7 @@ function IntegrationsView({
                           {lang === "fr" ? "Boutique connectée ✓" : "Store connected ✓"}
                         </div>
                         <div style={{ fontSize: 13, color: titleColor, fontWeight: 500, marginBottom: 10, letterSpacing: "-0.01em" }}>{activeShop}</div>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "12px 14px", border: `1px solid ${cardBorder}`, borderRadius: 12, marginBottom: 10, background: dark ? "#2A2B30" : "#FFFFFF" }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "12px 14px", border: `1px solid ${cardBorder}`, borderRadius: 12, marginBottom: 10, background: dark ? "#2A2B30" : "var(--ws-surface)" }}>
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ fontSize: 13, fontWeight: 600, color: titleColor, letterSpacing: "-0.01em" }}>
                               {lang === "fr" ? "Synchronisation automatique" : "Automatic sync"}
@@ -4075,7 +4108,7 @@ function IntegrationsView({
                                 }
                               })();
                             }}
-                            style={{ position: "relative", width: 44, height: 26, borderRadius: 999, border: "none", flexShrink: 0, cursor: togglingSync ? "default" : "pointer", background: syncEnabled ? "#0047FF" : "#D4D4D8", opacity: togglingSync ? 0.6 : 1, transition: "background 0.15s", padding: 0 }}
+                            style={{ position: "relative", width: 44, height: 26, borderRadius: 999, border: "none", flexShrink: 0, cursor: togglingSync ? "default" : "pointer", background: syncEnabled ? "var(--ws-accent)" : "#D4D4D8", opacity: togglingSync ? 0.6 : 1, transition: "background 0.15s", padding: 0 }}
                           >
                             <span style={{ position: "absolute", top: 3, left: syncEnabled ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#FFFFFF", boxShadow: "0 1px 3px rgba(0,0,0,0.2)", transition: "left 0.15s" }} />
                           </button>
@@ -4219,7 +4252,7 @@ function IntegrationsView({
                             {plan === "free" ? (
                               <p style={{ fontSize: 12, color: mutedColor, margin: 0 }}>
                                 {lang === "fr" ? "Le plan Free inclut les ventes manuelles. Shopify nécessite le plan Growth. " : "Free includes manual sales. Shopify requires the Growth plan. "}
-                                <button type="button" onClick={() => void onUpgrade?.()} style={{ background: "none", border: "none", color: dark ? "#8AB4FF" : "#0047FF", fontSize: 12, cursor: "pointer", padding: 0, fontFamily: "inherit" }}>
+                                <button type="button" onClick={() => void onUpgrade?.()} style={{ background: "none", border: "none", color: dark ? "#8AB4FF" : "var(--ws-accent)", fontSize: 12, cursor: "pointer", padding: 0, fontFamily: "inherit" }}>
                                   {lang === "fr" ? "Passer à Growth →" : "Upgrade to Growth →"}
                                 </button>
                               </p>
@@ -4228,7 +4261,7 @@ function IntegrationsView({
                                 {lang === "fr"
                                   ? `Jusqu'à ${SCALE_MAX_SHOPIFY_STORES} boutiques sur Scale. `
                                   : `Up to ${SCALE_MAX_SHOPIFY_STORES} stores on Scale. `}
-                                <button type="button" onClick={() => void onUpgradeScale?.()} style={{ background: "none", border: "none", color: dark ? "#8AB4FF" : "#0047FF", fontSize: 12, cursor: "pointer", padding: 0, fontFamily: "inherit" }}>
+                                <button type="button" onClick={() => void onUpgradeScale?.()} style={{ background: "none", border: "none", color: dark ? "#8AB4FF" : "var(--ws-accent)", fontSize: 12, cursor: "pointer", padding: 0, fontFamily: "inherit" }}>
                                   {lang === "fr" ? "Passer à Scale →" : "Upgrade to Scale →"}
                                 </button>
                               </p>
@@ -4346,12 +4379,12 @@ function AutomationView({
           onClose={() => setUpgradeModalOpen(false)}
         />
       )}
-      <div style={{ paddingTop: isMobile ? 16 : 40, paddingRight: isMobile ? 16 : 40, paddingBottom: isMobile ? 16 : 24, paddingLeft: isMobile ? 16 : 40, borderBottom: "1px solid #EFEFEF", background: "#FFFFFF" }}>
+      <div style={{ paddingTop: isMobile ? 16 : 40, paddingRight: isMobile ? 16 : 40, paddingBottom: isMobile ? 16 : 24, paddingLeft: isMobile ? 16 : 40, borderBottom: "1px solid var(--ws-border)", background: "var(--ws-surface)" }}>
         <div>
-          <h1 style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", margin: 0, marginBottom: 6, display: "flex", alignItems: "center" }}>
+          <h1 style={{ fontSize: 28, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.04em", margin: 0, marginBottom: 6, display: "flex", alignItems: "center" }}>
             {lang === "fr" ? "Automatisation" : "Automation"}
             {showComingSoon && (
-              <span style={{ fontSize: 13, fontWeight: 600, background: "#F0F4FF", color: "#0047FF", padding: "4px 12px", borderRadius: 20, marginLeft: 10 }}>
+              <span style={{ fontSize: 13, fontWeight: 600, background: "var(--ws-accent-soft)", color: "var(--ws-accent)", padding: "4px 12px", borderRadius: 20, marginLeft: 10 }}>
                 {lang === "fr" ? "Bientôt disponible" : "Coming soon"}
               </span>
             )}
@@ -4361,11 +4394,11 @@ function AutomationView({
               </span>
             )}
           </h1>
-          <p style={{ fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.02em", margin: 0 }}>{lang === "fr" ? "Créez des agents qui gèrent votre marketing créateur en automatique" : "Build agents that run your creator marketing on autopilot"}</p>
+          <p style={{ fontSize: 14, color: "var(--ws-text-muted)", letterSpacing: "-0.02em", margin: 0 }}>{lang === "fr" ? "Créez des agents qui gèrent votre marketing créateur en automatique" : "Build agents that run your creator marketing on autopilot"}</p>
         </div>
       </div>
       <div style={{ padding: isMobile ? "16px" : "40px" }}>
-        <div style={{ background: "linear-gradient(135deg, #0047FF 0%, #003BD6 100%)", color: "#FFFFFF", borderRadius: 18, padding: 32, marginBottom: 20, display: "flex", alignItems: "center", gap: 24 }}>
+        <div style={{ background: "linear-gradient(135deg, var(--ws-accent) 0%, #003BD6 100%)", color: "#FFFFFF", borderRadius: 18, padding: 32, marginBottom: 20, display: "flex", alignItems: "center", gap: 24 }}>
           <div style={{ flex: 1 }}>
             <h2 style={{ fontSize: 22, fontWeight: 600, letterSpacing: "-0.03em", margin: 0, marginBottom: 6 }}>{lang === "fr" ? "Créer un agent d'automatisation" : "Make an automation agent"}</h2>
             <p style={{ fontSize: 14, opacity: 0.9, letterSpacing: "-0.01em", margin: 0, marginBottom: 18 }}>{lang === "fr" ? "Assemblez des déclencheurs, des actions et des conditions comme des pièces de puzzle. Aucun code requis." : "Assemble triggers, actions, and conditions like puzzle pieces. No code required."}</p>
@@ -4404,16 +4437,16 @@ function AutomationView({
           </div>
         </div>
 
-        <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 24, marginBottom: 20 }}>
-          <h3 style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", margin: 0, marginBottom: 14 }}>{lang === "fr" ? "Automatisations préconstruites" : "Pre-built automations"}</h3>
+        <div style={{ background: "var(--ws-surface)", border: "1px solid var(--ws-border)", borderRadius: 16, padding: 24, marginBottom: 20 }}>
+          <h3 style={{ fontSize: 15, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.02em", margin: 0, marginBottom: 14 }}>{lang === "fr" ? "Automatisations préconstruites" : "Pre-built automations"}</h3>
           {[
             lang === "fr" ? "Quand un créateur publie → me notifier" : "When creator posts → notify me",
             lang === "fr" ? "Quand une vente est détectée → ajouter au suivi des commissions" : "When sale detected → add to commission tracker",
             lang === "fr" ? "Quand le seuil de commission est atteint → paiement automatique" : "When commission threshold reached → auto payout",
             lang === "fr" ? "Quand pas de réponse après 3 jours → envoyer une relance" : "When no reply after 3 days → send follow-up",
           ].map((row, i) => (
-            <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", borderBottom: i < 3 ? "1px solid #F5F5F5" : "none" }}>
-              <span style={{ fontSize: 14, color: "#1A1A1A", letterSpacing: "-0.02em" }}>{row}</span>
+            <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", borderBottom: i < 3 ? "1px solid var(--ws-border)" : "none" }}>
+              <span style={{ fontSize: 14, color: "var(--ws-text)", letterSpacing: "-0.02em" }}>{row}</span>
               <Toggle
                 on={false}
                 onChange={() => {
@@ -4428,10 +4461,10 @@ function AutomationView({
           ))}
         </div>
 
-        <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 20, display: "flex", alignItems: "center", gap: 16 }}>
+        <div style={{ background: "var(--ws-surface)", border: "1px solid var(--ws-border)", borderRadius: 16, padding: 20, display: "flex", alignItems: "center", gap: 16 }}>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 2 }}>{lang === "fr" ? "Importer depuis le code" : "Import from code"}</div>
-            <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em" }}>{lang === "fr" ? "Collez une URL webhook ou importez une automatisation depuis JSON" : "Paste a webhook URL or import an automation from JSON"}</div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.02em", marginBottom: 2 }}>{lang === "fr" ? "Importer depuis le code" : "Import from code"}</div>
+            <div style={{ fontSize: 13, color: "var(--ws-text-muted)", letterSpacing: "-0.01em" }}>{lang === "fr" ? "Collez une URL webhook ou importez une automatisation depuis JSON" : "Paste a webhook URL or import an automation from JSON"}</div>
           </div>
           <button type="button" className="hero-cta-shopify-light hero-cta-compact" onClick={() => alert(lang === "fr" ? "Bientôt disponible" : "Coming soon")}>{lang === "fr" ? "Importer" : "Import"}</button>
           <button type="button" className="hero-cta-shopify-light hero-cta-compact" onClick={() => alert(lang === "fr" ? "Bientôt disponible" : "Coming soon")}>{lang === "fr" ? "Tester" : "Test"}</button>
@@ -4447,12 +4480,12 @@ function LockedView({ title, subtitle, isMobile }: { title: string; subtitle: st
     <>
       <PageHeader isMobile={isMobile} title={title} subtitle={subtitle} />
       <div style={{ padding: isMobile ? "16px" : "40px" }}>
-        <div style={{ background: "#FFFFFF", border: "1px dashed #E5E5E5", borderRadius: 16, padding: isMobile ? 48 : 80, textAlign: "center" }}>
-          <div style={{ width: 64, height: 64, borderRadius: 16, background: "#F5F5F5", margin: "0 auto 18px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><rect x="5" y="11" width="14" height="10" rx="2" stroke="#9A9A9A" strokeWidth="1.8"/><path d="M8 11V8a4 4 0 018 0v3" stroke="#9A9A9A" strokeWidth="1.8" strokeLinecap="round"/></svg>
+        <div style={{ background: "var(--ws-surface)", border: "1px dashed var(--ws-border)", borderRadius: 16, padding: isMobile ? 48 : 80, textAlign: "center" }}>
+          <div style={{ width: 64, height: 64, borderRadius: 16, background: "var(--ws-hover)", margin: "0 auto 18px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><rect x="5" y="11" width="14" height="10" rx="2" stroke="var(--ws-text-dim)" strokeWidth="1.8"/><path d="M8 11V8a4 4 0 018 0v3" stroke="var(--ws-text-dim)" strokeWidth="1.8" strokeLinecap="round"/></svg>
           </div>
-          <h3 style={{ fontSize: 20, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", margin: 0, marginBottom: 6 }}>{lang === "fr" ? "Bientôt disponible" : "Coming soon"}</h3>
-          <p style={{ fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.02em", margin: 0, marginBottom: 22, maxWidth: 380, marginLeft: "auto", marginRight: "auto" }}>{lang === "fr" ? "Cet espace n’existe pas encore. Vous serez prévenu dès qu’il sera prêt." : <>This area is not created yet. You&apos;ll be notified when it&apos;s ready.</>}</p>
+          <h3 style={{ fontSize: 20, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.03em", margin: 0, marginBottom: 6 }}>{lang === "fr" ? "Bientôt disponible" : "Coming soon"}</h3>
+          <p style={{ fontSize: 14, color: "var(--ws-text-muted)", letterSpacing: "-0.02em", margin: 0, marginBottom: 22, maxWidth: 380, marginLeft: "auto", marginRight: "auto" }}>{lang === "fr" ? "Cet espace n’existe pas encore. Vous serez prévenu dès qu’il sera prêt." : <>This area is not created yet. You&apos;ll be notified when it&apos;s ready.</>}</p>
           <button type="button" style={btnPrimary}>{lang === "fr" ? "Me prévenir" : "Notify me"}</button>
         </div>
       </div>
@@ -4490,10 +4523,10 @@ const affiliateInputStyle: React.CSSProperties = {
   boxSizing: "border-box",
   padding: "10px 12px",
   borderRadius: 10,
-  border: "1px solid #E5E5E5",
+  border: "1px solid var(--ws-border)",
   fontSize: 14,
   fontFamily: "inherit",
-  color: "#1A1A1A",
+  color: "var(--ws-text)",
   letterSpacing: "-0.02em",
 };
 
@@ -4690,14 +4723,14 @@ function AffiliatesView({
         <div style={{ padding: isMobile ? 16 : 40 }}>
           <div
             style={{
-              border: "1px solid #EFEFEF",
+              border: "1px solid var(--ws-border)",
               borderRadius: 16,
               padding: isMobile ? "28px 20px" : "40px 32px",
-              background: "#FAFAFA",
+              background: "var(--ws-surface-2)",
               maxWidth: 560,
             }}
           >
-            <div style={{ fontSize: 18, fontWeight: 600, color: "#1A1A1A", marginBottom: 10, letterSpacing: "-0.02em" }}>
+            <div style={{ fontSize: 18, fontWeight: 600, color: "var(--ws-text)", marginBottom: 10, letterSpacing: "-0.02em" }}>
               {lang === "fr" ? "Ce que vous ratez sur Free" : "What you're missing on Free"}
             </div>
             <ul style={{ margin: "0 0 20px", paddingLeft: 18, color: "#4B5563", fontSize: 14, lineHeight: 1.6 }}>
@@ -4740,14 +4773,14 @@ function AffiliatesView({
       } />
         <div style={{ padding: isMobile ? 16 : 40 }}>
         {actionMessage && (
-          <div style={{ marginBottom: 16, padding: "12px 16px", background: "#FAFAFA", border: "1px solid #EFEFEF", borderRadius: 12, fontSize: 13, color: "#1A1A1A", letterSpacing: "-0.01em" }}>
+          <div style={{ marginBottom: 16, padding: "12px 16px", background: "var(--ws-surface-2)", border: "1px solid var(--ws-border)", borderRadius: 12, fontSize: 13, color: "var(--ws-text)", letterSpacing: "-0.01em" }}>
             {actionMessage}
           </div>
         )}
 
-        <div style={{ marginTop: isMobile ? 8 : 24, background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16 }}>
+        <div style={{ marginTop: isMobile ? 8 : 24, background: "var(--ws-surface)", border: "1px solid var(--ws-border)", borderRadius: 16 }}>
           <div style={{ overflowX: isMobile ? "auto" : undefined, WebkitOverflowScrolling: isMobile ? "touch" : undefined }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1.3fr 1fr 0.9fr 1.4fr", gap: 12, padding: "14px 20px", borderBottom: "1px solid #EFEFEF", background: "#FAFAFA", minWidth: isMobile ? 520 : undefined }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1.3fr 1fr 0.9fr 1.4fr", gap: 12, padding: "14px 20px", borderBottom: "1px solid var(--ws-border)", background: "var(--ws-surface-2)", minWidth: isMobile ? 520 : undefined }}>
             {[
               lang === "fr" ? "Créateur" : "Creator",
               lang === "fr" ? "Lien de parrainage" : "Referral link",
@@ -4755,18 +4788,18 @@ function AffiliatesView({
               lang === "fr" ? "Statut" : "Status",
               lang === "fr" ? "Action" : "Action",
             ].map((h) => (
-              <div key={h} style={{ fontSize: 12, fontWeight: 500, color: "#9A9A9A", letterSpacing: "-0.01em" }}>{h}</div>
+              <div key={h} style={{ fontSize: 12, fontWeight: 500, color: "var(--ws-text-dim)", letterSpacing: "-0.01em" }}>{h}</div>
             ))}
           </div>
           {affiliates.length === 0 ? (
-            <div style={{ padding: 40, textAlign: "center", color: "#9A9A9A", fontSize: 13 }}>
+            <div style={{ padding: 40, textAlign: "center", color: "var(--ws-text-dim)", fontSize: 13 }}>
               {lang === "fr" ? "Aucun affilié pour le moment." : "No affiliates yet."}
             </div>
           ) : affiliates.map((a, i) => {
             const linkCopied = copiedRow?.ref === a.ref && copiedRow.kind === "link";
             const codeCopied = copiedRow?.ref === a.ref && copiedRow.kind === "code";
             return (
-              <div key={a.ref} style={{ display: "grid", gridTemplateColumns: "1.4fr 1.3fr 1fr 0.9fr 1.4fr", gap: 12, padding: "16px 20px", borderBottom: i < affiliates.length - 1 ? "1px solid #F5F5F5" : "none", alignItems: "center" }}>
+              <div key={a.ref} style={{ display: "grid", gridTemplateColumns: "1.4fr 1.3fr 1fr 0.9fr 1.4fr", gap: 12, padding: "16px 20px", borderBottom: i < affiliates.length - 1 ? "1px solid var(--ws-border)" : "none", alignItems: "center" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <CreatorAvatar
                     src={avatarUrlForCreatorHandle(a.creator, creatorAvatarMap)}
@@ -4776,13 +4809,13 @@ function AffiliatesView({
                     alt={a.creator}
                   />
                   <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 500, color: "#1A1A1A", letterSpacing: "-0.01em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.creator}</div>
-                    <div style={{ fontSize: 11, color: "#9A9A9A" }}>{a.platform}</div>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: "var(--ws-text)", letterSpacing: "-0.01em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.creator}</div>
+                    <div style={{ fontSize: 11, color: "var(--ws-text-dim)" }}>{a.platform}</div>
                   </div>
                 </div>
-                <div style={{ fontSize: 12, color: "#0047FF", fontFamily: "'InterDisplay', 'Inter Display', sans-serif", letterSpacing: "-0.02em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.link || affiliateReferralLink(a.ref, a.destinationUrl)}</div>
-                <div style={{ fontSize: 12, color: "#1A1A1A", fontFamily: "monospace", fontWeight: 600 }}>{a.code}</div>
-                <div><span style={{ fontSize: 11, fontWeight: 600, color: "#1A1A1A", textTransform: "capitalize", letterSpacing: "-0.01em" }}>{affiliateStatusLabel(a.status, lang)}</span></div>
+                <div style={{ fontSize: 12, color: "var(--ws-accent)", fontFamily: "'InterDisplay', 'Inter Display', sans-serif", letterSpacing: "-0.02em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.link || affiliateReferralLink(a.ref, a.destinationUrl)}</div>
+                <div style={{ fontSize: 12, color: "var(--ws-text)", fontFamily: "monospace", fontWeight: 600 }}>{a.code}</div>
+                <div><span style={{ fontSize: 11, fontWeight: 600, color: "var(--ws-text)", textTransform: "capitalize", letterSpacing: "-0.01em" }}>{affiliateStatusLabel(a.status, lang)}</span></div>
                 <div style={{ marginLeft: -14 }}>
                   <AffiliateRowActions
                     lang={lang}
@@ -4990,7 +5023,7 @@ function AddAffiliatePanel({
           right: 0,
           bottom: 0,
           width: "min(440px, 100vw)",
-          background: "#FFFFFF",
+          background: "var(--ws-surface)",
           boxShadow: "-8px 0 32px rgba(0,0,0,0.1)",
           zIndex: 1001,
           display: "flex",
@@ -4999,31 +5032,31 @@ function AddAffiliatePanel({
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div style={{ padding: "24px 24px 20px", borderBottom: "1px solid #EFEFEF", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+        <div style={{ padding: "24px 24px 20px", borderBottom: "1px solid var(--ws-border)", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
           <div>
-            <h2 style={{ fontSize: 20, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", margin: 0, marginBottom: 6 }}>{lang === "fr" ? "Nouvel affilié" : "New affiliate"}</h2>
-            <p style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em", margin: 0, lineHeight: 1.45 }}>
+            <h2 style={{ fontSize: 20, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.03em", margin: 0, marginBottom: 6 }}>{lang === "fr" ? "Nouvel affilié" : "New affiliate"}</h2>
+            <p style={{ fontSize: 13, color: "var(--ws-text-muted)", letterSpacing: "-0.01em", margin: 0, lineHeight: 1.45 }}>
               {lang === "fr"
                 ? "Choisissez un créateur sauvegardé ou saisissez un pseudo, puis générez son lien et son code."
                 : "Pick a saved creator or enter a handle, then generate their link and discount code."}
             </p>
           </div>
           <button type="button" onClick={onClose} style={{ ...iconBtn, flexShrink: 0 }} aria-label={lang === "fr" ? "Fermer" : "Close"}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="#7A7A7A" strokeWidth="1.8" strokeLinecap="round"/></svg>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="var(--ws-text-muted)" strokeWidth="1.8" strokeLinecap="round"/></svg>
           </button>
         </div>
 
         <div style={{ flex: 1, overflowY: "auto", padding: 24 }}>
           <div style={{ marginBottom: 20 }}>
-            <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", letterSpacing: "-0.01em", marginBottom: 10 }}>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "var(--ws-text-dim)", letterSpacing: "-0.01em", marginBottom: 10 }}>
               {lang === "fr" ? "Créateurs sauvegardés" : "Saved creators"}
             </label>
             {loadingCreators ? (
-              <div style={{ fontSize: 13, color: "#9A9A9A", padding: "12px 0" }}>
+              <div style={{ fontSize: 13, color: "var(--ws-text-dim)", padding: "12px 0" }}>
                 {lang === "fr" ? "Chargement…" : "Loading…"}
               </div>
             ) : availableCreators.length === 0 ? (
-              <div style={{ fontSize: 13, color: "#9A9A9A", padding: "12px 14px", background: "#FAFAFA", border: "1px solid #EFEFEF", borderRadius: 12 }}>
+              <div style={{ fontSize: 13, color: "var(--ws-text-dim)", padding: "12px 14px", background: "var(--ws-surface-2)", border: "1px solid var(--ws-border)", borderRadius: 12 }}>
                 {savedCreators.length === 0
                   ? lang === "fr"
                     ? "Aucun créateur sauvegardé. Ajoutez-en depuis l’onglet Créateurs."
@@ -5071,11 +5104,11 @@ function AddAffiliatePanel({
             )}
           </div>
 
-          <div style={{ fontSize: 11, fontWeight: 600, color: "#9A9A9A", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 14 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: "var(--ws-text-dim)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 14 }}>
             {lang === "fr" ? "Ou saisir manuellement" : "Or enter manually"}
           </div>
 
-          <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", letterSpacing: "-0.01em", marginBottom: 6 }}>{lang === "fr" ? "Pseudo de l'influenceur" : "Influencer handle"}</label>
+          <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "var(--ws-text-dim)", letterSpacing: "-0.01em", marginBottom: 6 }}>{lang === "fr" ? "Pseudo de l'influenceur" : "Influencer handle"}</label>
           <input
             type="text"
             value={handle}
@@ -5084,7 +5117,7 @@ function AddAffiliatePanel({
             style={{ ...affiliateInputStyle, marginBottom: 16 }}
           />
 
-          <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", letterSpacing: "-0.01em", marginBottom: 6 }}>{lang === "fr" ? "Plateforme" : "Platform"}</label>
+          <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "var(--ws-text-dim)", letterSpacing: "-0.01em", marginBottom: 6 }}>{lang === "fr" ? "Plateforme" : "Platform"}</label>
           <select
             value={platform}
             onChange={(e) => setPlatform(e.target.value)}
@@ -5095,7 +5128,7 @@ function AddAffiliatePanel({
             ))}
           </select>
 
-          <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", letterSpacing: "-0.01em", marginBottom: 6 }}>{lang === "fr" ? "Remise sur le code (%)" : "Discount on code (%)"}</label>
+          <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "var(--ws-text-dim)", letterSpacing: "-0.01em", marginBottom: 6 }}>{lang === "fr" ? "Remise sur le code (%)" : "Discount on code (%)"}</label>
           <input
             type="text"
             inputMode="numeric"
@@ -5105,7 +5138,7 @@ function AddAffiliatePanel({
             style={{ ...affiliateInputStyle, marginBottom: 20 }}
           />
 
-          <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", letterSpacing: "-0.01em", marginBottom: 6 }}>{lang === "fr" ? "URL de destination" : "Destination URL"}</label>
+          <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "var(--ws-text-dim)", letterSpacing: "-0.01em", marginBottom: 6 }}>{lang === "fr" ? "URL de destination" : "Destination URL"}</label>
           <input
             type="url"
             value={destinationUrl}
@@ -5132,30 +5165,30 @@ function AddAffiliatePanel({
           </button>
 
           {generated && (
-            <div style={{ marginTop: 24, padding: 16, background: "#FAFAFA", border: "1px solid #EFEFEF", borderRadius: 14 }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: "#9A9A9A", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 14 }}>{lang === "fr" ? "Généré" : "Generated"}</div>
+            <div style={{ marginTop: 24, padding: 16, background: "var(--ws-surface-2)", border: "1px solid var(--ws-border)", borderRadius: 14 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: "var(--ws-text-dim)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 14 }}>{lang === "fr" ? "Généré" : "Generated"}</div>
 
               <div style={{ marginBottom: 14 }}>
-                <div style={{ fontSize: 12, color: "#9A9A9A", marginBottom: 6 }}>{lang === "fr" ? "Lien généré" : "Generated link"}</div>
+                <div style={{ fontSize: 12, color: "var(--ws-text-dim)", marginBottom: 6 }}>{lang === "fr" ? "Lien généré" : "Generated link"}</div>
                 <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                  <div style={{ fontSize: 12, color: "#0047FF", fontFamily: "'InterDisplay', 'Inter Display', sans-serif", letterSpacing: "-0.02em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", background: "#FFFFFF", border: "1px solid #E5E5E5", borderRadius: 8, padding: "10px 12px" }}>
+                  <div style={{ fontSize: 12, color: "var(--ws-accent)", fontFamily: "'InterDisplay', 'Inter Display', sans-serif", letterSpacing: "-0.02em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", background: "var(--ws-surface)", border: "1px solid var(--ws-border)", borderRadius: 8, padding: "10px 12px" }}>
                     {generated.link}
                   </div>
                   <button type="button" style={iconBtn} title={lang === "fr" ? "Copier le lien" : "Copy link"} onClick={() => void copyText(generated.link, "link")}>
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><rect x="9" y="9" width="11" height="11" rx="2" stroke="#7A7A7A" strokeWidth="1.7"/><path d="M5 15V5a2 2 0 012-2h10" stroke="#7A7A7A" strokeWidth="1.7"/></svg>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><rect x="9" y="9" width="11" height="11" rx="2" stroke="var(--ws-text-muted)" strokeWidth="1.7"/><path d="M5 15V5a2 2 0 012-2h10" stroke="var(--ws-text-muted)" strokeWidth="1.7"/></svg>
                   </button>
                 </div>
                 {copied === "link" && <div style={{ fontSize: 11, color: "#1FB567", marginTop: 4 }}>{lang === "fr" ? "Copié" : "Copied"}</div>}
               </div>
 
               <div>
-                <div style={{ fontSize: 12, color: "#9A9A9A", marginBottom: 6 }}>{lang === "fr" ? "Code promo" : "Discount code"}</div>
+                <div style={{ fontSize: 12, color: "var(--ws-text-dim)", marginBottom: 6 }}>{lang === "fr" ? "Code promo" : "Discount code"}</div>
                 <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                  <div style={{ flex: 1, fontSize: 14, fontWeight: 600, color: "#1A1A1A", fontFamily: "monospace", background: "#FFFFFF", border: "1px solid #E5E5E5", borderRadius: 8, padding: "10px 12px" }}>
+                  <div style={{ flex: 1, fontSize: 14, fontWeight: 600, color: "var(--ws-text)", fontFamily: "monospace", background: "var(--ws-surface)", border: "1px solid var(--ws-border)", borderRadius: 8, padding: "10px 12px" }}>
                     {generated.code}
                   </div>
                   <button type="button" style={iconBtn} title={lang === "fr" ? "Copier le code" : "Copy code"} onClick={() => void copyText(generated.code, "code")}>
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><rect x="9" y="9" width="11" height="11" rx="2" stroke="#7A7A7A" strokeWidth="1.7"/><path d="M5 15V5a2 2 0 012-2h10" stroke="#7A7A7A" strokeWidth="1.7"/></svg>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><rect x="9" y="9" width="11" height="11" rx="2" stroke="var(--ws-text-muted)" strokeWidth="1.7"/><path d="M5 15V5a2 2 0 012-2h10" stroke="var(--ws-text-muted)" strokeWidth="1.7"/></svg>
                   </button>
                 </div>
                 {copied === "code" && <div style={{ fontSize: 11, color: "#1FB567", marginTop: 4 }}>{lang === "fr" ? "Copié" : "Copied"}</div>}
@@ -5164,7 +5197,7 @@ function AddAffiliatePanel({
           )}
         </div>
 
-        <div style={{ padding: "16px 24px 24px", borderTop: "1px solid #EFEFEF", display: "flex", flexDirection: "column", gap: 8 }}>
+        <div style={{ padding: "16px 24px 24px", borderTop: "1px solid var(--ws-border)", display: "flex", flexDirection: "column", gap: 8 }}>
           <button
             type="button"
             disabled={!canAdd}
@@ -5209,19 +5242,19 @@ function AddAffiliatePanel({
 
 function FilterDropdown({ label, value }: { label: string; value: string }) {
   return (
-    <button type="button" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, background: "#FFFFFF", border: "1px solid #E5E5E5", borderRadius: 10, padding: "9px 12px", fontSize: 13, fontFamily: "inherit", color: "#1A1A1A", cursor: "pointer", letterSpacing: "-0.01em", minWidth: 0 }}>
+    <button type="button" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, background: "var(--ws-surface)", border: "1px solid var(--ws-border)", borderRadius: 10, padding: "9px 12px", fontSize: 13, fontFamily: "inherit", color: "var(--ws-text)", cursor: "pointer", letterSpacing: "-0.01em", minWidth: 0 }}>
       <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-        <span style={{ color: "#9A9A9A" }}>{label}: </span>
-        <span style={{ color: "#1A1A1A", fontWeight: 500 }}>{value}</span>
+        <span style={{ color: "var(--ws-text-dim)" }}>{label}: </span>
+        <span style={{ color: "var(--ws-text)", fontWeight: 500 }}>{value}</span>
       </span>
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}><path d="M6 9l6 6 6-6" stroke="#9A9A9A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}><path d="M6 9l6 6 6-6" stroke="var(--ws-text-dim)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
     </button>
   );
 }
 
 function Toggle({ on, onChange }: { on: boolean; onChange?: () => void }) {
   const track = (
-    <div style={{ position: "relative", width: 40, height: 22, background: on ? "#0047FF" : "#E5E5E5", borderRadius: 999, cursor: "pointer", transition: "background 0.2s" }}>
+    <div style={{ position: "relative", width: 40, height: 22, background: on ? "var(--ws-accent)" : "var(--ws-active)", borderRadius: 999, cursor: "pointer", transition: "background 0.2s" }}>
       <div style={{ position: "absolute", top: 2, left: on ? 20 : 2, width: 18, height: 18, background: "#FFFFFF", borderRadius: "50%", transition: "left 0.2s", boxShadow: "0 1px 2px rgba(0,0,0,0.1)" }} />
     </div>
   );
@@ -5413,7 +5446,7 @@ function renderSidebarNavIcon(iconKey: string) {
     case "notifications":
       return <NotificationIcon />;
     case "dot-blue":
-      return <DotIcon color="#0047FF" />;
+      return <DotIcon color="var(--ws-accent)" />;
     case "dot-pink":
       return <DotIcon color="#FF3D8B" />;
     case "help":
@@ -5446,8 +5479,8 @@ function TrackitTagline({ sidebar, collapsed }: { sidebar?: boolean; collapsed?:
         textAlign: sidebar ? "center" : undefined,
       }}
     >
-      Find it, <span style={{ color: "#0047FF" }}>Track it</span>, Pay it
-      <span style={{ color: "#0047FF", fontSize: sidebar ? 18 : 28, lineHeight: 1 }}>.</span>
+      Find it, <span style={{ color: "var(--ws-accent)" }}>Track it</span>, Pay it
+      <span style={{ color: "var(--ws-accent)", fontSize: sidebar ? 18 : 28, lineHeight: 1 }}>.</span>
     </span>
   );
 }
@@ -5544,7 +5577,7 @@ function DashboardTopBar({
     cursor: "pointer",
     fontSize: 14,
     fontWeight: 500,
-    color: "#1A1A1A",
+    color: "var(--ws-text)",
     fontFamily: "inherit",
     textAlign: "left",
     letterSpacing: "-0.02em",
@@ -5555,8 +5588,8 @@ function DashboardTopBar({
     top: "calc(100% + 8px)",
     right: 0,
     minWidth: 240,
-    background: "#FFFFFF",
-    border: "1px solid #EFEFEF",
+    background: "var(--ws-surface)",
+    border: "1px solid var(--ws-border)",
     borderRadius: 12,
     boxShadow: "0 12px 32px rgba(0,0,0,0.1)",
     padding: 6,
@@ -5578,8 +5611,8 @@ function DashboardTopBar({
         justifyContent: "flex-end",
         gap: 16,
         padding: "0 24px",
-        borderBottom: "1px solid #EFEFEF",
-        background: "#FFFFFF",
+        borderBottom: "1px solid var(--ws-border)",
+        background: "var(--ws-surface)",
         position: "relative",
         zIndex: 40,
       }}
@@ -5602,12 +5635,12 @@ function DashboardTopBar({
               justifyContent: "center",
               width: 40,
               height: 40,
-              border: "1px solid #EFEFEF",
+              border: "1px solid var(--ws-border)",
               borderRadius: 10,
-              background: notificationsOpen ? "#F5F5F5" : "#FFFFFF",
+              background: notificationsOpen ? "var(--ws-hover)" : "var(--ws-surface)",
               cursor: "pointer",
               fontFamily: "inherit",
-              color: "#5A5A5A",
+              color: "var(--ws-text-muted)",
             }}
           >
             <NotificationIcon />
@@ -5621,7 +5654,7 @@ function DashboardTopBar({
                   height: 18,
                   padding: "0 5px",
                   borderRadius: 999,
-                  background: "#0047FF",
+                  background: "var(--ws-accent)",
                   color: "#FFFFFF",
                   fontSize: 11,
                   fontWeight: 600,
@@ -5630,7 +5663,7 @@ function DashboardTopBar({
                   justifyContent: "center",
                   letterSpacing: "-0.02em",
                   lineHeight: 1,
-                  boxShadow: "0 0 0 2px #FFFFFF",
+                  boxShadow: "0 0 0 2px var(--ws-surface)",
                 }}
               >
                 {notificationUnread > 9 ? "9+" : notificationUnread}
@@ -5680,9 +5713,9 @@ function DashboardTopBar({
             alignItems: "center",
             gap: 8,
             padding: "4px 10px 4px 4px",
-            border: "1px solid #EFEFEF",
+            border: "1px solid var(--ws-border)",
             borderRadius: 999,
-            background: accountOpen ? "#F5F5F5" : "#FFFFFF",
+            background: accountOpen ? "var(--ws-hover)" : "var(--ws-surface)",
             cursor: "pointer",
             fontFamily: "inherit",
             maxWidth: 220,
@@ -5696,12 +5729,12 @@ function DashboardTopBar({
                   width: 32,
                   height: 32,
                   borderRadius: "50%",
-                  background: "#F0F0F0",
+                  background: "var(--ws-hover)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                   overflow: "hidden",
-                  border: "2px solid #FFFFFF",
+                  border: "2px solid var(--ws-surface)",
                   marginLeft: -8,
                   marginRight: -9,
                   zIndex: 1,
@@ -5711,7 +5744,7 @@ function DashboardTopBar({
                 {profile?.avatar_url && !avatarBroken ? (
                   <img key={profile.avatar_url} src={profile.avatar_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} onError={onAvatarError} />
                 ) : (
-                  <span style={{ fontSize: 12, fontWeight: 600, color: "#5A5A5A" }}>{ownerInitials}</span>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: "var(--ws-text-muted)" }}>{ownerInitials}</span>
                 )}
               </div>
             )}
@@ -5721,12 +5754,12 @@ function DashboardTopBar({
                 width: 32,
                 height: 32,
                 borderRadius: "50%",
-                background: "#E8EEFC",
+                background: "var(--ws-accent-soft)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 overflow: "hidden",
-                border: workspaceDelegated ? "2px solid #FFFFFF" : "none",
+                border: workspaceDelegated ? "2px solid var(--ws-surface)" : "none",
                 zIndex: 2,
                 boxSizing: "border-box",
               }}
@@ -5740,36 +5773,36 @@ function DashboardTopBar({
                   onError={workspaceDelegated ? () => setActorAvatarBroken(true) : onAvatarError}
                 />
               ) : (
-                <span style={{ fontSize: 13, fontWeight: 600, color: "#0047FF" }}>{initials}</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: "var(--ws-accent)" }}>{initials}</span>
               )}
             </div>
           </div>
-          <span style={{ fontSize: 13, fontWeight: 500, color: "#1A1A1A", letterSpacing: "-0.02em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          <span style={{ fontSize: 13, fontWeight: 500, color: "var(--ws-text)", letterSpacing: "-0.02em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {username}
           </span>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden style={{ color: "#9A9A9A", flexShrink: 0, transform: accountOpen ? "rotate(180deg)" : "none", transition: "transform 0.15s ease" }}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden style={{ color: "var(--ws-text-dim)", flexShrink: 0, transform: accountOpen ? "rotate(180deg)" : "none", transition: "transform 0.15s ease" }}>
             <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </button>
         {accountOpen && (
           <div style={dropdownStyle}>
             <div style={{ padding: "10px 12px 8px" }}>
-              <p style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", margin: "0 0 2px", letterSpacing: "-0.02em" }}>{username}</p>
-              <p style={{ fontSize: 12, color: "#9A9A9A", margin: 0, letterSpacing: "-0.01em" }}>
+              <p style={{ fontSize: 14, fontWeight: 600, color: "var(--ws-text)", margin: "0 0 2px", letterSpacing: "-0.02em" }}>{username}</p>
+              <p style={{ fontSize: 12, color: "var(--ws-text-dim)", margin: 0, letterSpacing: "-0.01em" }}>
                 {workspaceDelegated
                   ? (lang === "fr" ? `Admin de ${ownerUsername}` : `Admin for ${ownerUsername}`)
                   : plan}
               </p>
               {workspaceDelegated && (
-                <p style={{ fontSize: 12, color: "#0047FF", margin: "4px 0 0", letterSpacing: "-0.01em" }}>{plan}</p>
+                <p style={{ fontSize: 12, color: "var(--ws-accent)", margin: "4px 0 0", letterSpacing: "-0.01em" }}>{plan}</p>
               )}
               {storeName && !isCreator && (
-                <p style={{ fontSize: 12, color: "#0047FF", margin: "4px 0 0", letterSpacing: "-0.01em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <p style={{ fontSize: 12, color: "var(--ws-accent)", margin: "4px 0 0", letterSpacing: "-0.01em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {storeName}
                 </p>
               )}
             </div>
-            <div style={{ height: 1, background: "#F0F0F0", margin: "0 4px 4px" }} />
+            <div style={{ height: 1, background: "var(--ws-hover)", margin: "0 4px 4px" }} />
             <button type="button" style={menuItemStyle} onClick={() => navAndClose("settings")}>
               <SettingsIcon />
               {lang === "fr" ? "Paramètres" : "Settings"}
@@ -5805,7 +5838,7 @@ function DashboardTopBar({
             )}
             {!isCreator && (
               <>
-                <div style={{ height: 1, background: "#F0F0F0", margin: "6px 4px" }} />
+                <div style={{ height: 1, background: "var(--ws-hover)", margin: "6px 4px" }} />
                 <div style={{ padding: "4px" }}>
                   <button
                     type="button"
@@ -5880,7 +5913,7 @@ function SidebarNavGroup({
   return (
     <div style={{ marginBottom: 2 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 4, position: "relative" }}>
-        {active && <span style={{ position: "absolute", left: -8, top: 7, bottom: 7, width: 3, borderRadius: 2, background: "#0047FF" }} />}
+        {active && <span style={{ position: "absolute", left: -8, top: 7, bottom: 7, width: 3, borderRadius: 2, background: "var(--ws-accent)" }} />}
         <button
           type="button"
           onClick={onParentClick}
@@ -5892,8 +5925,8 @@ function SidebarNavGroup({
             padding: "8px 8px",
             borderRadius: 9,
             border: "none",
-            background: activeView === parentView ? "#F5F5F5" : "transparent",
-            color: active ? "#1A1A1A" : "#5A5A5A",
+            background: activeView === parentView ? "var(--ws-hover)" : "transparent",
+            color: active ? "var(--ws-text)" : "var(--ws-text-muted)",
             fontSize: 13,
             fontWeight: active ? 500 : 400,
             letterSpacing: "-0.02em",
@@ -5903,9 +5936,9 @@ function SidebarNavGroup({
             minWidth: 0,
           }}
         >
-          <span style={{ display: "flex", alignItems: "center", justifyContent: "center", color: active ? "#0047FF" : "#9A9A9A", flexShrink: 0 }}>{icon}</span>
+          <span style={{ display: "flex", alignItems: "center", justifyContent: "center", color: active ? "var(--ws-accent)" : "var(--ws-text-dim)", flexShrink: 0 }}>{icon}</span>
           <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
-          {badge && <span style={{ fontSize: 11, color: "#9A9A9A", background: "#F5F5F5", padding: "2px 8px", borderRadius: 6 }}>{badge}</span>}
+          {badge && <span style={{ fontSize: 11, color: "var(--ws-text-dim)", background: "var(--ws-hover)", padding: "2px 8px", borderRadius: 6 }}>{badge}</span>}
         </button>
         <button
           type="button"
@@ -5920,7 +5953,7 @@ function SidebarNavGroup({
             height: 34,
             border: "none",
             background: "transparent",
-            color: "#9A9A9A",
+            color: "var(--ws-text-dim)",
             cursor: "pointer",
             borderRadius: 8,
             flexShrink: 0,
@@ -5947,8 +5980,8 @@ function SidebarNavGroup({
                 padding: "7px 8px 7px 12px",
                 borderRadius: 8,
                 border: "none",
-                background: activeView === child.view ? "#F5F5F5" : "transparent",
-                color: activeView === child.view ? "#1A1A1A" : "#5A5A5A",
+                background: activeView === child.view ? "var(--ws-hover)" : "transparent",
+                color: activeView === child.view ? "var(--ws-text)" : "var(--ws-text-muted)",
                 fontSize: 13,
                 fontWeight: activeView === child.view ? 500 : 400,
                 letterSpacing: "-0.02em",
@@ -5958,7 +5991,7 @@ function SidebarNavGroup({
                 marginBottom: 2,
               }}
             >
-              <span style={{ width: 8, height: 8, borderRadius: "50%", background: activeView === child.view ? "#0047FF" : "#D0D0D0", flexShrink: 0 }} />
+              <span style={{ width: 8, height: 8, borderRadius: "50%", background: activeView === child.view ? "var(--ws-accent)" : "#D0D0D0", flexShrink: 0 }} />
               <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{child.label}</span>
             </button>
           ))}
@@ -5970,11 +6003,11 @@ function SidebarNavGroup({
 
 function SidebarItem({ collapsed, icon, label, active, badge, onClick }: { collapsed: boolean; icon: React.ReactNode; label: string; active?: boolean; badge?: string; onClick?: () => void }) {
   return (
-    <button type="button" onClick={onClick} style={{ display: "flex", width: "100%", alignItems: "center", gap: 10, padding: collapsed ? "8px 0" : "8px 8px", justifyContent: collapsed ? "center" : "flex-start", borderRadius: 9, border: "none", background: active ? "#F5F5F5" : "transparent", color: active ? "#1A1A1A" : "#5A5A5A", fontSize: 13, fontWeight: active ? 500 : 400, letterSpacing: "-0.02em", marginBottom: 2, position: "relative", fontFamily: "inherit", cursor: "pointer", textAlign: "left" }}>
-      {active && !collapsed && <span style={{ position: "absolute", left: -8, top: 7, bottom: 7, width: 3, borderRadius: 2, background: "#0047FF" }} />}
-      <span style={{ display: "flex", alignItems: "center", justifyContent: "center", color: active ? "#0047FF" : "#9A9A9A", flexShrink: 0 }}>{icon}</span>
+    <button type="button" onClick={onClick} style={{ display: "flex", width: "100%", alignItems: "center", gap: 10, padding: collapsed ? "8px 0" : "8px 8px", justifyContent: collapsed ? "center" : "flex-start", borderRadius: 9, border: "none", background: active ? "var(--ws-hover)" : "transparent", color: active ? "var(--ws-text)" : "var(--ws-text-muted)", fontSize: 13, fontWeight: active ? 500 : 400, letterSpacing: "-0.02em", marginBottom: 2, position: "relative", fontFamily: "inherit", cursor: "pointer", textAlign: "left" }}>
+      {active && !collapsed && <span style={{ position: "absolute", left: -8, top: 7, bottom: 7, width: 3, borderRadius: 2, background: "var(--ws-accent)" }} />}
+      <span style={{ display: "flex", alignItems: "center", justifyContent: "center", color: active ? "var(--ws-accent)" : "var(--ws-text-dim)", flexShrink: 0 }}>{icon}</span>
       {!collapsed && <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>}
-      {!collapsed && badge && <span style={{ fontSize: 11, color: "#9A9A9A", background: "#F5F5F5", padding: "2px 8px", borderRadius: 6 }}>{badge}</span>}
+      {!collapsed && badge && <span style={{ fontSize: 11, color: "var(--ws-text-dim)", background: "var(--ws-hover)", padding: "2px 8px", borderRadius: 6 }}>{badge}</span>}
     </button>
   );
 }

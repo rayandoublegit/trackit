@@ -155,14 +155,14 @@ export function ScriptsManager({
           onClose={() => setUpgradeModalOpen(false)}
         />
       )}
-    <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, overflow: "hidden", marginTop: standalone ? 0 : 32 }}>
-      <div style={{ padding: "18px 20px", borderBottom: "1px solid #EFEFEF" }}>
+    <div style={{ background: "var(--ws-surface)", border: "1px solid var(--ws-border)", borderRadius: 16, overflow: "hidden", marginTop: standalone ? 0 : 32 }}>
+      <div style={{ padding: "18px 20px", borderBottom: "1px solid var(--ws-border)" }}>
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
           <div>
-            <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 4 }}>
+            <div style={{ fontSize: 15, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.02em", marginBottom: 4 }}>
               Scripts
             </div>
-            <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em" }}>
+            <div style={{ fontSize: 13, color: "var(--ws-text-muted)", letterSpacing: "-0.01em" }}>
               {subtitle}
             </div>
           </div>
@@ -180,7 +180,7 @@ export function ScriptsManager({
       </div>
 
       {formOpen && (
-        <div style={{ padding: "20px", borderBottom: "1px solid #EFEFEF", background: "#FAFAFA" }}>
+        <div style={{ padding: "20px", borderBottom: "1px solid var(--ws-border)", background: "var(--ws-surface-2)" }}>
           <label style={labelStyle}>{lang === "fr" ? "Titre" : "Title"}</label>
           <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder={lang === "fr" ? "Ex : Brief vidéo lancement" : "e.g. Launch video brief"} style={inputStyle} />
 
@@ -189,7 +189,7 @@ export function ScriptsManager({
 
           <label style={labelStyle}>{lang === "fr" ? "Fichier joint (optionnel)" : "Attachment (optional)"}</label>
           <input type="file" onChange={(e) => setFile(e.target.files?.[0] || null)} style={{ marginBottom: 10, fontSize: 14 }} />
-          <div style={{ fontSize: 12, color: "#9A9A9A", marginBottom: 14 }}>{lang === "fr" ? "Ou collez un lien (Drive, YouTube...)" : "Or paste a link (Drive, YouTube...)"}</div>
+          <div style={{ fontSize: 12, color: "var(--ws-text-dim)", marginBottom: 14 }}>{lang === "fr" ? "Ou collez un lien (Drive, YouTube...)" : "Or paste a link (Drive, YouTube...)"}</div>
           <input type="text" value={link} onChange={(e) => setLink(e.target.value)} placeholder="https://..." style={inputStyle} />
 
           <label style={labelStyle}>{lang === "fr" ? "Destinataire" : "Recipient"}</label>
@@ -224,15 +224,15 @@ export function ScriptsManager({
 
       <div style={{ display: "flex", flexDirection: "column" }}>
         {loading ? (
-          <div style={{ padding: 48, textAlign: "center", fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.02em" }}>
+          <div style={{ padding: 48, textAlign: "center", fontSize: 14, color: "var(--ws-text-muted)", letterSpacing: "-0.02em" }}>
             {lang === "fr" ? "Chargement..." : "Loading..."}
           </div>
         ) : scripts.length === 0 ? (
           <div style={{ padding: 48, textAlign: "center" }}>
-            <div style={{ fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.02em", marginBottom: 6 }}>
+            <div style={{ fontSize: 14, color: "var(--ws-text-muted)", letterSpacing: "-0.02em", marginBottom: 6 }}>
               {lang === "fr" ? "Aucun script pour le moment" : "No scripts yet"}
             </div>
-            <div style={{ fontSize: 13, color: "#9A9A9A", letterSpacing: "-0.01em" }}>
+            <div style={{ fontSize: 13, color: "var(--ws-text-dim)", letterSpacing: "-0.01em" }}>
               {lang === "fr" ? "Créez votre premier script pour vos créateurs." : "Create your first script for your creators."}
             </div>
           </div>
@@ -242,17 +242,17 @@ export function ScriptsManager({
               key={s.id}
               style={{
                 padding: "16px 20px",
-                borderBottom: i < scripts.length - 1 ? "1px solid #F5F5F5" : "none",
+                borderBottom: i < scripts.length - 1 ? "1px solid var(--ws-border)" : "none",
               }}
             >
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: s.content ? 8 : 0 }}>
                 <div style={{ minWidth: 0, flex: 1 }}>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 4 }}>{s.title}</div>
-                  <div style={{ fontSize: 12, color: "#7A7A7A", letterSpacing: "-0.01em" }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.02em", marginBottom: 4 }}>{s.title}</div>
+                  <div style={{ fontSize: 12, color: "var(--ws-text-muted)", letterSpacing: "-0.01em" }}>
                     {targetLabel(s)} · {fmtDate(s.created_at)}
                   </div>
                 </div>
-                <button type="button" onClick={() => handleDelete(s.id)} style={{ background: "none", border: "none", color: "#B5B5B5", fontSize: 13, cursor: "pointer", fontFamily: "inherit", flexShrink: 0 }}>
+                <button type="button" onClick={() => handleDelete(s.id)} style={{ background: "none", border: "none", color: "var(--ws-text-dim)", fontSize: 13, cursor: "pointer", fontFamily: "inherit", flexShrink: 0 }}>
                   {lang === "fr" ? "Supprimer" : "Delete"}
                 </button>
               </div>
@@ -276,11 +276,11 @@ export function ScriptsManager({
                 gridTemplateColumns: "2fr 1fr 0.9fr 1.2fr",
                 gap: 12,
                 padding: "14px 20px",
-                background: "#FAFAFA",
-                borderBottom: "1px solid #EFEFEF",
+                background: "var(--ws-surface-2)",
+                borderBottom: "1px solid var(--ws-border)",
                 fontSize: 12,
                 fontWeight: 500,
-                color: "#9A9A9A",
+                color: "var(--ws-text-dim)",
               }}
             >
               {[lang === "fr" ? "Titre" : "Title", lang === "fr" ? "Destinataire" : "Recipient", lang === "fr" ? "Date" : "Date", lang === "fr" ? "Actions" : "Actions"].map((h) => (
@@ -296,26 +296,26 @@ export function ScriptsManager({
                   gap: 12,
                   padding: "16px 20px",
                   alignItems: "center",
-                  borderBottom: i < scripts.length - 1 ? "1px solid #F5F5F5" : "none",
+                  borderBottom: i < scripts.length - 1 ? "1px solid var(--ws-border)" : "none",
                 }}
               >
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: s.content ? 4 : 0 }}>{s.title}</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.02em", marginBottom: s.content ? 4 : 0 }}>{s.title}</div>
                   {s.content && (
-                    <div style={{ fontSize: 12, color: "#7A7A7A", lineHeight: 1.4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <div style={{ fontSize: 12, color: "var(--ws-text-muted)", lineHeight: 1.4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {s.content}
                     </div>
                   )}
                 </div>
-                <div style={{ fontSize: 13, color: "#1A1A1A" }}>{targetLabel(s)}</div>
-                <div style={{ fontSize: 13, color: "#7A7A7A" }}>{fmtDate(s.created_at)}</div>
+                <div style={{ fontSize: 13, color: "var(--ws-text)" }}>{targetLabel(s)}</div>
+                <div style={{ fontSize: 13, color: "var(--ws-text-muted)" }}>{fmtDate(s.created_at)}</div>
                 <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
                   {s.file_url && (
                     <a href={s.file_url} target="_blank" rel="noreferrer" style={{ fontSize: 13, color: BLUE, fontWeight: 500, textDecoration: "none" }}>
                       {lang === "fr" ? "Fichier" : "File"} →
                     </a>
                   )}
-                  <button type="button" onClick={() => handleDelete(s.id)} style={{ background: "none", border: "none", color: "#B5B5B5", fontSize: 13, cursor: "pointer", fontFamily: "inherit", padding: 0 }}>
+                  <button type="button" onClick={() => handleDelete(s.id)} style={{ background: "none", border: "none", color: "var(--ws-text-dim)", fontSize: 13, cursor: "pointer", fontFamily: "inherit", padding: 0 }}>
                     {lang === "fr" ? "Supprimer" : "Delete"}
                   </button>
                 </div>

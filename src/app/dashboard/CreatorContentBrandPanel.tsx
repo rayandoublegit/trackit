@@ -114,7 +114,7 @@ export function CreatorContentBrandPanel({
           cursor: "pointer",
           fontSize: 15,
           fontWeight: 600,
-          color: "#1A1A1A",
+          color: "var(--ws-text)",
           fontFamily: "inherit",
           padding: 0,
           marginBottom: 28,
@@ -134,31 +134,31 @@ export function CreatorContentBrandPanel({
             style={{
               fontSize: isMobile ? 24 : 28,
               fontWeight: 600,
-              color: "#1A1A1A",
+              color: "var(--ws-text)",
               margin: "0 0 4px",
               letterSpacing: "-0.04em",
             }}
           >
             {t.contentPanelTitle}
           </h1>
-          <p style={{ fontSize: 14, color: "#7A7A7A", margin: 0 }}>{t.contentPanelSubtitle(displayName)}</p>
+          <p style={{ fontSize: 14, color: "var(--ws-text-muted)", margin: 0 }}>{t.contentPanelSubtitle(displayName)}</p>
         </div>
       </div>
 
       {loading ? (
-        <p style={{ fontSize: 14, color: "#7A7A7A" }}>{t.loading}</p>
+        <p style={{ fontSize: 14, color: "var(--ws-text-muted)" }}>{t.loading}</p>
       ) : items.length === 0 ? (
         <div
           style={{
-            border: "1px solid #EFEFEF",
+            border: "1px solid var(--ws-border)",
             borderRadius: 16,
             padding: "48px 24px",
             textAlign: "center",
-            background: "#FAFAFA",
+            background: "var(--ws-surface-2)",
           }}
         >
-          <p style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", margin: "0 0 8px" }}>{t.contentEmptyTitle}</p>
-          <p style={{ fontSize: 14, color: "#7A7A7A", margin: 0, lineHeight: 1.5 }}>{t.contentEmptySubtitle}</p>
+          <p style={{ fontSize: 15, fontWeight: 600, color: "var(--ws-text)", margin: "0 0 8px" }}>{t.contentEmptyTitle}</p>
+          <p style={{ fontSize: 14, color: "var(--ws-text-muted)", margin: 0, lineHeight: 1.5 }}>{t.contentEmptySubtitle}</p>
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -166,16 +166,16 @@ export function CreatorContentBrandPanel({
             <div
               key={item.id}
               style={{
-                border: "1px solid #EFEFEF",
+                border: "1px solid var(--ws-border)",
                 borderRadius: 14,
                 padding: "18px 20px",
-                background: "#FFFFFF",
+                background: "var(--ws-surface)",
               }}
             >
-              <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 4 }}>
+              <div style={{ fontSize: 15, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.02em", marginBottom: 4 }}>
                 {item.title}
               </div>
-              <div style={{ fontSize: 12, color: "#9A9A9A", marginBottom: item.notes || item.file_url ? 10 : 0 }}>
+              <div style={{ fontSize: 12, color: "var(--ws-text-dim)", marginBottom: item.notes || item.file_url ? 10 : 0 }}>
                 {fmtDate(item.created_at)}
                 {item.file_size ? ` · ${formatBytes(item.file_size)}` : ""}
               </div>
@@ -207,7 +207,7 @@ export function CreatorContentBrandPanel({
                     maxWidth: "100%",
                     maxHeight: 360,
                     borderRadius: 12,
-                    border: "1px solid #EFEFEF",
+                    border: "1px solid var(--ws-border)",
                     marginBottom: 10,
                   }}
                 />

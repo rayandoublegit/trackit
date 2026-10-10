@@ -6,6 +6,8 @@ import { PlatformLogo } from "@/components/PlatformLogo";
 import { setActiveMinoChatId, setPendingMinoPrompt } from "@/lib/mino-chats-storage";
 import type { DashboardView } from "@/lib/dashboard-view-storage";
 import { useLang, type Lang } from "@/lib/useLang";
+import { setPendingMinoAttachments } from "@/lib/mino-attachments";
+import { MinoAttachButtons, MinoAttachChips, MinoDropHint, useMinoAttachments } from "./MinoAttachments";
 import "./home-mino.css";
 
 // Home opens on Mino: ask anything, and the chat view picks the question up.
@@ -130,15 +132,23 @@ export function MinoHomeHero({
   const lang = useLang();
   const fr = lang === "fr";
   const placeholder = useRotatingPlaceholder(lang);
+  const att = useMinoAttachments(text);
 
-  const ask = (raw: string) => {
+  const ask = (raw: string, withAttachments = false) => {
     const q = raw.trim();
-    if (!q) return;
+    const image = withAttachments ? att.image : null;
+    const site = withAttachments ? att.site : null;
+    if (!q && !image && !site) return;
     // Start fresh: the chat view builds the answer (creator profiles, a sales
-    // dashboard, an action card) in a new thread.
+    // dashboard, an action card, a brand analysis) in a new thread.
     setActiveMinoChatId(userId, null);
     onNavigate("ai");
-    window.setTimeout(() => setPendingMinoPrompt(userId, q), 60);
+    window.setTimeout(() => {
+      // Attachments first: the chat view reads them when the prompt event fires.
+      setPendingMinoAttachments(image || site ? { image, site } : null);
+      setPendingMinoPrompt(userId, q);
+    }, 60);
+    if (withAttachments) att.clear();
   };
 
   return (
@@ -162,17 +172,19 @@ export function MinoHomeHero({
       </h1>
       <p className="hm-hero__sub">
         {fr
-          ? "Mino trouve des créateurs sur TikTok et Instagram, lance des campagnes et ouvre tout ce qu’il faut dans Trackit."
-          : "Mino finds creators across TikTok and Instagram, starts campaigns and opens anything in Trackit."}
+          ? "Collez le lien de votre site ou ajoutez une photo de votre produit : Mino analyse votre marque et vous propose des créateurs TikTok et Instagram, avec leurs emails quand ils sont connus."
+          : "Paste your website link or add a photo of your product: Mino analyses your brand and suggests TikTok and Instagram creators, with their emails when known."}
       </p>
 
       <form
-        className="mtg-promptbox hm-hero__box"
+        className={`mtg-promptbox hm-hero__box${att.dragging ? " is-dragging" : ""}`}
         onSubmit={(e) => {
           e.preventDefault();
-          ask(text);
+          ask(text, true);
         }}
+        {...att.dropProps}
       >
+        <MinoDropHint show={att.dragging} />
         <div className="mtg-promptbox__led" aria-hidden>
           <span className="mtg-promptbox__led-spin" />
         </div>
@@ -185,16 +197,21 @@ export function MinoHomeHero({
             ref={inputRef}
             value={text}
             onChange={(e) => setText(e.target.value)}
+            onPaste={att.onPaste}
             placeholder={placeholder || (fr ? "Demandez à Mino" : "Ask Mino")}
             aria-label={fr ? "Demandez à Mino" : "Ask Mino"}
           />
-          <button type="submit" className="hm-hero__send" disabled={!text.trim()} aria-label={fr ? "Envoyer à Mino" : "Send to Mino"}>
+          <MinoAttachButtons att={att} />
+          <button type="submit" className="hm-hero__send" disabled={!text.trim() && !att.image && !att.site} aria-label={fr ? "Envoyer à Mino" : "Send to Mino"}>
             <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden>
               <path d="M12 19V5M6.5 10.5 12 5l5.5 5.5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
         </div>
       </form>
+      <div className="hm-hero__attachments">
+        <MinoAttachChips att={att} />
+      </div>
 
       <div className="hm-hero__chips">
         {CHIPS.map((c, i) => (

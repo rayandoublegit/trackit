@@ -372,7 +372,7 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
     return (
       <>
         <AnalyticsHeader isMobile={isMobile} lang={lang} range={range} setRange={setRange} compare={compare} setCompare={setCompare} analyticsData={analyticsData} />
-        <div style={{ padding: 80, textAlign: "center", color: "#9A9A9A", fontSize: 14 }}>
+        <div style={{ padding: 80, textAlign: "center", color: "var(--ws-text-dim)", fontSize: 14 }}>
           {lang === "fr" ? "Chargement des analytiques…" : "Loading analytics…"}
         </div>
       </>
@@ -571,7 +571,7 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
           <div style={{ overflowX: isMobile ? "auto" : undefined, WebkitOverflowScrolling: isMobile ? "touch" : undefined }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: isMobile ? 600 : undefined }}>
               <thead>
-                <tr style={{ borderBottom: "1px solid #EFEFEF", textAlign: "left" }}>
+                <tr style={{ borderBottom: "1px solid var(--ws-border)", textAlign: "left" }}>
                   <Th>{lang === "fr" ? "Rang" : "Rank"}</Th>
                   <Th sortable onClick={() => toggleSort("creator")}>{lang === "fr" ? "Créateur" : "Creator"}</Th>
                   <Th>{lang === "fr" ? "Plateforme" : "Platform"}</Th>
@@ -584,29 +584,29 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
               <tbody>
                 {sortedCreators.length === 0 ? (
                   <tr>
-                    <td colSpan={7} style={{ padding: "32px 8px", textAlign: "center", color: "#9A9A9A", fontSize: 13 }}>
+                    <td colSpan={7} style={{ padding: "32px 8px", textAlign: "center", color: "var(--ws-text-dim)", fontSize: 13 }}>
                       {lang === "fr" ? "Aucun créateur avec des ventes pour le moment." : "No creators with sales yet."}
                     </td>
                   </tr>
                 ) : sortedCreators.map((r, i) => (
-                  <tr key={r.id} style={{ borderBottom: "1px solid #F5F5F5", position: "relative" }}>
+                  <tr key={r.id} style={{ borderBottom: "1px solid var(--ws-border)", position: "relative" }}>
                     <td style={{ padding: "12px 8px" }}><RankBadge rank={r.rank} /></td>
                     <td style={{ padding: "12px 8px" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                         <CreatorAvatar src={r.avatar_url} username={r.handle} displayName={r.creator} size={36} alt={r.creator} />
                         <div style={{ minWidth: 0 }}>
-                          <div style={{ fontWeight: 500, color: "#1A1A1A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.creator}</div>
+                          <div style={{ fontWeight: 500, color: "var(--ws-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.creator}</div>
                           {r.handle && r.creator !== `@${r.handle}` ? (
-                            <div style={{ fontSize: 12, color: "#0047FF", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>@{r.handle}</div>
+                            <div style={{ fontSize: 12, color: "var(--ws-accent)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>@{r.handle}</div>
                           ) : null}
                         </div>
                       </div>
                     </td>
-                    <td style={{ padding: "12px 8px", color: "#7A7A7A" }}>{r.platform}</td>
+                    <td style={{ padding: "12px 8px", color: "var(--ws-text-muted)" }}>{r.platform}</td>
                     <td style={{ padding: "12px 8px" }}>
-                      <div style={{ fontWeight: 500, color: "#1A1A1A" }}>{formatCurrency(r.sales, lang)}</div>
+                      <div style={{ fontWeight: 500, color: "var(--ws-text)" }}>{formatCurrency(r.sales, lang)}</div>
                       {r.salesCount > 0 ? (
-                        <div style={{ fontSize: 11, color: "#9A9A9A", marginTop: 2 }}>
+                        <div style={{ fontSize: 11, color: "var(--ws-text-dim)", marginTop: 2 }}>
                           {r.salesCount} {lang === "fr" ? (r.salesCount > 1 ? "ventes" : "vente") : r.salesCount > 1 ? "sales" : "sale"}
                         </div>
                       ) : null}
@@ -615,7 +615,7 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
                     <td style={{ padding: "12px 8px", fontWeight: 500, filter: !hasAdvancedAnalytics ? "blur(4px)" : "none", userSelect: !hasAdvancedAnalytics ? "none" : "auto" }}>
                       {hasAdvancedAnalytics ? (
                         <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-                          <span style={{ color: r.roi >= 1 ? "#166534" : r.roi > 0 ? "#991B1B" : "#9A9A9A" }}>
+                          <span style={{ color: r.roi >= 1 ? "#166534" : r.roi > 0 ? "#991B1B" : "var(--ws-text-dim)" }}>
                             {r.roi > 0 ? `${r.roi.toFixed(1)}×` : "—"}
                           </span>
                           {r.roi > 0 ? <ProfitabilityPill profitable={r.roi >= 1} lang={lang} /> : null}
@@ -631,7 +631,7 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
                 {!hasAdvancedAnalytics && !isFree && (
                   <tr>
                     <td colSpan={7} style={{ padding: "16px 8px", textAlign: "center", background: "#F8F9FF", borderTop: "1px solid #E5EDFF" }}>
-                      <button type="button" onClick={() => void onUpgradePro?.()} style={{ background: "none", border: "none", fontSize: 13, color: "#0047FF", fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>
+                      <button type="button" onClick={() => void onUpgradePro?.()} style={{ background: "none", border: "none", fontSize: 13, color: "var(--ws-accent)", fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>
                         {lang === "fr" ? "🔒 Passez à Pro pour le suivi ROI et l'export CSV →" : "🔒 Upgrade to Pro for ROI tracking & CSV export →"}
                       </button>
                     </td>
@@ -654,19 +654,19 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
           <div style={{ overflowX: isMobile ? "auto" : undefined, WebkitOverflowScrolling: isMobile ? "touch" : undefined }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: isMobile ? 600 : undefined }}>
             <thead>
-              <tr style={{ borderBottom: "1px solid #EFEFEF", textAlign: "left" }}>
+              <tr style={{ borderBottom: "1px solid var(--ws-border)", textAlign: "left" }}>
                 <Th>{lang === "fr" ? "Nom de la campagne" : "Campaign Name"}</Th><Th>{lang === "fr" ? "Créateurs" : "Creators"}</Th><Th>{lang === "fr" ? "Ventes totales" : "Total Sales"}</Th><Th>{lang === "fr" ? "Commissions" : "Commissions"}</Th><Th>{lang === "fr" ? "ROI moyen" : "Avg ROI"}</Th><Th>{lang === "fr" ? "Date de début" : "Start Date"}</Th><Th>{lang === "fr" ? "Statut" : "Status"}</Th>
               </tr>
             </thead>
             <tbody>
               {campaignRows.length === 0 ? (
                 <tr>
-                  <td colSpan={7} style={{ padding: "32px 8px", textAlign: "center", color: "#9A9A9A", fontSize: 13 }}>
+                  <td colSpan={7} style={{ padding: "32px 8px", textAlign: "center", color: "var(--ws-text-dim)", fontSize: 13 }}>
                     {lang === "fr" ? "Aucune campagne pour le moment." : "No campaigns yet."}
                   </td>
                 </tr>
               ) : campaignRows.map((c: { id?: string; name?: string; platform?: string; status?: string; created_at?: string | null; start_date?: string | null; creatorCount?: number; totalSales?: number; totalCommissions?: number; roi?: number }) => (
-                <tr key={c.id || c.name} style={{ borderBottom: "1px solid #F5F5F5" }}>
+                <tr key={c.id || c.name} style={{ borderBottom: "1px solid var(--ws-border)" }}>
                   <td style={{ padding: "12px 8px", fontWeight: 500 }}>{c.name || "—"}</td>
                   <td style={{ padding: "12px 8px" }}>{c.creatorCount ?? 0}</td>
                   <td style={{ padding: "12px 8px" }}>{formatCurrency(c.totalSales ?? 0, lang)}</td>
@@ -681,7 +681,7 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
                       "—"
                     )}
                   </td>
-                  <td style={{ padding: "12px 8px", color: "#7A7A7A" }}>{formatCampaignStartDate(c.start_date || c.created_at, lang)}</td>
+                  <td style={{ padding: "12px 8px", color: "var(--ws-text-muted)" }}>{formatCampaignStartDate(c.start_date || c.created_at, lang)}</td>
                   <td style={{ padding: "12px 8px" }}><CampaignStatus lang={lang} status={String(c.status || "Draft")} /></td>
                 </tr>
               ))}
@@ -712,15 +712,15 @@ function AnalyticsHeader({ lang, range, setRange, compare, setCompare, isMobile,
   return (
     <div style={{ paddingTop: isMobile ? 16 : 40, paddingRight: isMobile ? 16 : 40, paddingBottom: isMobile ? 16 : 20, paddingLeft: isMobile ? 16 : 40, borderBottom: "1px solid var(--ws-border)", background: "var(--ws-surface)" }}>
       <div style={{ marginBottom: 16 }}>
-        <h1 style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", margin: 0, letterSpacing: "-0.04em" }}>{lang === "fr" ? "Analytiques" : "Analytics"}</h1>
+        <h1 style={{ fontSize: 28, fontWeight: 600, color: "var(--ws-text)", margin: 0, letterSpacing: "-0.04em" }}>{lang === "fr" ? "Analytiques" : "Analytics"}</h1>
       </div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 16 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-          <div style={{ display: "inline-flex", background: "#F5F5F5", borderRadius: 10, padding: 3, gap: 2, overflowX: isMobile ? "auto" : undefined, flexWrap: isMobile ? "nowrap" : undefined }}>
+          <div style={{ display: "inline-flex", background: "var(--ws-hover)", borderRadius: 10, padding: 3, gap: 2, overflowX: isMobile ? "auto" : undefined, flexWrap: isMobile ? "nowrap" : undefined }}>
             {ranges.map((r) => (
               <button key={r.id} type="button" onClick={() => setRange(r.id)} style={{
                 padding: "8px 14px", borderRadius: 8, border: "none", fontSize: 13, fontFamily: "inherit", cursor: "pointer",
-                background: range === r.id ? "#FFF" : "transparent", color: range === r.id ? "#1A1A1A" : "#7A7A7A",
+                background: range === r.id ? "var(--ws-surface)" : "transparent", color: range === r.id ? "var(--ws-text)" : "var(--ws-text-muted)",
                 fontWeight: range === r.id ? 500 : 400, boxShadow: range === r.id ? "0 1px 2px rgba(0,0,0,0.06)" : "none",
               }}>{r.label}</button>
             ))}
@@ -730,7 +730,7 @@ function AnalyticsHeader({ lang, range, setRange, compare, setCompare, isMobile,
           ) : null}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ fontSize: 13, color: "#7A7A7A" }}>{lang === "fr" ? "Comparer à la période précédente" : "Compare to previous period"}</span>
+          <span style={{ fontSize: 13, color: "var(--ws-text-muted)" }}>{lang === "fr" ? "Comparer à la période précédente" : "Compare to previous period"}</span>
           <CompareToggle on={compare} onToggle={() => setCompare(!compare)} />
         </div>
       </div>
@@ -740,8 +740,8 @@ function AnalyticsHeader({ lang, range, setRange, compare, setCompare, isMobile,
 
 function CompareToggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
   return (
-    <button type="button" onClick={onToggle} style={{ position: "relative", width: 40, height: 22, background: on ? "#0047FF" : "#E5E5E5", borderRadius: 999, border: "none", cursor: "pointer", padding: 0 }}>
-      <span style={{ position: "absolute", top: 2, left: on ? 20 : 2, width: 18, height: 18, background: "#FFF", borderRadius: "50%", transition: "left 0.2s" }} />
+    <button type="button" onClick={onToggle} style={{ position: "relative", width: 40, height: 22, background: on ? "var(--ws-accent)" : "var(--ws-active)", borderRadius: 999, border: "none", cursor: "pointer", padding: 0 }}>
+      <span style={{ position: "absolute", top: 2, left: on ? 20 : 2, width: 18, height: 18, background: "#FFFFFF", borderRadius: "50%", transition: "left 0.2s" }} />
     </button>
   );
 }
@@ -777,7 +777,7 @@ function TrendStat({ trend, lang }: { trend: PeriodTrend; lang: "en" | "fr" }) {
 
 function Th({ children, sortable, onClick }: { children: React.ReactNode; sortable?: boolean; onClick?: () => void }) {
   return (
-    <th style={{ padding: "10px 8px", color: "#9A9A9A", fontWeight: 500, fontSize: 12, cursor: sortable ? "pointer" : "default", userSelect: "none" }} onClick={onClick}>
+    <th style={{ padding: "10px 8px", color: "var(--ws-text-dim)", fontWeight: 500, fontSize: 12, cursor: sortable ? "pointer" : "default", userSelect: "none" }} onClick={onClick}>
       {children}{sortable ? " ↕" : ""}
     </th>
   );
@@ -824,7 +824,7 @@ function StatusBadge({ lang, status }: { lang: "en" | "fr"; status: string }) {
 
 function CampaignStatus({ lang, status }: { lang: "en" | "fr"; status: string }) {
   return (
-    <span style={{ fontSize: 11, fontWeight: 600, color: "#1A1A1A", textTransform: "capitalize", letterSpacing: "-0.01em" }}>
+    <span style={{ fontSize: 11, fontWeight: 600, color: "var(--ws-text)", textTransform: "capitalize", letterSpacing: "-0.01em" }}>
       {campaignStatusLabel(status, lang)}
     </span>
   );

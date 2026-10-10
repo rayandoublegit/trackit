@@ -7,10 +7,11 @@ import {
   nicheTagsFor,
   type FeedCreator,
 } from "@/lib/discovery-feed";
-import { cleanSearch, countryOrClause, isMissingColumn, nicheClause } from "@/lib/catalog-query";
-import { clientImageUrl, isStablePublicImageUrl } from "@/lib/client-image-url";
+import { cleanSearch, countryOrClause, isMissingColumn, knownSchemaLevel, nicheClause, rememberSchemaLevel } from "@/lib/catalog-query";
 import { feedAvatarUrlForCreator } from "@/lib/feed-avatar-url";
 import { isViralVideo } from "@/lib/viral";
+import { storageKeyCandidates } from "@/lib/creator-storage-key";
+import { videoCover } from "@/lib/video-cover";
 import type { CreatorProfileData, HistoryPoint, LibraryVideo, VideoLibraryResult } from "@/lib/creator-intel-types";
 
 // Reads for the creator profile page and the video library. Tracked data
@@ -38,11 +39,17 @@ type Query = any;
 
 const isMissingRelation = (message: string) => /relation .* does not exist|could not find the table|schema cache/i.test(message);
 
-function coverFor(username: string, raw: string, index: number): string {
-  if (!raw) return index < 3 ? `/api/creator-video-thumbs?username=${encodeURIComponent(username)}&i=${index}` : "";
-  if (isStablePublicImageUrl(raw)) return raw;
-  if (index < 3) return `/api/creator-video-thumbs?username=${encodeURIComponent(username)}&i=${index}`;
-  return clientImageUrl(raw);
+/**
+ * Spellings of a stored text value without case ("fitness", "Fitness",
+ * "Weight Loss"): an `in` list on them uses a plain index, `ilike` does not.
+ */
+export function caseVariants(value: string): string[] {
+  const v = value.trim();
+  if (!v) return [];
+  const lower = v.toLowerCase();
+  const first = lower.charAt(0).toUpperCase() + lower.slice(1);
+  const title = lower.replace(/(^|[\s/&-])(\p{L})/gu, (_, sep: string, ch: string) => sep + ch.toUpperCase());
+  return [...new Set([v, lower, first, title, v.toUpperCase()])];
 }
 
 /** Only http(s) links are shown as product links. */
@@ -99,8 +106,9 @@ function videoFormat(v: Row, mediaType: LibraryVideo["mediaType"]): LibraryVideo
   return str(v.platform).toLowerCase() === "youtube" && n(v.duration_seconds) > 180 ? "long" : "short";
 }
 
-function trackedVideo(v: Row, c: CreatorBits | undefined, index: number): LibraryVideo {
+function trackedVideo(v: Row, c: CreatorBits | undefined): LibraryVideo {
   const username = str(v.username);
+  const { cover, fallback } = videoCover({ platform: str(v.platform), username, raw: str(v.cover_url) });
   const mediaType = (["video", "photo", "carousel"].includes(str(v.media_type)) ? v.media_type : "video") as LibraryVideo["mediaType"];
   const views = n(v.views);
   const productUrl = safeUrl(v.product_url);
@@ -113,7 +121,8 @@ function trackedVideo(v: Row, c: CreatorBits | undefined, index: number): Librar
     followers: c?.followers ?? 0,
     niche: c?.niche ?? "",
     countryCode: c?.countryCode ?? null,
-    cover: isStablePublicImageUrl(str(v.cover_url)) ? str(v.cover_url) : coverFor(username, str(v.cover_url), index),
+    cover,
+    ...(fallback ? { coverFallback: fallback } : {}),
     shareUrl: str(v.share_url),
     caption: str(v.caption),
     hashtags: Array.isArray(v.hashtags) ? (v.hashtags as string[]) : [],
@@ -141,6 +150,7 @@ function snapshotVideos(row: Row, c: FeedCreator): LibraryVideo[] {
     const views = n(t.playCount);
     const created = n(t.createTime);
     const caption = str(t.desc);
+    const { cover, fallback } = videoCover({ platform: c.platform, username: c.username, raw: str(t.cover), topIndex: i });
     return {
       platform: c.platform.toLowerCase(),
       id: str(t.id) || `${c.username}-${i}`,
@@ -150,7 +160,8 @@ function snapshotVideos(row: Row, c: FeedCreator): LibraryVideo[] {
       followers: c.followersCount,
       niche: c.primaryNiche,
       countryCode: c.countryCode,
-      cover: coverFor(c.username, str(t.cover), i),
+      cover,
+      ...(fallback ? { coverFallback: fallback } : {}),
       shareUrl: str(t.shareUrl),
       caption,
       hashtags: hashtagsIn(caption),
@@ -175,42 +186,79 @@ function columnsFor(level: Level) {
   return [CREATOR_LIST_COLUMNS, level >= 1 ? CREATOR_GROWTH_COLUMNS : "", level >= 2 ? CREATOR_VIDEO_STATS_COLUMNS : ""].filter(Boolean).join(",");
 }
 
-/** creators_index rows with every column this database has (newest migrations first). */
+/**
+ * creators_index rows with every column this database has. The level that
+ * works is shared with the catalog (catalog-query's schema cache), so a
+ * database without the latest migrations costs one failed query per process,
+ * not one per request.
+ */
 async function creatorRows(
   build: (cols: string, level: Level) => PromiseLike<{ data: unknown; error: { message: string } | null }>,
 ): Promise<{ rows: Row[]; level: Level }> {
-  for (const level of [2, 1, 0] as Level[]) {
+  const known = knownSchemaLevel();
+  let level = (known == null ? 2 : Math.min(known, 2)) as Level;
+  for (;;) {
     const res = await build(columnsFor(level), level);
-    if (!res.error) return { rows: (res.data ?? []) as Row[], level };
-    if (!isMissingColumn(res.error.message)) return { rows: [], level };
+    if (!res.error) {
+      // Level 2 says nothing about newer columns (catalog level 3): only remember a downgrade.
+      if (level < 2 && known !== level) rememberSchemaLevel(level);
+      return { rows: (res.data ?? []) as Row[], level };
+    }
+    if (!isMissingColumn(res.error.message) || level === 0) return { rows: [], level };
+    level = (level - 1) as Level;
   }
-  return { rows: [], level: 0 };
+}
+
+/** Same niche and platform, comparable size (index on primary_niche, followers). */
+async function similarCreators(admin: SupabaseClient, creator: FeedCreator, platform: string, stored: string): Promise<FeedCreator[]> {
+  const niches = caseVariants(creator.primaryNiche || "");
+  if (!niches.length) return [];
+  const f = Math.max(creator.followersCount, 1);
+  const sim = await creatorRows((cols) =>
+    admin
+      .from("creators_index")
+      .select(cols)
+      .in("primary_niche", niches)
+      .ilike("platform", platform)
+      .neq("username", stored)
+      .gte("followers", Math.floor(f / 4))
+      .lte("followers", Math.ceil(f * 4))
+      .order("engagement_rate", { ascending: false, nullsFirst: false })
+      .limit(8),
+  );
+  return sim.rows.map(catalogRowToFeedCreator);
 }
 
 export async function readCreatorProfile(admin: SupabaseClient, rawUsername: string): Promise<CreatorProfileData | null> {
-  const username = rawUsername.replace(/^@/, "").trim().toLowerCase();
-  const { rows } = await creatorRows((cols) => admin.from("creators_index").select(cols).in("username", [username, `ig_${username}`, `yt_${username}`]).limit(1));
-  const row = rows[0];
+  // The same handle can exist on several platforms: pick the best match, not any.
+  const candidates = storageKeyCandidates(rawUsername);
+  if (!candidates.length) return null;
+  const { rows: found } = await creatorRows((cols) => admin.from("creators_index").select(cols).in("username", candidates).limit(candidates.length));
+  const row = candidates.map((k) => found.find((r) => String(r.username).toLowerCase() === k)).find(Boolean);
   if (!row) return null;
   const creator = catalogRowToFeedCreator(row);
   const platform = String(row.platform ?? "tiktok").toLowerCase();
   const stored = String(row.username);
 
-  const [snap, vids] = await Promise.all([
+  // History, videos and similar creators in one round trip. Per-creator reads go
+  // through the username indexes (migration 000049); platform stays a filter
+  // without case so data written before migration 000046 still matches.
+  const [snap, vids, sim] = await Promise.all([
     admin
       .from("creator_snapshots")
       .select("captured_on, followers, avg_views, engagement_rate")
-      .ilike("platform", platform)
       .eq("username", stored)
+      .ilike("platform", platform)
       .order("captured_on", { ascending: true })
       .limit(400),
     admin
       .from("creator_videos")
       .select("*")
-      .ilike("platform", platform)
       .eq("username", stored)
+      .ilike("platform", platform)
       .order("posted_at", { ascending: false, nullsFirst: false })
       .limit(60),
+    similarCreators(admin, creator, platform, stored),
   ]);
   const history: HistoryPoint[] = (snap.error ? [] : (snap.data ?? [])).map((s: Row) => ({
     day: String(s.captured_on),
@@ -220,7 +268,7 @@ export async function readCreatorProfile(admin: SupabaseClient, rawUsername: str
   }));
   const tracked = vids.error ? [] : ((vids.data ?? []) as Row[]);
   const bits = bitsFromFeed(creator);
-  const videos = tracked.length ? tracked.map((v, i) => trackedVideo(v, bits, i)) : snapshotVideos(row, creator);
+  const videos = tracked.length ? tracked.map((v) => trackedVideo(v, bits)) : snapshotVideos(row, creator);
 
   const tagCounts = new Map<string, number>();
   for (const v of videos) for (const t of v.hashtags) tagCounts.set(t, (tagCounts.get(t) ?? 0) + 1);
@@ -235,26 +283,7 @@ export async function readCreatorProfile(admin: SupabaseClient, rawUsername: str
     viralVideos: creator.videoStats?.viralVideos ?? (judged.length ? judged.filter((v) => v.isViral).length : null),
   };
 
-  // Similar: same niche and platform, comparable size.
-  let similar: FeedCreator[] = [];
-  if (creator.primaryNiche) {
-    const f = Math.max(creator.followersCount, 1);
-    const sim = await creatorRows((cols) =>
-      admin
-        .from("creators_index")
-        .select(cols)
-        .ilike("platform", platform)
-        .ilike("primary_niche", creator.primaryNiche)
-        .neq("username", stored)
-        .gte("followers", Math.floor(f / 4))
-        .lte("followers", Math.ceil(f * 4))
-        .order("engagement_rate", { ascending: false, nullsFirst: false })
-        .limit(8),
-    );
-    similar = sim.rows.map(catalogRowToFeedCreator);
-  }
-
-  return { creator, history, videos, similar, hashtags, mix, depth: tracked.length ? "tracked" : "snapshot" };
+  return { creator, history, videos, similar: sim, hashtags, mix, depth: tracked.length ? "tracked" : "snapshot" };
 }
 
 export type VideoMediaFilter = "video" | "short" | "long" | "photo" | "carousel";
@@ -279,6 +308,8 @@ export type VideoQuery = {
   viral?: boolean;
   duration?: "short" | "medium" | "long";
   sort?: VideoSort;
+  /** "snapshot": page through the stored top videos (page 1 came back with source "snapshot"). */
+  source?: "snapshot";
   offset?: number;
   limit?: number;
 };
@@ -313,6 +344,7 @@ export function videoQueryFromParams(p: URLSearchParams): VideoQuery {
     viral: p.get("viral") === "1" || p.get("viral") === "true",
     duration: pick(p.get("duration"), ["short", "medium", "long"] as const),
     sort: pick(p.get("sort"), ["views", "gained", "recent", "engagement"] as const) ?? "views",
+    source: p.get("source") === "snapshot" ? "snapshot" : undefined,
     offset: Math.max(0, Math.floor(Number(p.get("offset")) || 0)),
     limit: pos(p.get("limit")) ?? 48,
   };
@@ -409,7 +441,7 @@ async function trackedFromView(admin: SupabaseClient, q: VideoQuery, limit: numb
   if (error) return isMissingRelation(error.message) || isMissingColumn(error.message) ? "missing" : "none";
   const rows = (data ?? []) as Row[];
   return {
-    videos: rows.slice(0, limit).map((r, i) => trackedVideo(r, bitsFromViewRow(r), i + offset)),
+    videos: rows.slice(0, limit).map((r) => trackedVideo(r, bitsFromViewRow(r))),
     hasMore: rows.length > limit,
   };
 }
@@ -450,13 +482,13 @@ async function trackedFromTable(admin: SupabaseClient, q: VideoQuery, limit: num
     : [];
   const byName = new Map(creators.map((c) => [c.username.toLowerCase(), c]));
   return {
-    videos: rows.slice(0, limit).map((r, i) => trackedVideo(r, bitsFromFeed(byName.get(String(r.username).toLowerCase())), i + offset)),
+    videos: rows.slice(0, limit).map((r) => trackedVideo(r, bitsFromFeed(byName.get(String(r.username).toLowerCase())))),
     hasMore: rows.length > limit,
   };
 }
 
 /** Stored top videos of creators that have no tracked videos yet, filtered like tracked ones. */
-async function snapshotLibrary(admin: SupabaseClient, q: VideoQuery, limit: number): Promise<VideoLibraryResult> {
+async function snapshotLibrary(admin: SupabaseClient, q: VideoQuery, limit: number, offset: number): Promise<VideoLibraryResult> {
   const nicheOr = q.niche ? nicheClause(q.niche) : null;
   if (q.niche && !nicheOr) return { videos: [], hasMore: false, source: "snapshot" };
   const { rows } = await creatorRows((cols, level) => {
@@ -498,12 +530,17 @@ async function snapshotLibrary(admin: SupabaseClient, q: VideoQuery, limit: numb
   if (q.sort === "recent") videos.sort((a, b) => (b.postedAt ?? "").localeCompare(a.postedAt ?? ""));
   else if (q.sort === "engagement") videos.sort((a, b) => er(b) - er(a) || b.views - a.views);
   else videos.sort((a, b) => b.views - a.views);
-  return { videos: videos.slice(0, limit), hasMore: false, source: "snapshot" };
+  return { videos: videos.slice(offset, offset + limit), hasMore: videos.length > offset + limit, source: "snapshot" };
 }
 
 export async function readVideoLibrary(admin: SupabaseClient, q: VideoQuery): Promise<VideoLibraryResult> {
   const limit = Math.min(Math.max(q.limit ?? 48, 1), 96);
   const offset = Math.max(q.offset ?? 0, 0);
+
+  // Next page of a snapshot result: no tracked video matched on page 1.
+  if (q.source === "snapshot") {
+    return needsTrackedData(q) ? { videos: [], hasMore: false, source: "snapshot" } : snapshotLibrary(admin, q, limit, offset);
+  }
 
   let tracked = await trackedFromView(admin, q, limit, offset);
   if (tracked === "missing") tracked = await trackedFromTable(admin, q, limit, offset);
@@ -515,5 +552,5 @@ export async function readVideoLibrary(admin: SupabaseClient, q: VideoQuery): Pr
   // No tracked video matches. Fall back to the stored top videos, unless a
   // filter needs data those don't carry (format, length, product link).
   if (needsTrackedData(q)) return { videos: [], hasMore: false, source: "tracked", needsTracking: true };
-  return snapshotLibrary(admin, q, limit);
+  return snapshotLibrary(admin, q, limit, 0);
 }

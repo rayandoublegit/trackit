@@ -3156,7 +3156,7 @@ function Toggle({ on, onChange, label }: { on: boolean; onChange: (v: boolean) =
         aria-pressed={on}
         style={{ position: "relative", width: 40, height: 22, background: on ? "var(--ws-accent)" : "var(--ws-border)", borderRadius: 999, border: "none", cursor: "pointer", padding: 0, flexShrink: 0 }}
       >
-        <span style={{ position: "absolute", top: 2, left: on ? 20 : 2, width: 18, height: 18, background: "var(--ws-surface)", borderRadius: "50%", transition: "left 0.2s" }} />
+        <span style={{ position: "absolute", top: 2, left: on ? 20 : 2, width: 18, height: 18, background: "#FFFFFF", borderRadius: "50%", transition: "left 0.2s" }} />
       </button>
       {label && <span style={{ fontSize: 13, color: "var(--ws-text)", letterSpacing: "-0.02em" }}>{label}</span>}
     </div>

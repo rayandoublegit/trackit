@@ -8,6 +8,8 @@ import { CreatorAvatar } from "./CreatorAvatar";
 import { CountUp } from "./sample-motion";
 import { useLang, type Lang } from "@/lib/useLang";
 import { nicheLabel } from "@/lib/niche-tree";
+import { CreatorProfileError, getCachedCreatorProfile, loadCreatorProfile } from "@/lib/creator-profile-cache";
+import { CoverImage } from "./CoverImage";
 import "./creator-profile.css";
 
 // A creator's page, market-research style: identity and links, key numbers
@@ -159,8 +161,7 @@ function VideoCard({ v, rank }: { v: LibraryVideo; rank?: number }) {
   return (
     <a className="cp-video" href={v.shareUrl || undefined} target="_blank" rel="noreferrer">
       <span className="cp-video__media">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        {v.cover ? <img src={v.cover} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" /> : null}
+        <CoverImage src={v.cover} fallback={v.coverFallback} width={180} height={260} />
         {rank ? <span className="cp-video__rank">#{rank}</span> : null}
         <span className="cp-video__views">
           <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden><path d="M7 4v16l13-8z" /></svg>
@@ -228,22 +229,19 @@ export function CreatorProfilePage({
   const lang = useLang();
   const fr = lang === "fr";
   const f = (n: number | null | undefined) => fmt(n, lang);
-  const [data, setData] = useState<CreatorProfileData | null>(null);
+  // A creator prefetched from the catalog (hover) or opened before paints at once.
+  const [data, setData] = useState<CreatorProfileData | null>(() => getCachedCreatorProfile(username));
   const [error, setError] = useState<"missing" | "failed" | null>(null);
   const [tab, setTab] = useState<"top" | "latest">("top");
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    setData(null);
+    setData(getCachedCreatorProfile(username));
     setError(null);
-    fetch(`/api/creator-profile?username=${encodeURIComponent(username)}`)
-      .then(async (r) => {
-        if (!r.ok) throw new Error(r.status === 404 ? "missing" : "failed");
-        return r.json() as Promise<CreatorProfileData>;
-      })
+    loadCreatorProfile(username)
       .then((d) => !cancelled && setData(d))
-      .catch((e) => !cancelled && setError(e instanceof Error && e.message === "missing" ? "missing" : "failed"));
+      .catch((e) => !cancelled && setError(e instanceof CreatorProfileError && e.kind === "missing" ? "missing" : "failed"));
     return () => {
       cancelled = true;
     };

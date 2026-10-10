@@ -4,6 +4,7 @@ import { useCallback, useLayoutEffect, useMemo, useRef, useState, type Synthetic
 import { getCachedAvatarUrl, isPersistableAvatarUrl, setCachedAvatarUrl } from "@/lib/avatar-url-cache";
 import { normalizeCreatorHandle, pickBestCreatorAvatar } from "@/lib/creator-avatar";
 import {
+  avatarFallbacks,
   creatorAvatarApiUrl,
   feedAvatarUrlForCreator,
   isStableAvatarStorageUrl,
@@ -87,26 +88,17 @@ export function CreatorAvatar({
       return;
     }
 
-    // Force a live TikTok profile scrape + permanent re-host.
-    if (step === 0) {
-      const refreshUrl = creatorAvatarApiUrl(resolvedUsername, src, { refresh: true });
-      if (refreshUrl && activeSrc !== refreshUrl) {
-        setOverrideSrc(refreshUrl);
-        return;
-      }
-    }
-
-    // One more attempt without the (possibly dead) src hint.
-    if (step === 1) {
-      const api = creatorAvatarApiUrl(resolvedUsername, null, { refresh: true });
-      if (api && activeSrc !== api) {
-        setOverrideSrc(api);
-        return;
-      }
+    // The first paint never waits on a scrape: only a failed photo goes to
+    // /api/creator-avatar (stored photo, re-host, then a live profile scrape),
+    // and once more with a forced refresh.
+    const next = avatarFallbacks(resolvedUsername, src, targetSrc).filter((u) => u !== activeSrc);
+    if (step < 2 && next.length) {
+      setOverrideSrc(next[0]);
+      return;
     }
 
     setOverrideSrc("");
-  }, [activeSrc, resolvedUsername, src]);
+  }, [activeSrc, resolvedUsername, src, targetSrc]);
 
   const onLoad = useCallback(
     (e: SyntheticEvent<HTMLImageElement>) => {
@@ -160,7 +152,7 @@ export function CreatorAvatar({
       alt={alt || displayName || resolvedUsername || ""}
       width={size}
       height={size}
-      loading="eager"
+      loading={priority ? "eager" : "lazy"}
       decoding="async"
       fetchPriority={priority ? "high" : "auto"}
       referrerPolicy="no-referrer"

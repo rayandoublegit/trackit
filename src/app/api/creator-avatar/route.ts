@@ -1,4 +1,4 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { after, NextResponse, type NextRequest } from "next/server";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { fetchRemoteImage, isAllowedImageHost } from "@/lib/fetch-remote-image";
 import { avatarFromDiscoverySavedRow, pickBestCreatorAvatar } from "@/lib/creator-avatar";
@@ -70,26 +70,40 @@ type StoredAvatarLookup = {
   failedAt: string | null;
 };
 
+/** Whether creators_index has avatar_refresh_failed_at (migration 000028); learned once per process. */
+let hasFailCol: boolean | null = null;
+
+async function indexAvatarRow(
+  admin: NonNullable<ReturnType<typeof getAdmin>>,
+  username: string
+): Promise<{ avatar_url?: string | null; avatar_refresh_failed_at?: string | null } | null> {
+  if (hasFailCol !== false) {
+    const withFailCol = await admin
+      .from("creators_index")
+      .select("avatar_url, avatar_refresh_failed_at")
+      .eq("username", username)
+      .maybeSingle();
+    if (!withFailCol.error) {
+      hasFailCol = true;
+      return withFailCol.data;
+    }
+    if (!/avatar_refresh_failed_at/i.test(withFailCol.error.message)) return null;
+    hasFailCol = false;
+  }
+  const fallback = await admin.from("creators_index").select("avatar_url").eq("username", username).maybeSingle();
+  return fallback.data;
+}
+
 async function lookupStoredAvatar(
   admin: NonNullable<ReturnType<typeof getAdmin>>,
   username: string
 ): Promise<StoredAvatarLookup> {
-  let indexRow: { avatar_url?: string | null; avatar_refresh_failed_at?: string | null } | null = null;
-  const withFailCol = await admin
-    .from("creators_index")
-    .select("avatar_url, avatar_refresh_failed_at")
-    .eq("username", username)
-    .maybeSingle();
-  if (withFailCol.error) {
-    const fallback = await admin
-      .from("creators_index")
-      .select("avatar_url")
-      .eq("username", username)
-      .maybeSingle();
-    indexRow = fallback.data;
-  } else {
-    indexRow = withFailCol.data;
-  }
+  // The three sources in one round trip instead of one after the other.
+  const [indexRow, creatorsRes, savedRes] = await Promise.all([
+    indexAvatarRow(admin, username),
+    admin.from("creators").select("avatar_url").ilike("handle", username).limit(6),
+    admin.from("discovery_saved").select("avatar_url, snapshot").ilike("creator_username", username).limit(6),
+  ]);
 
   const failedAt =
     typeof indexRow?.avatar_refresh_failed_at === "string"
@@ -101,27 +115,18 @@ async function lookupStoredAvatar(
     return { url: indexUrl, failedAt };
   }
 
-  const { data: creatorRows } = await admin
-    .from("creators")
-    .select("avatar_url")
-    .ilike("handle", username)
-    .limit(6);
-  for (const row of creatorRows ?? []) {
+  const creatorRows = creatorsRes.data ?? [];
+  for (const row of creatorRows) {
     const url = pickBestCreatorAvatar(row.avatar_url);
     if (url && isStablePublicUrl(url)) return { url, failedAt };
   }
 
-  for (const row of creatorRows ?? []) {
+  for (const row of creatorRows) {
     const url = pickBestCreatorAvatar(row.avatar_url);
     if (url) return { url, failedAt };
   }
 
-  const { data: savedRows } = await admin
-    .from("discovery_saved")
-    .select("avatar_url, snapshot")
-    .ilike("creator_username", username)
-    .limit(6);
-  for (const row of savedRows ?? []) {
+  for (const row of savedRes.data ?? []) {
     const url = avatarFromDiscoverySavedRow(row);
     if (url) return { url, failedAt };
   }
@@ -265,9 +270,17 @@ export async function GET(req: NextRequest) {
         const bytes = new Uint8Array(await new Response(img.body).arrayBuffer());
         if (!bytes.byteLength) continue;
 
+        // Serve the photo now; storing it for good (upload + DB update) runs
+        // after the response instead of before it.
         if (admin) {
-          const permanent = await persistBuffer(admin, username, Buffer.from(bytes), img.contentType);
-          if (permanent) return redirectTo(permanent);
+          const contentType = img.contentType;
+          after(async () => {
+            try {
+              await persistBuffer(admin, username, Buffer.from(bytes), contentType);
+            } catch {
+              /* next view retries */
+            }
+          });
         }
 
         return serveBytes(bytes, img.contentType, cacheKey);

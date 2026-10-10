@@ -222,7 +222,7 @@ export const ytSearch = {
 };
 
 // ── fetch stub ─────────────────────────────────────────────────────────────────
-export type Route = (url: URL) => { status?: number; body: unknown } | undefined;
+export type Route = (url: URL, body?: string) => { status?: number; body: unknown } | undefined;
 
 export function json(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
@@ -231,17 +231,20 @@ export function json(status: number, body: unknown): Response {
 /** A fetch that answers provider URLs through `route`, images with a tiny JPEG, and records every call. */
 export function fakeFetch(route: Route) {
   const calls: string[] = [];
-  const fn = async (input: RequestInfo | URL): Promise<Response> => {
+  /** Request bodies, in call order ("" for GET): the RapidAPI Instagram endpoints take form posts. */
+  const bodies: string[] = [];
+  const fn = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url);
     calls.push(url.href);
+    bodies.push(typeof init?.body === "string" ? init.body : "");
     if (/tiktokcdn|cdninstagram|ytimg|googleusercontent|ggpht/.test(url.hostname)) {
       return new Response(new Uint8Array([0xff, 0xd8, 0xff, 0xd9]), { status: 200, headers: { "content-type": "image/jpeg" } });
     }
-    const hit = route(url);
+    const hit = route(url, bodies[bodies.length - 1]);
     if (!hit) return json(500, { error: `no fixture for ${url.pathname}` });
     return json(hit.status ?? 200, hit.body);
   };
-  return { fn: fn as unknown as typeof fetch, calls };
+  return { fn: fn as unknown as typeof fetch, calls, bodies };
 }
 
 export const PROVIDER_ENV = {

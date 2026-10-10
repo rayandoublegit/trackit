@@ -19,5 +19,5 @@ export async function GET(req: NextRequest) {
   if (!admin) return NextResponse.json({ error: "Database not configured" }, { status: 503 });
 
   const result = await readVideoLibrary(admin, videoQueryFromParams(req.nextUrl.searchParams));
-  return NextResponse.json(result, { headers: { "cache-control": "private, max-age=60" } });
+  return NextResponse.json(result, { headers: { "cache-control": "private, max-age=60, stale-while-revalidate=600" } });
 }

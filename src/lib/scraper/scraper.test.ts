@@ -120,7 +120,7 @@ describe("weekly budget", () => {
   });
 
   it("reads the caps from the environment", () => {
-    expect(weeklyCaps()).toEqual({ refreshes: 65_000, discoveryKeywords: 1_200, newCreators: 12_000 });
+    expect(weeklyCaps()).toEqual({ refreshes: 100_000, discoveryKeywords: 3_000, newCreators: 30_000 });
     vi.stubEnv("SCRAPE_WEEKLY_MAX_CREATORS", "50000");
     vi.stubEnv("SCRAPE_WEEKLY_MAX_DISCOVERY_KEYWORDS", "0");
     expect(weeklyCaps()).toMatchObject({ refreshes: 50_000, discoveryKeywords: 0 });

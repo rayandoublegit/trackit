@@ -14,6 +14,8 @@ export type LibraryVideo = {
   niche: string;
   countryCode: string | null;
   cover: string;
+  /** Tried only when `cover` fails to load (a route that refetches the cover). */
+  coverFallback?: string;
   shareUrl: string;
   caption: string;
   hashtags: string[];

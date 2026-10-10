@@ -1,36 +1,9 @@
 // Shared server-side image fetch (TikTok CDN, ui-avatars, etc.) with HEIC→JPEG
 // conversion so avatars render in browsers.
 
-export const IMAGE_PROXY_ALLOWED_SUFFIXES = [
-  "tiktokcdn.com",
-  "tiktokcdn-us.com",
-  "tiktokcdn-eu.com",
-  "ibyteimg.com",
-  "ttwstatic.com",
-  "ui-avatars.com",
-  "ibb.co",
-  "i.ibb.co",
-  "supabase.co",
-  "cdninstagram.com",
-  "fbcdn.net",
-  "instagram.com",
-  "ytimg.com",
-  "googleusercontent.com",
-  "ggpht.com",
-  "pbs.twimg.com",
-  "twimg.com",
-];
+import { isAllowedImageHost } from "@/lib/image-hosts";
 
-export function isAllowedImageHost(url: string): boolean {
-  try {
-    const parsed = new URL(url);
-    if (parsed.protocol !== "https:") return false;
-    const host = parsed.hostname.toLowerCase();
-    return IMAGE_PROXY_ALLOWED_SUFFIXES.some((d) => host === d || host.endsWith("." + d));
-  } catch {
-    return false;
-  }
-}
+export { IMAGE_PROXY_ALLOWED_SUFFIXES, isAllowedImageHost } from "@/lib/image-hosts";
 
 export type FetchedImage = { body: BodyInit; contentType: string };
 

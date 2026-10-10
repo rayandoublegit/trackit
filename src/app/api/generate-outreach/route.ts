@@ -69,13 +69,27 @@ export async function POST(request: NextRequest) {
     lang: String(lang ?? "en"),
   });
 
-  const message = await getAnthropic().messages.create({
-    model: "claude-sonnet-4-20250514",
-    max_tokens: 800,
-    messages: [{ role: "user", content: prompt }],
-  });
+  let message: Anthropic.Message;
+  try {
+    message = await getAnthropic().messages.create({
+      model: "claude-sonnet-5-5",
+      max_tokens: 4000,
+      output_config: { effort: "low" },
+      messages: [{ role: "user", content: prompt }],
+    });
+  } catch {
+    return NextResponse.json({ error: "Generation failed" }, { status: 502 });
+  }
+  if (message.stop_reason === "refusal") {
+    return NextResponse.json({ error: "Generation declined" }, { status: 422 });
+  }
 
-  const raw = message.content[0].type === "text" ? message.content[0].text : "";
+  // Thinking blocks may come first: join the text blocks only.
+  const raw = message.content
+    .filter((b): b is Anthropic.TextBlock => b.type === "text")
+    .map((b) => b.text)
+    .join("")
+    .trim();
   const parsed = parseOutreachGenerationResponse(raw, String(platform ?? ""));
 
   return NextResponse.json({

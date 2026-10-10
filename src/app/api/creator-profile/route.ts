@@ -15,5 +15,5 @@ export async function GET(req: NextRequest) {
   if (!admin) return NextResponse.json({ error: "Database not configured" }, { status: 503 });
   const data = await readCreatorProfile(admin, username);
   if (!data) return NextResponse.json({ error: "Creator not found" }, { status: 404 });
-  return NextResponse.json(data, { headers: { "cache-control": "private, max-age=60" } });
+  return NextResponse.json(data, { headers: { "cache-control": "private, max-age=60, stale-while-revalidate=600" } });
 }

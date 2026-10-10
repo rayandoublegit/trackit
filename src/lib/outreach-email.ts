@@ -1,3 +1,5 @@
+import { buildMailComposeLink, detectMailClient, resolveMailClient, type MailClient } from "@/lib/mail-client";
+
 export function isValidEmailAddress(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 }
@@ -82,52 +84,76 @@ export function buildOutreachMailtoUrl(options: {
 
 export type EmailComposeMode = "gmail" | "outlook" | "mailto";
 
-/** Opens the user's mail client for the brand address (Gmail / Outlook / mailto). */
+/**
+ * Opens the user's mail client for the brand address (Gmail / Outlook / mailto).
+ * Uses the app the user picked (Settings / contact sheet) when there is one.
+ */
 export function buildEmailComposeUrl(options: {
   fromEmail: string;
   recipients: string[];
   subject: string;
   body: string;
-}): { mode: EmailComposeMode; url: string } | null {
+  lang?: "en" | "fr";
+}): { mode: EmailComposeMode; url: string; truncated: boolean } | null {
   const batch = splitBatchEmailRecipients(options.recipients);
   if (!batch) return null;
-
-  const domain = senderEmailDomain(options.fromEmail);
-  const subject = options.subject.trim();
-  const body = options.body.trim();
-
-  if (domain === "gmail.com" || domain === "googlemail.com") {
-    const params = new URLSearchParams({
-      view: "cm",
-      fs: "1",
-      to: batch.to,
-      su: subject,
-      body,
-    });
-    if (batch.cc.length > 0) params.set("cc", batch.cc.join(","));
-    return { mode: "gmail", url: `https://mail.google.com/mail/?${params.toString()}` };
-  }
-
-  if (["outlook.com", "hotmail.com", "live.com", "msn.com"].includes(domain)) {
-    const params = new URLSearchParams({
-      to: batch.to,
-      subject,
-      body,
-    });
-    if (batch.cc.length > 0) params.set("cc", batch.cc.join(","));
-    return {
-      mode: "outlook",
-      url: `https://outlook.live.com/mail/0/deeplink/compose?${params.toString()}`,
-    };
-  }
-
-  const mailtoUrl = buildOutreachMailtoUrl({
-    recipients: options.recipients,
-    subject,
-    body,
+  const client: MailClient =
+    (typeof window !== "undefined" ? resolveMailClient(options.fromEmail) : detectMailClient(options.fromEmail)) ?? "mailto";
+  const link = buildMailComposeLink({
+    client,
+    to: batch.to,
+    cc: batch.cc,
+    subject: options.subject,
+    body: options.body,
+    fromEmail: options.fromEmail,
+    lang: options.lang,
   });
-  if (!mailtoUrl) return null;
-  return { mode: "mailto", url: mailtoUrl };
+  const mode: EmailComposeMode = client === "gmail" ? "gmail" : client === "mailto" ? "mailto" : "outlook";
+  return { mode, url: link.url, truncated: link.truncated };
+}
+
+/**
+ * Opens a compose link. Must run synchronously inside the click handler (no
+ * await before it) or browsers block the new tab. mailto: never opens a tab.
+ */
+export function openComposeLink(url: string): "opened" | "blocked" {
+  if (typeof window === "undefined") return "blocked";
+  if (url.startsWith("mailto:")) {
+    const a = document.createElement("a");
+    a.href = url;
+    a.rel = "noopener";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    return "opened";
+  }
+  const w = window.open(url, "_blank");
+  if (!w) return "blocked";
+  try {
+    w.opener = null;
+  } catch {
+    /* cross-origin already */
+  }
+  return "opened";
+}
+
+/**
+ * True only when the server can send directly from this address
+ * (RESEND_API_KEY + OUTREACH_DIRECT_SEND_DOMAINS). Otherwise compose in the mail app.
+ */
+export async function fetchDirectSendAvailable(fromEmail: string): Promise<boolean> {
+  if (!isValidEmailAddress(fromEmail)) return false;
+  try {
+    // The server checks the signed-in account's address; nothing goes in the URL.
+    const res = await fetch("/api/outreach/send-email", {
+      credentials: "include",
+      cache: "no-store",
+    });
+    const data = (await res.json().catch(() => ({}))) as { directSend?: boolean };
+    return res.ok && data.directSend === true;
+  } catch {
+    return false;
+  }
 }
 
 export type OutreachEmailSendResult =

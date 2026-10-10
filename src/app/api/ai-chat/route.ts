@@ -1,8 +1,8 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
 import { getAuthedUserId } from "@/lib/api-auth";
-import type { FeedCreator } from "@/lib/discovery-feed";
-import { describeSearch, parseCreatorSearch, runCreatorSearch, type MinoSearchResult } from "@/lib/mino-creator-search";
+import { cardCreator, describeSearch, parseCreatorSearch, runCreatorSearch, type MinoSearchResult } from "@/lib/mino-creator-search";
+import { searchToCatalogFilters } from "@/lib/mino-filters";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -32,18 +32,6 @@ function searchBrief(result: MinoSearchResult, lang: Lang): string {
     "Write 1 or 2 short sentences: say what you found and point out one standout and why. Never list the creators or their handles.",
     ...lines,
   ].join("\n");
-}
-
-/** Keeps stored chats light: only what the profile cards render (3 videos) and saving needs. */
-function cardCreator(c: FeedCreator): FeedCreator {
-  const topVideos = (c.topVideos ?? []).filter((v) => v.cover || v.shareUrl).slice(0, 3);
-  return {
-    ...c,
-    bio: (c.bio || "").slice(0, 160),
-    // Live search results carry thumbnails but no top videos: keep a few to play.
-    videoThumbnails: topVideos.length ? [] : (c.videoThumbnails ?? []).filter((v) => v.thumbnail).slice(0, 3),
-    topVideos,
-  };
 }
 
 function fallbackReply(result: MinoSearchResult | null, lang: Lang): string {
@@ -126,7 +114,7 @@ export async function POST(request: Request) {
     const extra = result
       ? {
           creators: result.creators.map(cardCreator),
-          search: { label: describeSearch(result.search, lang), sources: result.sources },
+          search: { label: describeSearch(result.search, lang), sources: result.sources, filters: searchToCatalogFilters(result.search) },
         }
       : {};
 
@@ -164,7 +152,14 @@ export async function POST(request: Request) {
       );
     }
 
-    return NextResponse.json({ ok: true, reply: reply || fallbackReply(result, lang), ...extra });
+    const aiConfigured = Boolean(process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY);
+    const fallback =
+      !aiConfigured && !result
+        ? lang === "fr"
+          ? "Je ne peux pas discuter pour l’instant : l’assistant IA n’est pas configuré sur ce serveur. Je peux quand même chercher des créateurs, par exemple « créatrices beauté en France avec un email »."
+          : "I can’t chat right now: the AI assistant isn’t configured on this server. I can still search creators, for example “beauty creators in France with an email”."
+        : fallbackReply(result, lang);
+    return NextResponse.json({ ok: true, reply: reply || fallback, ...extra });
   } catch (e) {
     console.error("POST /api/ai-chat", e);
     return NextResponse.json({ ok: false, error: "Chat failed" }, { status: 500 });
