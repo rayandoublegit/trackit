@@ -184,7 +184,7 @@ export async function runScrapeWorker(admin: SupabaseClient, opts: WorkerOptions
   let newCreatorsLeft = left.newCreators;
   const minFollowers = opts.minFollowers ?? envInt("SCRAPE_DISCOVERY_MIN_FOLLOWERS", 5_000);
   const maxFollowers = opts.maxFollowers ?? envInt("SCRAPE_DISCOVERY_MAX_FOLLOWERS", 2_000_000);
-  const marketMaxPage = envInt("SCRAPE_MARKET_MAX_PAGE", 100);
+  const marketMaxPage = envInt("SCRAPE_MARKET_MAX_PAGE", 500);
   const leadsPerRefresh = Math.max(0, envInt("SCRAPE_INSTAGRAM_LEADS_PER_REFRESH", 15));
   const similarCalls = process.env.SCRAPE_INSTAGRAM_SIMILAR === "1";
   const handBack: Job[] = [];

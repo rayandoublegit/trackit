@@ -26,7 +26,7 @@ export async function GET(request: Request) {
 
   const params = new URL(request.url).searchParams;
   const budget = Math.min(Math.max(Number(params.get("budget") || process.env.SCRAPE_BATCH || 60) || 60, 1), 300);
-  const concurrency = Math.min(Math.max(Number(process.env.SCRAPE_CONCURRENCY ?? 8) || 8, 1), 10);
+  const concurrency = Math.min(Math.max(Number(process.env.SCRAPE_CONCURRENCY ?? 10) || 10, 1), 12);
   try {
     const summary = await runScrapeWorker(admin, { budget, concurrency, trigger: params.get("trigger") || "worker" });
     return NextResponse.json(summary);

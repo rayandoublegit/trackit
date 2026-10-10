@@ -42,16 +42,16 @@
       "schedule": "5 0 * * 1"
     },
     {
-      "path": "/api/cron/scrape/instagram-seed?searches=4000",
-      "schedule": "10 0 * * 1"
+      "path": "/api/cron/scrape/instagram-seed?searches=5000",
+      "schedule": "10 * * * *"
     },
     {
       "path": "/api/cron/scrape/weekly-refresh",
       "schedule": "15 0 * * 1"
     },
     {
-      "path": "/api/cron/scrape?budget=240",
-      "schedule": "*/10 * * * *"
+      "path": "/api/cron/scrape?budget=300",
+      "schedule": "*/2 * * * *"
     },
     {
       "path": "/api/cron/outreach-send",

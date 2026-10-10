@@ -6,9 +6,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 // added), so the caps hold across every invocation of the week.
 //
 // Defaults are sized to grow the base to 100,000+ creators (docs/SCRAPING.md):
-//   SCRAPE_WEEKLY_MAX_CREATORS            creator refreshes per week (default 150,000)
-//   SCRAPE_WEEKLY_MAX_DISCOVERY_KEYWORDS  searches + Creator Marketplace pages per week (default 8,000)
-//   SCRAPE_WEEKLY_MAX_NEW_CREATORS        new creators discovery may add per week (default 100,000)
+//   SCRAPE_WEEKLY_MAX_CREATORS            creator refreshes per week (default 1,000,000: no practical limit)
+//   SCRAPE_WEEKLY_MAX_DISCOVERY_KEYWORDS  searches + Creator Marketplace pages per week (default 100,000)
+//   SCRAPE_WEEKLY_MAX_NEW_CREATORS        new creators discovery may add per week (default 1,000,000)
 
 const DAY = 86_400_000;
 const WEEK = 7 * DAY;
@@ -25,9 +25,9 @@ export type WeeklyCaps = { refreshes: number; discoveryKeywords: number; newCrea
 
 export function weeklyCaps(): WeeklyCaps {
   return {
-    refreshes: envInt("SCRAPE_WEEKLY_MAX_CREATORS", 150_000),
-    discoveryKeywords: envInt("SCRAPE_WEEKLY_MAX_DISCOVERY_KEYWORDS", 8_000),
-    newCreators: envInt("SCRAPE_WEEKLY_MAX_NEW_CREATORS", 100_000),
+    refreshes: envInt("SCRAPE_WEEKLY_MAX_CREATORS", 1_000_000),
+    discoveryKeywords: envInt("SCRAPE_WEEKLY_MAX_DISCOVERY_KEYWORDS", 100_000),
+    newCreators: envInt("SCRAPE_WEEKLY_MAX_NEW_CREATORS", 1_000_000),
   };
 }
 
@@ -91,9 +91,9 @@ export async function weeklyUsage(admin: SupabaseClient, nowMs = Date.now()): Pr
 // The RapidAPI Instagram plan is counted in requests (50,000 a month on the
 // current plan), so Instagram has its own hard caps on API calls, on top of the
 // job caps above:
-//   SCRAPE_INSTAGRAM_MAX_CALLS_PER_WEEK   calls per week (Monday 00:00 UTC), default 11,000
+//   SCRAPE_INSTAGRAM_MAX_CALLS_PER_WEEK   calls per week (Monday 00:00 UTC), default 10,000,000 (no practical limit)
 //   SCRAPE_INSTAGRAM_MAX_CALLS_PER_30D    calls over the last 30 days (rolling, so no
-//                                         billing period can go over), default 45,000
+//                                         billing period can go over), default 40,000,000 (no practical limit)
 // They count the RapidAPI Instagram calls only (notes.callsByProvider key
 // "rapidapi-instagram"): ScrapeCreators credits are not part of that plan, so
 // Instagram served by ScrapeCreators is not held back. Raise both after
@@ -103,8 +103,8 @@ export type InstagramCaps = { perWeek: number; per30d: number };
 
 export function instagramCaps(): InstagramCaps {
   return {
-    perWeek: envInt("SCRAPE_INSTAGRAM_MAX_CALLS_PER_WEEK", 11_000),
-    per30d: envInt("SCRAPE_INSTAGRAM_MAX_CALLS_PER_30D", 45_000),
+    perWeek: envInt("SCRAPE_INSTAGRAM_MAX_CALLS_PER_WEEK", 10_000_000),
+    per30d: envInt("SCRAPE_INSTAGRAM_MAX_CALLS_PER_30D", 40_000_000),
   };
 }
 

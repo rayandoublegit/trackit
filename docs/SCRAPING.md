@@ -45,23 +45,21 @@ every video) without calling a scraping API when someone opens the app.
   `seed-niches` cron are no longer scheduled (the routes still exist for manual use;
   `seed-niches` and `enrich-creators` now write lowercase platforms).
 
-### Burst growth (2026-10-09)
+### No-limit burst (2026-10-09)
 
-Defaults raised for a burst toward 100,000 creators: `SCRAPE_WEEKLY_MAX_NEW_CREATORS`
-100,000 (was 12,000), `SCRAPE_WEEKLY_MAX_DISCOVERY_KEYWORDS` 8,000 (was 1,200;
-searches and Creator Marketplace pages), `SCRAPE_WEEKLY_MAX_CREATORS` 150,000
-(was 65,000), worker `budget=240` and `SCRAPE_CONCURRENCY` 8 (~34,500 jobs a day),
-Instagram seed `searches=4000` a week.
+The owner asked for no practical limit (plans to be upgraded): default caps are
+now 1,000,000 refreshes and new creators a week, 100,000 discovery jobs a week,
+and Instagram RapidAPI caps of 10,000,000 a week / 40,000,000 per 30 days. Set
+the env vars to bring limits back. The worker runs every 2 minutes with
+`budget=300` and `SCRAPE_CONCURRENCY` 10 (overlapping passes are safe: jobs are
+claimed with `for update skip locked`). Creator Marketplace walks page up to 500
+(`SCRAPE_MARKET_MAX_PAGE`). `instagram-seed?searches=5000` runs hourly (a query is
+searched at most once per 30 days, so reruns cost nothing). `weekly-discovery`
+stays on Mondays: run it once by hand to start a burst (with the caps lifted it
+queues every Marketplace walk and the whole niche tree at once).
 
-- Creator Marketplace walks run one page per walk per pass (216 walks): listing
-  rows appear within about a day; every new creator then needs its first refresh
-  (2 calls), so full data for 100,000 new TikTok creators takes 3-4 days and
-  about 200,000 ScrapeCreators credits.
-- The Instagram call caps now count RapidAPI Instagram calls only and apply only
-  when RapidAPI is the first Instagram provider: ScrapeCreators Instagram is
-  limited by its own credits.
-- Lower the env caps when credits run short; a provider out of credits stops
-  its platform cleanly.
+Watch provider credits: a provider out of credits stops its platform cleanly;
+RapidAPI plans may bill overage per request beyond the monthly quota.
 
 ## When is a creator refreshed
 
