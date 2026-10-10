@@ -16,7 +16,7 @@
       "maxDuration": 60
     },
     "src/app/api/cron/scrape/weekly-discovery/route.ts": {
-      "maxDuration": 60
+      "maxDuration": 300
     },
     "src/app/api/cron/scrape/instagram-seed/route.ts": {
       "maxDuration": 60
