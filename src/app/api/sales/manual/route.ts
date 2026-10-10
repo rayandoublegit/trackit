@@ -2,7 +2,9 @@ import { createClient } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
 import { requireBrandSpace } from "@/lib/brand-workspace-server";
 import { brandTablesHaveWorkspaceId } from "@/lib/workspace-db";
-import { getManualSalesLimit, normalizePlan } from "@/lib/plan-limits";
+import { canUseTrackit, getManualSalesLimit, lowestTierFor, normalizePlan } from "@/lib/plan-limits";
+import { paywallResponse } from "@/lib/plan-gate-server";
+import { DEV_BYPASS_PLAN } from "@/lib/dev-bypass";
 import {
   COMMISSION_NOT_CONFIGURED_CODE,
   commissionNotConfiguredMessage,
@@ -64,7 +66,9 @@ export async function POST(request: NextRequest) {
     .select("plan")
     .eq("id", userId)
     .maybeSingle();
-  const plan = normalizePlan(profilePlan?.plan);
+  const plan = DEV_BYPASS_PLAN ? normalizePlan(DEV_BYPASS_PLAN) : normalizePlan(profilePlan?.plan);
+  // Sales tracking is part of Trackit (Pro and above).
+  if (!canUseTrackit(plan)) return paywallResponse("campaigns", lowestTierFor(canUseTrackit));
   const manualSalesLimit = getManualSalesLimit(plan);
   if (manualSalesLimit != null) {
     let manualQ = supabaseAdmin

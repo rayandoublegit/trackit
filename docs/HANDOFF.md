@@ -7,7 +7,8 @@ Last updated: 2026-09-30.
 Related docs: [SCRAPING.md](SCRAPING.md) (creator data pipeline),
 [ADMIN_PLAN.md](ADMIN_PLAN.md) (staff console),
 [PARTNERADS_GIFTING_HANDOFF.md](PARTNERADS_GIFTING_HANDOFF.md) (gifting),
-[VERIFICATION_2026-09-29.md](VERIFICATION_2026-09-29.md) (last full verification).
+[VERIFICATION_2026-09-29.md](VERIFICATION_2026-09-29.md) (last full verification),
+[EMAIL_OUTREACH.md](EMAIL_OUTREACH.md) (mailbox connection and automatic outreach).
 
 ---
 
@@ -88,7 +89,7 @@ Billing: Whop (webhook `src/app/api/whop/webhook`) plus legacy Stripe price ids 
 | Database | Supabase `tokpuhzjhysqxwjkxfya` |
 
 `/api/ai-chat` uses OpenAI when `OPENAI_API_KEY` is set, otherwise Anthropic.
-The scraper uses ScrapeCreators first (TikTok, Instagram, YouTube) and falls back to RapidAPI for TikTok (`SCRAPER_PROVIDER_TIKTOK` swaps the order).
+The scraper uses ScrapeCreators first (TikTok, Instagram, YouTube) and falls back to RapidAPI for TikTok (`SCRAPER_PROVIDER_TIKTOK` swaps the order) and Instagram (RapidAPI "Instagram Scraper Stable API", `RAPIDAPI_INSTAGRAM_KEY`; the only Instagram provider without a ScrapeCreators key, capped by `SCRAPE_INSTAGRAM_MAX_CALLS_PER_WEEK` / `_PER_30D`, see SCRAPING.md "Instagram").
 
 The separate `partnerads` Vercel project (partnerads.vercel.app) was deleted on
 2026-09-29; thentrack.it is the only deployment, so crons run once.

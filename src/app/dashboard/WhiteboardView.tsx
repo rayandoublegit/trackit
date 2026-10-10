@@ -431,7 +431,7 @@ export function WhiteboardView({ userId, isMobile }: { userId?: string; isMobile
         text: "",
         fontSize: textSize,
         fontFamily: textFont,
-        color: drawColor === "#ffffff" && theme !== "dark" ? "#1a1a1a" : drawColor,
+        color: drawColor === "#ffffff" && theme !== "dark" ? "var(--ws-text)" : drawColor,
       };
       persist({ ...docRef.current, items: [...docRef.current.items, box] }, { recordHistory: true });
       setSelectedId(box.id);
@@ -1267,7 +1267,7 @@ function ToolIcon({
         <svg {...common}>
           <path d="M6 4.5h9.2L18.5 8v11.5H6V4.5z" fill="#F6D45C" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
           <path d="M15.2 4.5V8H18.5" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
-          <path d="M8.5 12h7M8.5 15h5" stroke="#1a1a1a" strokeWidth="1.4" strokeLinecap="round" opacity="0.45" />
+          <path d="M8.5 12h7M8.5 15h5" stroke="var(--ws-text)" strokeWidth="1.4" strokeLinecap="round" opacity="0.45" />
         </svg>
       );
     case "text":

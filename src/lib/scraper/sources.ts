@@ -3,6 +3,7 @@ import { ProviderError, looksNotFound, providerGet } from "./http";
 import { firstUrlIn, http, num, scrapeCreatorsGet, str } from "./sc-client";
 import { hashtagsOf, type CallMeter, type CreatorSource, type ScrapePlatform, type ScrapedProfile, type ScrapedSearchHit, type ScrapedVideo } from "./types";
 import { scrapeCreatorsInstagram } from "./sources-instagram";
+import { rapidApiInstagram } from "./sources-instagram-rapid";
 import { scrapeCreatorsYouTube } from "./sources-youtube";
 
 // TikTok sources (ScrapeCreators and the RapidAPI TikTok scraper) and the
@@ -197,7 +198,9 @@ export const scrapeCreatorsTikTok: CreatorSource = {
 // ── Choice and fallback ────────────────────────────────────────────────────────
 const PROVIDERS: Record<ScrapePlatform, Record<string, CreatorSource>> = {
   tiktok: { scrapecreators: scrapeCreatorsTikTok, rapidapi: rapidApiTikTok },
-  instagram: { scrapecreators: scrapeCreatorsInstagram },
+  // RapidAPI "Instagram Scraper Stable API" (RAPIDAPI_INSTAGRAM_KEY, else RAPIDAPI_KEY):
+  // the only Instagram provider when ScrapeCreators has no key; SCRAPER_PROVIDER_INSTAGRAM=rapidapi puts it first.
+  instagram: { scrapecreators: scrapeCreatorsInstagram, rapidapi: rapidApiInstagram },
   youtube: { scrapecreators: scrapeCreatorsYouTube },
 };
 
@@ -238,10 +241,10 @@ export function providerOrder(platform: ScrapePlatform): CreatorSource[] {
  * the rest of the run.
  */
 export function fallbackSource(platform: ScrapePlatform, providers: CreatorSource[]): CreatorSource {
-  async function attempt<T>(call: (s: CreatorSource) => Promise<T>, onNotFound: () => T): Promise<T> {
+  async function attempt<T>(call: (s: CreatorSource) => Promise<T>, onNotFound: () => T, among: CreatorSource[] = providers): Promise<T> {
     const errors: string[] = [];
     let downCount = 0;
-    for (const p of providers) {
+    for (const p of among) {
       if (isDown(p.name)) {
         downCount += 1;
         errors.push(`${p.name}: skipped (out of credits or bad key)`);
@@ -258,16 +261,23 @@ export function fallbackSource(platform: ScrapePlatform, providers: CreatorSourc
         errors.push(e instanceof Error ? e.message : String(e));
       }
     }
-    throw new AllProvidersFailed(platform, errors, downCount === providers.length);
+    throw new AllProvidersFailed(platform, errors, among.length > 0 && downCount === among.length);
   }
+  // Optional calls (similar accounts, hashtag posts) go to the providers that have them.
+  const withSimilar = providers.filter((p) => p.similar);
+  const withHashtag = providers.filter((p) => p.hashtag);
   return {
     name: providers.map((p) => p.name).join(">"),
     platform,
-    callsPerRefresh: providers[0]?.callsPerRefresh ?? 2,
+    get callsPerRefresh() {
+      return providers[0]?.callsPerRefresh ?? 2;
+    },
     available: () => providers.some((p) => p.available()),
     profile: (handle, meter) => attempt((p) => p.profile(handle, meter), () => null),
     videos: (handle, count, meter) => attempt((p) => p.videos(handle, count, meter), () => []),
     search: (keyword, count, meter) => attempt((p) => p.search(keyword, count, meter), () => []),
+    ...(withSimilar.length ? { similar: (handle: string, meter?: CallMeter) => attempt((p) => p.similar!(handle, meter), () => [], withSimilar) } : {}),
+    ...(withHashtag.length ? { hashtag: (tag: string, meter?: CallMeter) => attempt((p) => p.hashtag!(tag, meter), () => [], withHashtag) } : {}),
   };
 }
 

@@ -1,5 +1,20 @@
 import { describe, it, expect } from "vitest";
-import { clientImageUrl, isHeicImageUrl } from "@/lib/client-image-url";
+import { clientImageUrl, isHeicImageUrl, unwrapImageSource } from "@/lib/client-image-url";
+
+describe("Instagram CDN and route unwrapping", () => {
+  it("proxies Instagram / Facebook CDN images", () => {
+    expect(clientImageUrl("https://scontent.cdninstagram.com/v/a.jpg")).toContain("/api/img-proxy?url=");
+    expect(clientImageUrl("https://scontent-cdg4-1.xx.fbcdn.net/v/a.jpg")).toContain("/api/img-proxy?url=");
+  });
+
+  it("unwraps our image routes to the remote URL", () => {
+    const cdn = "https://p16-sign.tiktokcdn.com/a.jpg";
+    expect(unwrapImageSource(`/api/img-proxy?url=${encodeURIComponent(cdn)}`)).toBe(cdn);
+    expect(unwrapImageSource(`/api/creator-avatar?username=a&src=${encodeURIComponent(cdn)}`)).toBe(cdn);
+    expect(unwrapImageSource("/api/creator-avatar?username=a")).toBe("");
+    expect(unwrapImageSource(cdn)).toBe(cdn);
+  });
+});
 
 describe("clientImageUrl", () => {
   it("proxies TikTok CDN", () => {

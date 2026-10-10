@@ -1,21 +1,23 @@
 import type { Lang } from "@/lib/useLang";
 import {
-  BASIC_MAX_CAMPAIGNS,
-  BASIC_MAX_SHOPIFY_STORES,
-  BASIC_MONTHLY_DISCOVERIES,
-  FREE_LIFETIME_DISCOVERIES,
-  FREE_MAX_CAMPAIGNS,
-  FREE_MAX_MANUAL_SALES,
-  PRO_MAX_CAMPAIGNS,
-  PRO_MONTHLY_DISCOVERIES,
-  SCALE_MAX_SHOPIFY_STORES,
+  FREE_RESULTS_PER_SEARCH,
+  PRO_MAX_SHOPIFY_STORES,
   type PlanTier,
 } from "@/lib/plan-limits";
+
+// What each plan includes, as shown on the pricing page, the landing bento,
+// billing cards and upgrade modals. Must match the matrix in lib/plan-limits.ts:
+//   Free   teaser (first results per search), no emails, no live lookup / Mino analysis
+//   Growth unlimited creator search, live lookup, Mino analysis, emails
+//   Pro    Growth + Find It, Trackit, payouts, AI drafts, gifting links, portal, scripts, templates
+//   Scale  Pro + team members
 
 export type PricingHighlight = {
   id: string;
   label: string;
   value: string;
+  /** One natural sentence for the pricing bento (falls back to "label — value"). */
+  bento?: string;
 };
 
 export function formatPricingHighlightLine(item: PricingHighlight): string {
@@ -24,51 +26,37 @@ export function formatPricingHighlightLine(item: PricingHighlight): string {
   return `${item.label} — ${item.value}`;
 }
 
+/** Line shown on the pricing bento cards. */
+export function formatBentoHighlightLine(item: PricingHighlight): string {
+  return item.bento ?? formatPricingHighlightLine(item);
+}
+
 export function getPlanPricingHighlights(tier: PlanTier, lang: Lang): PricingHighlight[] {
   const fr = lang === "fr";
 
   if (tier === "free") {
     return [
       {
-        id: "discoveries",
-        label: fr ? "Découvertes" : "Discoveries",
+        id: "search",
+        label: fr ? "Recherche de créateurs" : "Creator search",
         value: fr
-          ? `${FREE_LIFETIME_DISCOVERIES} recherches au total`
-          : `${FREE_LIFETIME_DISCOVERIES} lifetime searches`,
+          ? `${FREE_RESULTS_PER_SEARCH} premiers résultats par recherche`
+          : `First ${FREE_RESULTS_PER_SEARCH} results per search`,
       },
       {
-        id: "campaigns",
-        label: fr ? "Campagnes" : "Campaigns",
-        value: fr
-          ? `${FREE_MAX_CAMPAIGNS} réelle (+ démo Trackit hors quota)`
-          : `${FREE_MAX_CAMPAIGNS} real (+ Trackit demo excluded)`,
+        id: "blocked-emails",
+        label: fr ? "E-mails des créateurs" : "Creator emails",
+        value: fr ? "Masqués (Growth+)" : "Hidden (Growth+)",
       },
       {
-        id: "sales",
-        label: fr ? "Ventes" : "Sales",
-        value: fr
-          ? `Manuelles, ${FREE_MAX_MANUAL_SALES} au total`
-          : `Manual, ${FREE_MAX_MANUAL_SALES} lifetime`,
+        id: "blocked-live",
+        label: fr ? "Recherche en direct et analyse Mino" : "Live lookup and Mino analysis",
+        value: fr ? "Bloquées (Growth+)" : "Locked (Growth+)",
       },
       {
-        id: "commissions",
-        label: fr ? "Commissions + Listes" : "Commissions + Lists",
-        value: fr ? "Incluses" : "Included",
-      },
-      {
-        id: "blocked-shopify",
-        label: "Shopify",
-        value: fr ? "Bloqué (Growth+)" : "Locked (Growth+)",
-      },
-      {
-        id: "blocked-links",
-        label: fr ? "Liens suivis" : "Tracked links",
-        value: fr ? "Bloqués (Growth+)" : "Locked (Growth+)",
-      },
-      {
-        id: "blocked-templates",
-        label: fr ? "Modèles d’outreach" : "Outreach templates",
-        value: fr ? "Bloqués (Growth+)" : "Locked (Growth+)",
+        id: "blocked-trackit",
+        label: fr ? "Campagnes, suivi et paiements" : "Campaigns, tracking and payouts",
+        value: fr ? "Bloqués (Pro+)" : "Locked (Pro+)",
       },
     ];
   }
@@ -76,41 +64,34 @@ export function getPlanPricingHighlights(tier: PlanTier, lang: Lang): PricingHig
   if (tier === "basic") {
     return [
       {
-        id: "discoveries",
-        label: fr ? "Découvertes" : "Discoveries",
-        value: fr ? `${BASIC_MONTHLY_DISCOVERIES} / mois` : `${BASIC_MONTHLY_DISCOVERIES} / month`,
+        id: "search",
+        label: fr ? "Recherche de créateurs" : "Creator search",
+        value: fr ? "Illimitée (TikTok, Instagram, YouTube, vidéos)" : "Unlimited (TikTok, Instagram, YouTube, videos)",
+        bento: fr ? "Recherche de créateurs illimitée" : "Unlimited creator search",
       },
       {
-        id: "campaigns",
-        label: fr ? "Campagnes" : "Campaigns",
-        value: fr ? `${BASIC_MAX_CAMPAIGNS} actives` : `${BASIC_MAX_CAMPAIGNS} active`,
+        id: "live-lookup",
+        label: fr ? "Recherche en direct" : "Live creator lookup",
+        value: fr ? "Illimitée" : "Unlimited",
+        bento: fr ? "Recherche en direct illimitée" : "Unlimited live creator lookup",
       },
       {
-        id: "shopify",
-        label: "Shopify",
-        value: fr
-          ? `${BASIC_MAX_SHOPIFY_STORES} boutique connectée`
-          : `${BASIC_MAX_SHOPIFY_STORES} connected store`,
+        id: "mino-analysis",
+        label: fr ? "Analyse de site et de photo par Mino" : "Mino site and photo analysis",
+        value: fr ? "Illimitée" : "Unlimited",
+        bento: fr ? "Analyses Mino illimitées (site et photo)" : "Unlimited Mino analyses (site and photo)",
       },
       {
-        id: "affiliate",
-        label: fr ? "Liens d'affiliation" : "Affiliate links",
-        value: fr ? "Suivis (clics, ventes, CA)" : "Tracked (clicks, sales, revenue)",
+        id: "emails",
+        label: fr ? "E-mails des créateurs" : "Creator emails",
+        value: fr ? "Visibles" : "Visible",
+        bento: fr ? "E-mails des créateurs visibles" : "Creator emails visible",
       },
       {
-        id: "commissions",
-        label: fr ? "Commissions" : "Commissions",
-        value: fr ? "Calcul automatique" : "Automatic calculation",
-      },
-      {
-        id: "templates",
-        label: "Outreach",
-        value: fr ? "Modèles + historique" : "Templates + history",
-      },
-      {
-        id: "payout",
-        label: fr ? "Paiements créateurs" : "Creator payouts",
-        value: fr ? "Manuels" : "Manual",
+        id: "outreach",
+        label: fr ? "Contact des créateurs" : "Creator outreach",
+        value: fr ? "Par e-mail depuis Trackit" : "By email from Trackit",
+        bento: fr ? "Contactez les créateurs par e-mail" : "Email creators from Trackit",
       },
     ];
   }
@@ -118,46 +99,61 @@ export function getPlanPricingHighlights(tier: PlanTier, lang: Lang): PricingHig
   if (tier === "pro") {
     return [
       {
-        id: "includes-starter",
+        id: "includes-growth",
         label: fr ? "Tout Growth, et en plus :" : "Everything in Growth, plus",
         value: "",
       },
       {
-        id: "discoveries",
-        label: fr ? "Découvertes" : "Discoveries",
-        value: fr ? `${PRO_MONTHLY_DISCOVERIES} / mois` : `${PRO_MONTHLY_DISCOVERIES} / month`,
+        id: "findit",
+        label: "Find It",
+        value: fr ? "Réception des contenus de vos créateurs" : "Inbox for your creators’ content",
+        bento: fr ? "Find It : réception des contenus créateurs" : "Find It: creator content inbox",
       },
       {
-        id: "campaigns",
-        label: fr ? "Campagnes" : "Campaigns",
-        value: fr ? `${PRO_MAX_CAMPAIGNS} actives` : `${PRO_MAX_CAMPAIGNS} active`,
+        id: "trackit",
+        label: "Trackit",
+        value: fr ? "Campagnes illimitées, liens et codes suivis" : "Unlimited campaigns, tracked links and codes",
+        bento: fr ? "Campagnes illimitées, liens et codes suivis" : "Unlimited campaigns, tracked links and codes",
       },
       {
-        id: "ai",
-        label: fr ? "Outreach IA" : "AI outreach",
-        value: fr ? "Illimité" : "Unlimited",
-      },
-      {
-        id: "creator-dashboard",
-        label: fr ? "Portail créateur" : "Creator portal",
-        value: fr ? "Tableau de bord dédié à vos créateurs" : "Dedicated dashboard for your creators",
-      },
-      {
-        id: "creator-content",
-        label: fr ? "Contenu" : "Content",
+        id: "shopify",
+        label: "Shopify",
         value: fr
-          ? "Import + statistiques de performance (vues, engagement)"
-          : "Upload + performance stats (views, engagement)",
+          ? `Ventes suivies, jusqu’à ${PRO_MAX_SHOPIFY_STORES} boutiques, analytiques`
+          : `Tracked sales, up to ${PRO_MAX_SHOPIFY_STORES} stores, analytics`,
+        bento: fr
+          ? `Ventes Shopify suivies (${PRO_MAX_SHOPIFY_STORES} boutiques) et analytiques`
+          : `Shopify sales tracking (${PRO_MAX_SHOPIFY_STORES} stores) and analytics`,
       },
       {
         id: "payout",
         label: fr ? "Paiements créateurs" : "Creator payouts",
-        value: fr ? "Automatiques via Stripe" : "Automatic via Stripe",
+        value: fr ? "Manuels, automatiques via Stripe, solde" : "Manual, automatic via Stripe, balance",
+        bento: fr ? "Paiements créateurs manuels et automatiques" : "Manual and automatic creator payouts",
       },
       {
-        id: "automation",
-        label: fr ? "Scripts & briefs" : "Scripts & briefs",
+        id: "ai",
+        label: fr ? "Brouillons d’e-mails par l’IA" : "AI email drafts",
+        value: fr ? "Illimités" : "Unlimited",
+        bento: fr ? "Brouillons d’e-mails écrits par l’IA" : "AI-written email drafts",
+      },
+      {
+        id: "gifting",
+        label: "Gifting",
+        value: fr ? "Liens de candidature, campagnes illimitées" : "Share links, unlimited campaigns",
+        bento: fr ? "Campagnes de gifting avec lien, illimitées" : "Unlimited gifting campaigns with share links",
+      },
+      {
+        id: "creator-portal",
+        label: fr ? "Portail créateur" : "Creator portal",
+        value: fr ? "Invitations et tableau de bord créateur" : "Invitations and creator dashboard",
+        bento: fr ? "Portail et invitations créateurs" : "Creator portal and invitations",
+      },
+      {
+        id: "scripts",
+        label: fr ? "Scripts, modèles et automatisations" : "Scripts, templates and automations",
         value: fr ? "Inclus" : "Included",
+        bento: fr ? "Scripts, modèles et automatisations" : "Scripts, templates and automations",
       },
     ];
   }
@@ -169,24 +165,10 @@ export function getPlanPricingHighlights(tier: PlanTier, lang: Lang): PricingHig
       value: "",
     },
     {
-      id: "discoveries",
-      label: fr ? "Découvertes" : "Discoveries",
-      value: fr ? "Illimitées" : "Unlimited",
-    },
-    {
-      id: "campaigns",
-      label: fr ? "Campagnes" : "Campaigns",
-      value: fr ? "Illimitées" : "Unlimited",
-    },
-    {
-      id: "shopify",
-      label: "Shopify",
-      value: fr ? `${SCALE_MAX_SHOPIFY_STORES} boutiques` : `${SCALE_MAX_SHOPIFY_STORES} stores`,
-    },
-    {
-      id: "support",
-      label: "Support",
-      value: fr ? "Dédié, réponse prioritaire" : "Dedicated, priority response",
+      id: "team",
+      label: fr ? "Membres de l’équipe" : "Team members",
+      value: fr ? "Invitez vos collègues dans votre espace" : "Invite colleagues into your workspace",
+      bento: fr ? "Invitez votre équipe dans votre espace de marque" : "Invite your team into your brand workspace",
     },
   ];
 }

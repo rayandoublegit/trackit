@@ -166,6 +166,10 @@ class FakeQuery implements PromiseLike<Result> {
     this.filters.push((r) => r[c] != null && r[c] < v);
     return this;
   }
+  is(c: string, v: unknown) {
+    this.filters.push((r) => (v === null ? r[c] == null : r[c] === v));
+    return this;
+  }
   ilike(c: string, v: string) {
     const re = new RegExp(`^${String(v).replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/%/g, ".*")}$`, "i");
     this.filters.push((r) => re.test(String(r[c] ?? "")));

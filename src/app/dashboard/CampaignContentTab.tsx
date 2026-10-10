@@ -14,8 +14,8 @@ import { ContentFileActions } from "./ContentFileActions";
 import { ContentPostStatsDisplay } from "./ContentPostStats";
 
 const addContentBtn: React.CSSProperties = {
-  background: "#1A1A1A",
-  color: "#FFFFFF",
+  background: "var(--ws-btn)",
+  color: "var(--ws-btn-text)",
   border: "none",
   borderRadius: 10,
   padding: "10px 18px",
@@ -103,7 +103,7 @@ export function CampaignContentTab({
         flexWrap: "wrap",
       }}
     >
-      <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em" }}>
+      <div style={{ fontSize: 15, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.02em" }}>
         {lang === "fr" ? "Contenu de la campagne" : "Campaign content"}
       </div>
       <button type="button" style={addContentBtn} onClick={() => setShowAddContent(true)}>
@@ -116,7 +116,7 @@ export function CampaignContentTab({
     return (
       <>
         {header}
-        <p style={{ fontSize: 14, color: "#9A9A9A" }}>{lang === "fr" ? "Chargement…" : "Loading…"}</p>
+        <p style={{ fontSize: 14, color: "var(--ws-text-dim)" }}>{lang === "fr" ? "Chargement…" : "Loading…"}</p>
         <CampaignContentPerformancePanel lang={lang} brandId={brandId} campaignId={campaignId} isMobile={isMobile} />
         <AddBrandContentPanel
           open={showAddContent}
@@ -135,14 +135,14 @@ export function CampaignContentTab({
         {header}
         <div
           style={{
-            border: "1px dashed #E5E5E5",
+            border: "1px dashed var(--ws-border)",
             borderRadius: 14,
             padding: "40px 24px",
             textAlign: "center",
             marginTop: 12,
           }}
         >
-          <p style={{ fontSize: 15, color: "#6B7280", lineHeight: 1.5, margin: "0 0 16px" }}>
+          <p style={{ fontSize: 15, color: "var(--ws-text-muted)", lineHeight: 1.5, margin: "0 0 16px" }}>
             {lang === "fr"
               ? "Aucun contenu pour cette campagne. Ajoutez-en ou attendez qu’un créateur membre en envoie depuis son tableau de bord."
               : "No content for this campaign yet. Add some yourself or wait for a member creator to upload from their dashboard."}
@@ -183,10 +183,10 @@ export function CampaignContentTab({
               style={{
                 display: "flex",
                 flexDirection: "column",
-                border: "1px solid #EFEFEF",
+                border: "1px solid var(--ws-border)",
                 borderRadius: 14,
                 overflow: "hidden",
-                background: "#FFFFFF",
+                background: "var(--ws-surface)",
                 minHeight: 0,
               }}
             >
@@ -194,7 +194,7 @@ export function CampaignContentTab({
                 style={{
                   width: "100%",
                   aspectRatio: "16/10",
-                  background: "#F5F5F5",
+                  background: "var(--ws-hover)",
                   flexShrink: 0,
                 }}
               >
@@ -211,7 +211,7 @@ export function CampaignContentTab({
                       alignItems: "center",
                       justifyContent: "center",
                       fontSize: 12,
-                      color: "#6B7280",
+                      color: "var(--ws-text-muted)",
                       padding: 12,
                       textAlign: "center",
                       wordBreak: "break-word",
@@ -238,7 +238,7 @@ export function CampaignContentTab({
                       style={{
                         fontSize: 14,
                         fontWeight: 600,
-                        color: "#1A1A1A",
+                        color: "var(--ws-text)",
                         letterSpacing: "-0.02em",
                         lineHeight: 1.3,
                         overflow: "hidden",
@@ -253,7 +253,7 @@ export function CampaignContentTab({
                       <p
                         style={{
                           fontSize: 13,
-                          color: "#6B7280",
+                          color: "var(--ws-text-muted)",
                           margin: "4px 0 0",
                           lineHeight: 1.4,
                           display: "-webkit-box",
@@ -265,7 +265,7 @@ export function CampaignContentTab({
                         {item.notes}
                       </p>
                     ) : creatorLabel ? (
-                      <div style={{ fontSize: 12, color: "#9A9A9A", marginTop: 4, letterSpacing: "-0.01em" }}>
+                      <div style={{ fontSize: 12, color: "var(--ws-text-dim)", marginTop: 4, letterSpacing: "-0.01em" }}>
                         {creatorLabel}
                       </div>
                     ) : null}
@@ -275,7 +275,7 @@ export function CampaignContentTab({
                     dateTime={item.created_at}
                     style={{
                       fontSize: 12,
-                      color: "#9A9A9A",
+                      color: "var(--ws-text-dim)",
                       letterSpacing: "-0.01em",
                       whiteSpace: "nowrap",
                       flexShrink: 0,

@@ -1,5 +1,7 @@
 "use client";
 
+import { handlePaywallResponse } from "@/lib/plan-upgrade-events";
+import { UpgradeNudge } from "@/components/PlanLock";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLang } from "@/lib/useLang";
 import { getCampaigns } from "@/lib/db";
@@ -30,6 +32,16 @@ import { MinoCreatorResults, MinoSearchMotion } from "./MinoCreatorResults";
 import { MinoActionWidget, MinoErrorWidget, MinoRevenueLoading, MinoRevenueWidget, viewLabel } from "./MinoWidgets";
 import { formatMoney } from "./SampleCampaignPreview";
 import { useDashboardNavigationOptional } from "./DashboardNavigationProvider";
+import { MinoAttachButtons, MinoAttachChips, MinoDropHint, useMinoAttachments, GlobeIcon, ImageIcon } from "./MinoAttachments";
+import { MinoAnalysisResult, MinoWiderSearches } from "./MinoAnalysisResult";
+import {
+  setPendingCatalogFilters,
+  takePendingMinoAttachments,
+  type MinoImageAttachment,
+} from "@/lib/mino-attachments";
+import type { MinoAnalysisMeta } from "@/lib/mino-analysis";
+import type { MinoCatalogFilters } from "@/lib/mino-filters";
+import { findSiteUrl } from "@/lib/mino-url-safety";
 
 const MINO_TYPE_LINES = {
   en: [
@@ -166,6 +178,63 @@ function revenueReply(s: MinoRevenueSnapshot, fr: boolean): string {
 
 type AssistantAnswer = { content: string; widget?: MinoWidget };
 
+type SubmitOptions = { image?: MinoImageAttachment | null; site?: string | null };
+
+const hostOf = (url: string) => {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
+};
+
+/** What the user sees when the analysis route answers with a known error (no fake output). */
+function analyzeErrorText(code: string, fr: boolean, siteHost?: string): string | null {
+  switch (code) {
+    case "plan_required":
+      return fr
+        ? "L’analyse de votre site ou de votre photo est incluse dès le plan Growth (analyses illimitées). Vous pouvez quand même me décrire votre marque, par exemple « créatrices skincare en France »."
+        : "Site and photo analysis comes with the Growth plan (unlimited analyses). You can still describe your brand, for example “skincare creators in France”.";
+    case "rate_limited":
+      return fr
+        ? "Vous avez lancé beaucoup d’analyses en une heure. Réessayez dans quelques minutes."
+        : "You ran a lot of analyses within an hour. Try again in a few minutes.";
+    case "ai_unavailable":
+      return fr
+        ? `L’analyse par l’IA n’est pas disponible sur ce serveur pour l’instant (clé Anthropic absente)${siteHost ? `. J’ai bien pu lire votre site (${siteHost})` : ""}. Vous pouvez quand même me décrire votre marque, par exemple « créatrices skincare en France avec un email ».`
+        : `AI analysis isn’t available on this server right now (no Anthropic key)${siteHost ? `. I could read your site (${siteHost})` : ""}. You can still describe your brand, for example “skincare creators in France with an email”.`;
+    case "site_blocked":
+    case "site_invalid_url":
+      return fr ? "Je ne peux pas ouvrir cette adresse : seuls les sites web publics (http ou https) sont acceptés." : "I can’t open that address: only public websites (http or https) are allowed.";
+    case "site_social":
+      return fr ? "C’est un lien de réseau social. Donnez-moi le site de votre marque, ou une photo de votre produit." : "That’s a social media link. Give me your brand’s website, or a photo of your product.";
+    case "site_timeout":
+      return fr ? "Votre site met trop de temps à répondre (plus de 8 secondes). Réessayez, ou envoyez une photo de votre produit." : "Your site took too long to answer (over 8 seconds). Try again, or send a photo of your product.";
+    case "site_unreachable":
+    case "site_http_error":
+      return fr ? "Je n’arrive pas à ouvrir votre site. Vérifiez l’adresse, ou envoyez une photo de votre produit." : "I can’t open your site. Check the address, or send a photo of your product.";
+    case "site_protected":
+      return fr
+        ? "Votre site bloque les visites automatiques, je ne peux pas le lire. Envoyez-moi une photo de votre produit, ou décrivez votre marque en une phrase."
+        : "Your site blocks automated visits, so I can’t read it. Send me a photo of your product, or describe your brand in one sentence.";
+    case "site_not_html":
+      return fr ? "Cette adresse n’est pas une page web. Donnez-moi la page d’accueil de votre site." : "That address isn’t a web page. Give me your site’s home page.";
+    case "site_too_large":
+      return fr ? "Cette page est trop lourde à lire. Essayez la page d’accueil." : "That page is too large to read. Try the home page.";
+    case "image_too_large":
+      return fr ? "Photo trop lourde : 5 Mo maximum." : "Photo too large: 5 MB maximum.";
+    case "image_type":
+    case "image_invalid":
+      return fr ? "Ce fichier n’est pas une photo lisible (JPG, PNG, WebP ou HEIC)." : "That file isn’t a readable photo (JPG, PNG, WebP or HEIC).";
+    case "image_heic":
+      return fr ? "Je n’arrive pas à convertir cette photo HEIC. Exportez-la en JPG puis réessayez." : "I couldn’t convert this HEIC photo. Export it as JPG and try again.";
+    case "analysis_refused":
+      return fr ? "Je ne peux pas analyser ce contenu." : "I can’t analyse this content.";
+    default:
+      return null;
+  }
+}
+
 function matchCreator(list: PayableCreator[], query: string): PayableCreator | null {
   const q = query.toLowerCase().replace(/^@/, "").trim();
   if (!q) return null;
@@ -220,14 +289,21 @@ export function AiChatView({
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   /** What Mino is doing while busy: the search motion, the dashboard skeleton, or "thinking". */
-  const [busyView, setBusyView] = useState<{ kind: "search" | "revenue" | "think"; label: string } | null>(null);
+  const [busyView, setBusyView] = useState<{ kind: "search" | "revenue" | "think" | "analyze"; label: string } | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const lastTurnRef = useRef<HTMLDivElement>(null);
-  const submitRef = useRef<(raw: string) => Promise<void>>(async () => {});
+  const submitRef = useRef<(raw: string, opts?: SubmitOptions) => Promise<void>>(async () => {});
+  const att = useMinoAttachments(prompt);
 
   const go = (state: DashboardNavState) => {
     if (dashNav) dashNav.navigate(state);
     else onNavigate(state.view);
+  };
+
+  /** "Open in Creators with these filters": Creators > Search picks them up when it shows. */
+  const openCatalogWith = (filters?: MinoCatalogFilters) => {
+    if (filters) setPendingCatalogFilters(filters);
+    go({ view: "discovery" });
   };
 
   const activeChat = useMemo(
@@ -649,12 +725,53 @@ export function AiChatView({
       ok?: boolean;
       reply?: string;
       creators?: FeedCreator[];
-      search?: { label: string; sources: string[] };
+      search?: { label: string; sources: string[]; filters?: MinoCatalogFilters };
     };
     if (!res.ok || !data.ok || !data.reply) throw new Error(`ai-chat ${res.status}`);
     return {
       content: data.reply,
-      ...(data.creators?.length ? { creators: data.creators, search: data.search } : {}),
+      // An empty search keeps its filters: the answer offers wider searches.
+      ...(data.search ? { creators: data.creators ?? [], search: data.search } : {}),
+    };
+  };
+
+  /** Website and/or photo analysis. Known failures answer in words; network or server errors throw (retry card). */
+  const askAnalyze = async (
+    text: string,
+    image: MinoImageAttachment | null,
+    site: string | null,
+  ): Promise<AssistantAnswer & Pick<MinoChatMessage, "creators" | "search" | "analysis">> => {
+    const res = await fetch("/api/mino/analyze", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message: text,
+        url: site,
+        image: image ? { data: image.data, mediaType: image.mediaType, name: image.name } : null,
+        lang: fr ? "fr" : "en",
+      }),
+    });
+    const data = (await res.json().catch(() => ({}))) as {
+      ok?: boolean;
+      error?: string;
+      reply?: string;
+      analysis?: MinoAnalysisMeta;
+      creators?: FeedCreator[];
+      search?: { label: string; sources: string[]; filters?: MinoCatalogFilters };
+      site?: { host?: string } | null;
+    };
+    if (!res.ok || !data.ok) {
+      handlePaywallResponse(res.status, data);
+      const known = data.error ? analyzeErrorText(data.error, fr, data.site?.host) : null;
+      if (known) return { content: known };
+      throw new Error(`analyze ${res.status}`);
+    }
+    return {
+      content: data.reply || "",
+      analysis: data.analysis,
+      creators: data.creators ?? [],
+      search: data.search,
     };
   };
 
@@ -669,15 +786,31 @@ export function AiChatView({
    * searches build profiles, actions build a card, the rest is conversation.
    * `base` replaces the current thread (a retry drops the failed turn first).
    */
-  const submit = async (raw: string, base?: MinoChatMessage[]) => {
-    const text = raw.trim();
+  const submit = async (raw: string, base?: MinoChatMessage[], opts?: SubmitOptions) => {
+    // Attachments: the prompt box's own, unless the caller says otherwise (chips, retries, Home).
+    const image = isCreator ? null : opts && "image" in opts ? (opts.image ?? null) : att.image;
+    const site = isCreator ? null : opts && "site" in opts ? (opts.site ?? null) : att.site;
+    const analyze = Boolean(image || site);
+    const text =
+      raw.trim() ||
+      (image
+        ? fr
+          ? "Analyse cette photo et trouve-moi des créateurs"
+          : "Analyse this photo and find me creators"
+        : site
+          ? fr
+            ? "Analyse mon site et trouve-moi des créateurs"
+            : "Analyse my site and find me creators"
+          : "");
     if (!text || chatBusy) return;
 
     const history = base ?? messages;
     const startingSession = !chatMode && !!activeChatId && history.length === 0;
-    const revenueAsk = isCreator ? null : parseRevenueAsk(text);
-    const creatorSearch = isCreator || revenueAsk ? null : parseCreatorSearch(text);
-    const route: "revenue" | "search" | "command" | "chat" = revenueAsk
+    const revenueAsk = isCreator || analyze ? null : parseRevenueAsk(text);
+    const creatorSearch = isCreator || revenueAsk || analyze ? null : parseCreatorSearch(text);
+    const route: "analyze" | "revenue" | "search" | "command" | "chat" = analyze
+      ? "analyze"
+      : revenueAsk
       ? "revenue"
       : creatorSearch
         ? "search"
@@ -696,14 +829,22 @@ export function AiChatView({
     }
     setChatMode(true);
 
-    const nextMessages: MinoChatMessage[] = [...history, { role: "user", content: text }];
+    const attachments: NonNullable<MinoChatMessage["attachments"]> = [
+      ...(image ? [{ kind: "image" as const, name: image.name, thumb: image.thumb || undefined }] : []),
+      ...(site ? [{ kind: "site" as const, url: site }] : []),
+    ];
+    const userMessage: MinoChatMessage = attachments.length ? { role: "user", content: text, attachments } : { role: "user", content: text };
+    const nextMessages: MinoChatMessage[] = [...history, userMessage];
     setMessages(nextMessages);
     persistMessages(chatId, nextMessages, text);
     setPrompt("");
+    if (!opts) att.clear();
     setChatBusy(true);
     setStatus("");
     setBusyView(
-      route === "search" && creatorSearch
+      route === "analyze"
+        ? { kind: "analyze", label: [site ? hostOf(site) : "", image ? "photo" : ""].filter(Boolean).join(" + ") }
+        : route === "search" && creatorSearch
         ? { kind: "search", label: describeSearch(creatorSearch, lang) }
         : route === "revenue" && revenueAsk
           ? { kind: "revenue", label: describeRevenueAsk(revenueAsk, lang) }
@@ -715,7 +856,9 @@ export function AiChatView({
     let answer: MinoChatMessage;
     try {
       const result =
-        route === "revenue" && revenueAsk
+        route === "analyze"
+          ? await askAnalyze(text, image, site)
+          : route === "revenue" && revenueAsk
           ? await askRevenue(revenueAsk)
           : route === "command"
             ? await askCommand(text)
@@ -736,14 +879,16 @@ export function AiChatView({
     setChatBusy(false);
     setBusyView(null);
   };
-  submitRef.current = (raw: string) => submit(raw);
+  submitRef.current = (raw: string, opts?: SubmitOptions) => submit(raw, undefined, opts);
+  /** A suggested search from an answer: plain text, no attachments. */
+  const runSuggested = (text: string) => void submit(text, undefined, { image: null, site: null });
 
   /** Drops the failed turn (question + error) and asks again. */
   const retry = (errorIndex: number) => {
     const failed = messages[errorIndex];
     if (failed?.widget?.kind !== "error") return;
     const cut = messages[errorIndex - 1]?.role === "user" ? errorIndex - 1 : errorIndex;
-    void submit(failed.widget.retryText, messages.slice(0, cut));
+    void submit(failed.widget.retryText, messages.slice(0, cut), { image: null, site: findSiteUrl(failed.widget.retryText) });
   };
 
   /** Re-reads the numbers of a revenue widget in place. */
@@ -770,7 +915,13 @@ export function AiChatView({
   useEffect(() => {
     const consume = () => {
       const text = takePendingMinoPrompt(userId);
-      if (text) void submitRef.current(text);
+      const pending = takePendingMinoAttachments();
+      if (text || pending) {
+        void submitRef.current(text || "", {
+          image: pending?.image ?? null,
+          site: pending?.site ?? (text ? findSiteUrl(text) : null),
+        });
+      }
     };
     consume();
     window.addEventListener(MINO_PENDING_EVENT, consume);
@@ -839,13 +990,51 @@ export function AiChatView({
                 ref={i === messages.length - 1 ? lastTurnRef : undefined}
                 className={`ai-chat-turn ai-chat-turn--${m.role}`}
               >
+                {m.role === "user" && m.attachments?.length ? (
+                  <div className="mino-msg-attachments">
+                    {m.attachments.map((a, k) =>
+                      a.kind === "image" ? (
+                        <span key={k} className="mino-attach-chip is-image">
+                          {a.thumb ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={a.thumb} alt="" />
+                          ) : (
+                            <span className="mino-attach-chip__icon">
+                              <ImageIcon size={14} />
+                            </span>
+                          )}
+                          <span className="mino-attach-chip__text">{a.name}</span>
+                        </span>
+                      ) : (
+                        <span key={k} className="mino-attach-chip is-site">
+                          <span className="mino-attach-chip__icon">
+                            <GlobeIcon size={14} />
+                          </span>
+                          <span className="mino-attach-chip__text">{hostOf(a.url)}</span>
+                        </span>
+                      ),
+                    )}
+                  </div>
+                ) : null}
                 {m.content ? <div className={`ai-chat-bubble ai-chat-bubble--${m.role}`}>{m.content}</div> : null}
+                {m.role === "assistant" && m.analysis ? (
+                  <MinoAnalysisResult meta={m.analysis} onOpenCatalog={openCatalogWith} onSearch={runSuggested} busy={chatBusy} />
+                ) : null}
+                {m.role === "assistant" && m.search?.filters && m.creators && m.creators.length === 0 ? (
+                  <MinoWiderSearches
+                    filters={m.analysis ? m.analysis.usedFilters : m.search.filters}
+                    keyword={m.analysis ? m.analysis.analysis.keywords[0] : m.search.filters.niche ? undefined : m.search.label.split(" · ")[0] || undefined}
+                    onSearch={runSuggested}
+                    onOpenCatalog={openCatalogWith}
+                    busy={chatBusy}
+                  />
+                ) : null}
                 {m.role === "assistant" && m.creators?.length ? (
                   <MinoCreatorResults
                     creators={m.creators}
                     label={m.search?.label ?? ""}
                     sources={m.search?.sources ?? []}
-                    onOpenCatalog={() => go({ view: "discovery" })}
+                    onOpenCatalog={() => openCatalogWith(m.search?.filters)}
                     onOpenProfile={(c) => go({ view: "discovery", creator: c.username })}
                     onContact={(c) => (onReachOut ? onReachOut(c) : go({ view: "outreach" }))}
                     isPaid={isPaid}
@@ -867,7 +1056,17 @@ export function AiChatView({
               </div>
             ))}
             {chatBusy ? (
-              busyView?.kind === "search" ? (
+              busyView?.kind === "analyze" ? (
+                <MinoSearchMotion
+                  label={busyView.label}
+                  title={fr ? "Analyse de votre marque" : "Analysing your brand"}
+                  steps={
+                    fr
+                      ? ["Lecture de votre site et de votre photo", "Compréhension de la marque et de l’audience", "Choix des niches et des filtres", "Recherche des créateurs"]
+                      : ["Reading your site and photo", "Understanding the brand and audience", "Picking niches and filters", "Searching creators"]
+                  }
+                />
+              ) : busyView?.kind === "search" ? (
                 <MinoSearchMotion label={busyView.label} />
               ) : busyView?.kind === "revenue" ? (
                 <MinoRevenueLoading label={busyView.label} />
@@ -885,7 +1084,8 @@ export function AiChatView({
           </div>
         ) : null}
 
-        <div className="mtg-promptbox">
+        <div className={`mtg-promptbox${att.dragging ? " is-dragging" : ""}`} {...(isCreator ? {} : att.dropProps)}>
+          <MinoDropHint show={att.dragging} />
           <div className="mtg-promptbox__led" aria-hidden>
             <span className="mtg-promptbox__led-spin" />
           </div>
@@ -893,6 +1093,16 @@ export function AiChatView({
             <span className="mtg-promptbox__led-spin" />
           </div>
           <div className="mtg-promptbox__inner">
+            {!isCreator ? <MinoAttachChips att={att} /> : null}
+            {!isCreator && isPaid === false && (att.image || att.site) ? (
+              <div style={{ margin: "0 0 8px" }}>
+                <UpgradeNudge
+                  lang={fr ? "fr" : "en"}
+                  feature="mino-analysis"
+                  body={fr ? "L’analyse de site et de photo est illimitée dès Growth." : "Site and photo analysis is unlimited from Growth."}
+                />
+              </div>
+            ) : null}
             <div className="mtg-promptbox__row">
               <svg className="mtg-promptbox__search" viewBox="0 0 24 24" width="18" height="18" aria-hidden>
                 <circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" strokeWidth="1.6" />
@@ -902,6 +1112,7 @@ export function AiChatView({
                 ref={textareaRef}
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
+                onPaste={isCreator ? undefined : att.onPaste}
                 placeholder={
                   chatMode
                     ? fr
@@ -925,10 +1136,14 @@ export function AiChatView({
               />
             </div>
             <div className="mtg-promptbox__bar">
-              <span className="mtg-promptbox__meta">
-                <MinoCompanion size={16} />
-                Mino
-              </span>
+              {isCreator ? (
+                <span className="mtg-promptbox__meta">
+                  <MinoCompanion size={16} />
+                  Mino
+                </span>
+              ) : (
+                <MinoAttachButtons att={att} disabled={chatBusy} />
+              )}
               <div className="mtg-promptbox__actions">
                 <button
                   type="button"
@@ -940,7 +1155,7 @@ export function AiChatView({
                 <button
                   type="button"
                   className="mtg-promptbox__send"
-                  disabled={!prompt.trim() || chatBusy}
+                  disabled={(!prompt.trim() && !att.image && !att.site) || chatBusy}
                   onClick={() => void submit(prompt)}
                   aria-label={fr ? "Envoyer" : "Send"}
                 >

@@ -163,7 +163,7 @@ export function CreatorPaymentInfo({ userId, isMobile }: { userId?: string; isMo
               >
                 <span style={{ flex: 1, fontSize: 15, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.02em" }}>{current.label}</span>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden style={{ flexShrink: 0, transform: open ? "rotate(180deg)" : "none", transition: "transform 0.15s" }}>
-                  <path d="M6 9l6 6 6-6" stroke="#9A9A9A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M6 9l6 6 6-6" stroke="var(--ws-text-dim)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </button>
               {open && (

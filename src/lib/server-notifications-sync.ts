@@ -28,7 +28,7 @@ function formatServerTime(iso: string, lang: "en" | "fr"): string {
   }
 }
 
-function composeNotification(
+export function composeNotification(
   lang: "en" | "fr",
   item: ServerNotification,
 ): { kind: NotificationKind; title: string; body: string } | null {
@@ -92,6 +92,25 @@ function composeNotification(
           ? `${name} vous a envoyé un message`
           : `${name} sent you a message`,
         body: preview || (fr ? "Ouvrez l'inbox pour lire le message." : "Open your inbox to read the message."),
+      };
+    }
+    case "gift_application": {
+      const campaignName = payloadString(item.payload, "campaignName");
+      const handle = payloadString(item.payload, "handle").replace(/^@/, "");
+      const auto = item.payload?.autoApproved === true;
+      const who = handle && !name.includes(handle) ? `${name} (@${handle})` : name;
+      return {
+        kind: "campaign",
+        title: auto
+          ? fr ? `${who} a rejoint votre campagne cadeau` : `${who} joined your gift campaign`
+          : fr ? `${who} veut participer à votre campagne cadeau` : `${who} applied to your gift campaign`,
+        body: auto
+          ? fr
+            ? `Accepté automatiquement${campaignName ? ` sur « ${campaignName} »` : ""}. Le créateur doit maintenant signer et donner son adresse.`
+            : `Approved automatically${campaignName ? ` on "${campaignName}"` : ""}. The creator now signs and shares an address.`
+          : fr
+            ? `Candidature${campaignName ? ` sur « ${campaignName} »` : ""} à valider dans Gifting.`
+            : `Application${campaignName ? ` on "${campaignName}"` : ""} to review in Gifting.`,
       };
     }
     default:

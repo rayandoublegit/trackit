@@ -12,13 +12,16 @@ import { creatorCountry, creatorLanguage } from "@/lib/creator-language";
 import { classifyCreatorNiche } from "@/lib/creator-niche";
 import { buildSeedTargets } from "@/lib/niche-tree";
 import { creatorKey, handleFromKey, knownKeys, normalizeHandle, normalizePlatform } from "./identity";
-import { nextScrapeAt, retryAfterFailure, scrapePriority } from "./schedule";
-import { CallMeter, type CreatorSource, type ScrapedVideo } from "./types";
+import { nextScrapeAt, refreshIntervalDays, retryAfterFailure, scrapePriority } from "./schedule";
+import { CallMeter, type CreatorSource, type RelatedAccount, type ScrapedSearchHit, type ScrapedVideo } from "./types";
 import { marketTarget, nextMarketPage, parseMarketPage, parseMarketTarget } from "./marketplace";
-import { scrapeCreatorsGet } from "./sc-client";
+import { emailIn, scrapeCreatorsGet } from "./sc-client";
+import { mentionsIn } from "./sources-instagram";
+import { instagramSearchQueries } from "./discovery-plan";
 
 // One refresh of one creator: fetch profile + latest videos (2 API calls for
-// TikTok and Instagram, 3 for YouTube), store what expires (covers, avatar),
+// TikTok and Instagram on ScrapeCreators, 3 for Instagram on RapidAPI and for
+// YouTube), store what expires (covers, avatar),
 // write today's snapshots, update the current-state row, then recompute
 // growth and the next refresh date.
 //
@@ -32,10 +35,28 @@ export type IngestResult = {
   apiCalls: number;
   videos: number;
   coversStored: number;
+  /** Instagram: accounts seen next to this creator, queued to be looked at. */
+  leadsQueued: number;
 };
 
-/** The account does not exist any more (renamed, deleted or banned). */
+/** The account does not exist any more (renamed, deleted or banned), or is private. */
 export class CreatorNotFound extends Error {}
+
+/** A creator not in the catalog yet, looked at and left out (too small, too big, private, a brand). */
+export class CreatorSkipped extends Error {}
+
+/** Not run now (no new creators left this week): the job goes back to the queue untouched. */
+export class CreatorDeferred extends Error {}
+
+/**
+ * Rules for a refresh of a creator not in the catalog yet (an Instagram lead):
+ * after the profile call it is kept only when creator-sized, public and not a
+ * brand; otherwise it stops there (1 call spent, nothing written).
+ */
+export type DiscoveryGate = { minFollowers: number; maxFollowers: number; allowNew: boolean };
+
+/** Instagram snowball after a refresh: queue the accounts seen next to the creator. */
+export type SnowballOptions = { maxLeads: number; similar?: boolean };
 
 const VIDEOS_PER_REFRESH = 30;
 const NEW_COVERS_PER_REFRESH = 9;
@@ -150,7 +171,7 @@ export async function refreshCreator(
   admin: SupabaseClient,
   source: CreatorSource,
   rawKey: string,
-  opts: { meter?: CallMeter; nowMs?: number } = {},
+  opts: { meter?: CallMeter; nowMs?: number; gate?: DiscoveryGate; snowball?: SnowballOptions } = {},
 ): Promise<IngestResult> {
   const platform = source.platform;
   const key = normalizeHandle(rawKey);
@@ -161,10 +182,8 @@ export async function refreshCreator(
   const nowIso = new Date(now).toISOString();
   const today = nowIso.slice(0, 10);
 
-  const profile = await source.profile(handle, meter);
-  if (!profile || !profile.username) throw new CreatorNotFound(`${platform}:${handle} not found`);
-  const videos = await source.videos(handle, VIDEOS_PER_REFRESH, meter);
-
+  // Read first (no API call): a key held by another platform costs nothing,
+  // and a creator not in the catalog yet goes through the discovery gate.
   const { data: existing } = await admin
     .from("creators_index")
     .select("username, platform, avatar_url, primary_niche, niches, first_seen_at, language, country_code")
@@ -174,6 +193,27 @@ export async function refreshCreator(
     // Never let one platform's refresh overwrite another platform's creator.
     throw new Error(`${platform}:${key} is stored as a ${existing.platform} creator`);
   }
+  const gate = existing ? undefined : opts.gate;
+  if (gate && !gate.allowNew) throw new CreatorDeferred(`${platform}:${handle}: no new creators left this week`);
+
+  const profile = await source.profile(handle, meter);
+  if (!profile || !profile.username) throw new CreatorNotFound(`${platform}:${handle} not found`);
+  if (gate) {
+    const brand = detectBrand({ username: key, displayName: profile.displayName, bio: profile.bio, bioLink: profile.bioLink, seller: profile.seller, category: profile.category });
+    const why = profile.isPrivate
+      ? "private"
+      : profile.followers < gate.minFollowers
+        ? `${profile.followers} followers (min ${gate.minFollowers})`
+        : profile.followers > gate.maxFollowers
+          ? `${profile.followers} followers (max ${gate.maxFollowers})`
+          : brand.isBrand
+            ? `brand account (${brand.reason})`
+            : null;
+    if (why) throw new CreatorSkipped(`${platform}:${handle} skipped: ${why}`);
+  }
+  // A private account's posts can't be read: it backs off like a missing one.
+  if (profile.isPrivate) throw new CreatorNotFound(`${platform}:${handle} is private`);
+  const videos = await source.videos(handle, VIDEOS_PER_REFRESH, meter);
 
   const { covers, stored } = await storedCovers(admin, platform, key, videos);
   const coverOf = (v: ScrapedVideo) => covers.get(v.id) ?? v.coverUrl;
@@ -213,9 +253,14 @@ export async function refreshCreator(
     category: profile.category,
   });
 
+  // Public contact e-mail: the one the platform shows, else one written in the
+  // bio. Never cleared here (an address found another way is kept).
+  const email = profile.email ?? emailIn(profile.bio);
+
   const upsert = {
     ...row,
     ...nicheMerge,
+    ...(email ? { email } : {}),
     is_brand: brand.isBrand,
     brand_reason: brand.reason,
     username: key,
@@ -303,9 +348,114 @@ export async function refreshCreator(
     },
     now,
   );
-  await admin.from("creators_index").update({ scrape_priority: priority, next_scrape_at: nextScrapeAt(priority, now) }).eq("username", key);
+  await admin
+    .from("creators_index")
+    .update({ scrape_priority: priority, next_scrape_at: nextScrapeAt(priority, now, refreshIntervalDays(platform, source.name)) })
+    .eq("username", key);
 
-  return { username: key, isNew: !existing, apiCalls: meter.calls - callsBefore, videos: videos.length, coversStored: stored };
+  // Instagram snowball: co-authors, tagged people and @mentions are the next
+  // creators to look at (no call here; each lead costs 1 call when looked at).
+  let leadsQueued = 0;
+  if (platform === "instagram" && opts.snowball && opts.snowball.maxLeads > 0) {
+    const related: RelatedAccount[] = [
+      ...mentionsIn(profile.bio).map((u) => ({ username: u, displayName: "", via: "bio" as const })),
+      ...videos.flatMap((v) => v.related ?? []),
+    ];
+    if (opts.snowball.similar && source.similar) {
+      try {
+        const similar = await source.similar(handle, meter);
+        related.unshift(...similar.map((h) => ({ username: h.username, displayName: h.displayName, via: "similar" as const })));
+      } catch {
+        // Optional and often busy upstream: the refresh itself succeeded.
+      }
+    }
+    const country = String(nicheMerge.country_code ?? existing?.country_code ?? "").toUpperCase();
+    const language = String(nicheMerge.language ?? existing?.language ?? "").toLowerCase();
+    leadsQueued = await queueInstagramLeads(admin, related, {
+      exclude: [handle],
+      max: opts.snowball.maxLeads,
+      priority: country === "FR" || language === "fr" ? 4 : 5,
+    });
+  }
+
+  return { username: key, isNew: !existing, apiCalls: meter.calls - callsBefore, videos: videos.length, coversStored: stored, leadsQueued };
+}
+
+const LEAD_ORDER: Record<RelatedAccount["via"], number> = { similar: 0, coauthor: 1, search: 2, hashtag: 3, bio: 4, tag: 5, mention: 6 };
+
+/**
+ * Queues Instagram accounts to look at: a creator_refresh job on a key not in
+ * the catalog yet, which the worker runs through the discovery gate (profile
+ * call first; only creator-sized, public, non-brand accounts are fully
+ * refreshed and added). Skips handles already in the catalog, already queued
+ * or looked at in the last 30 days (finished jobs are pruned after 30 days),
+ * and names that are obviously brands. Returns how many were queued.
+ */
+export async function queueInstagramLeads(
+  admin: SupabaseClient,
+  accounts: (RelatedAccount | (ScrapedSearchHit & { via?: RelatedAccount["via"] }))[],
+  opts: { exclude?: string[]; max: number; priority?: number },
+): Promise<number> {
+  if (opts.max <= 0) return 0;
+  const exclude = new Set((opts.exclude ?? []).map(normalizeHandle));
+  const byHandle = new Map<string, { username: string; via: RelatedAccount["via"] }>();
+  for (const a of accounts) {
+    const h = normalizeHandle(a.username);
+    if (!/^[a-z0-9._]{1,30}$/.test(h) || exclude.has(h) || byHandle.has(h)) continue;
+    if (detectBrand({ username: h, displayName: a.displayName }).isBrand) continue;
+    byHandle.set(h, { username: h, via: a.via ?? "search" });
+  }
+  // Best leads first; a few more than needed in case some are known already.
+  const leads = [...byHandle.values()].sort((a, b) => LEAD_ORDER[a.via] - LEAD_ORDER[b.via]).slice(0, opts.max * 3);
+  if (!leads.length) return 0;
+
+  const keys = leads.map((l) => creatorKey("instagram", l.username));
+  const [{ data: known }, { data: seen }] = await Promise.all([
+    admin.from("creators_index").select("username").in("username", leads.flatMap((l) => knownKeys("instagram", l.username))),
+    admin.from("scrape_jobs").select("target").eq("kind", "creator_refresh").eq("platform", "instagram").in("target", keys),
+  ]);
+  const taken = new Set([
+    ...(known ?? []).map((k) => normalizeHandle(String(k.username))),
+    ...(seen ?? []).map((j) => normalizeHandle(String(j.target))),
+  ]);
+  const fresh = leads.filter((l) => !knownKeys("instagram", l.username).some((k) => taken.has(k))).slice(0, opts.max);
+  if (!fresh.length) return 0;
+
+  const jobs = fresh.map((l) => ({ kind: "creator_refresh", platform: "instagram", target: creatorKey("instagram", l.username), priority: opts.priority ?? 5 }));
+  const { error } = await admin.from("scrape_jobs").insert(jobs);
+  if (!error) return jobs.length;
+  // One live job per target: one by one, a duplicate is refused, which is fine.
+  let queued = 0;
+  for (const job of jobs) if (!(await admin.from("scrape_jobs").insert(job)).error) queued += 1;
+  return queued;
+}
+
+let frenchInstagramQueries: Set<string> | null = null;
+/** True for an Instagram search query of the French market (its leads go first). */
+export function isFrenchInstagramQuery(keyword: string): boolean {
+  frenchInstagramQueries ??= new Set(instagramSearchQueries().filter((q) => q.country === "FR").map((q) => q.keyword));
+  return frenchInstagramQueries.has(keyword.trim().toLowerCase());
+}
+
+/** Hashtag discovery target ("#skincare"), Instagram only. */
+export const isHashtagTarget = (target: string) => /^#[\p{L}\p{N}_]{2,60}$/u.test(target.trim());
+
+/**
+ * One hashtag of Instagram discovery (optional endpoint, often busy): the
+ * owners of its recent posts become leads. 1 call.
+ */
+export async function discoverInstagramHashtag(
+  admin: SupabaseClient,
+  source: CreatorSource,
+  tag: string,
+  opts: { meter?: CallMeter; maxLeads?: number } = {},
+): Promise<{ found: number; leads: number; apiCalls: number }> {
+  const meter = opts.meter ?? new CallMeter();
+  const before = meter.calls;
+  if (!source.hashtag) return { found: 0, leads: 0, apiCalls: 0 };
+  const hits = await source.hashtag(tag, meter);
+  const leads = await queueInstagramLeads(admin, hits.map((h) => ({ ...h, via: "hashtag" as const })), { max: opts.maxLeads ?? 30, priority: 5 });
+  return { found: hits.length, leads, apiCalls: meter.calls - before };
 }
 
 /**
@@ -354,17 +504,26 @@ export async function discoverKeyword(
   source: CreatorSource,
   keyword: string,
   opts: DiscoverOptions = {},
-): Promise<{ found: number; added: number; apiCalls: number; addedKeys: string[] }> {
+): Promise<{ found: number; added: number; apiCalls: number; addedKeys: string[]; leads: number }> {
   const platform = source.platform;
   const meter = opts.meter ?? new CallMeter();
   const callsBefore = meter.calls;
   const min = opts.minFollowers ?? 5_000;
   const max = opts.maxFollowers ?? Number.POSITIVE_INFINITY;
-  const hits = (await source.search(keyword, opts.count ?? 30, meter)).filter(
-    (h) => h.username && h.followers != null && h.followers >= min && h.followers <= max,
-  );
+  const all = await source.search(keyword, opts.count ?? 30, meter);
+  const hits = all.filter((h) => h.username && h.followers != null && h.followers >= min && h.followers <= max);
+  // Instagram search rarely gives the follower count: those accounts are
+  // queued as leads (looked at through the discovery gate) instead of skipped.
+  const leads =
+    platform === "instagram" && (opts.maxNew ?? 1) > 0
+      ? await queueInstagramLeads(
+          admin,
+          all.filter((h) => h.username && h.followers == null).map((h) => ({ ...h, via: "search" as const })),
+          { max: 30, priority: isFrenchInstagramQuery(keyword) ? 4 : 5 },
+        )
+      : 0;
   const calls = () => meter.calls - callsBefore;
-  if (!hits.length) return { found: 0, added: 0, apiCalls: calls(), addedKeys: [] };
+  if (!hits.length) return { found: 0, added: 0, apiCalls: calls(), addedKeys: [], leads };
 
   // Known under the current key or a pre-prefix key of the same platform.
   const candidates = hits.flatMap((h) => knownKeys(platform, h.username));
@@ -386,7 +545,7 @@ export async function discoverKeyword(
       return true;
     })
     .slice(0, Math.max(0, opts.maxNew ?? Number.POSITIVE_INFINITY));
-  if (!fresh.length) return { found: hits.length, added: 0, apiCalls: calls(), addedKeys: [] };
+  if (!fresh.length) return { found: hits.length, added: 0, apiCalls: calls(), addedKeys: [], leads };
 
   const nowIso = new Date().toISOString();
   const niches = nicheTagsForKeyword(keyword);
@@ -419,7 +578,7 @@ export async function discoverKeyword(
   const { error: jobErr } = await admin.from("scrape_jobs").insert(jobs);
   if (jobErr) for (const job of jobs) await admin.from("scrape_jobs").insert(job);
 
-  return { found: hits.length, added: rows.length, apiCalls: calls(), addedKeys: rows.map((r) => r.username) };
+  return { found: hits.length, added: rows.length, apiCalls: calls(), addedKeys: rows.map((r) => r.username), leads };
 }
 
 /**

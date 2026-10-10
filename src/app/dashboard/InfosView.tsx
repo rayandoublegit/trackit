@@ -410,7 +410,7 @@ function CreatorInfosView({
                     style={{
                       fontSize: 12.5,
                       fontWeight: 650,
-                      color: "#0047ff",
+                      color: "var(--ws-accent)",
                       letterSpacing: "-0.02em",
                       marginBottom: 12,
                       textTransform: "uppercase",

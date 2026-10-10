@@ -51,12 +51,12 @@ const fieldInput: React.CSSProperties = {
   boxSizing: "border-box",
   padding: "14px 16px",
   borderRadius: 10,
-  border: "1px solid #D1D5DB",
+  border: "1px solid var(--ws-border-strong)",
   fontSize: 15,
   fontFamily: "inherit",
-  color: "#1A1A1A",
+  color: "var(--ws-text)",
   letterSpacing: "-0.02em",
-  background: "#FFF",
+  background: "var(--ws-surface)",
   outline: "none",
 };
 
@@ -72,8 +72,8 @@ const drawerBtnPrimary: React.CSSProperties = {
   fontSize: 14,
   borderRadius: 8,
   fontWeight: 600,
-  color: "#FFF",
-  background: "#1A1A1A",
+  color: "var(--ws-btn-text)",
+  background: "var(--ws-btn)",
   border: "none",
   padding: "11px 16px",
   cursor: "pointer",
@@ -82,7 +82,7 @@ const drawerBtnPrimary: React.CSSProperties = {
 const sectionTitle: React.CSSProperties = {
   fontSize: 16,
   fontWeight: 600,
-  color: "#1A1A1A",
+  color: "var(--ws-text)",
   marginBottom: 14,
   letterSpacing: "-0.02em",
 };
@@ -386,7 +386,7 @@ export function AddSalePanel({
         style={{
           width: "min(560px, 100%)",
           height: "100%",
-          background: "#FFF",
+          background: "var(--ws-surface)",
           overflowY: "auto",
           transform: shown ? "translateX(0)" : "translateX(40px)",
           opacity: shown ? 1 : 0,
@@ -404,7 +404,7 @@ export function AddSalePanel({
             style={{
               background: "none",
               border: "none",
-              color: "#9A9A9A",
+              color: "var(--ws-text-dim)",
               fontWeight: 500,
               fontSize: 14,
               cursor: submitting ? "default" : "pointer",
@@ -435,18 +435,18 @@ export function AddSalePanel({
           </button>
         </div>
 
-        <h2 style={{ fontSize: 22, fontWeight: 600, color: "#1A1A1A", margin: "0 0 8px", letterSpacing: "-0.03em" }}>
+        <h2 style={{ fontSize: 22, fontWeight: 600, color: "var(--ws-text)", margin: "0 0 8px", letterSpacing: "-0.03em" }}>
           {lang === "fr" ? "Ajouter une vente" : "Add a sale"}
         </h2>
-        <p style={{ fontSize: 14, color: "#6B7280", margin: "0 0 28px", lineHeight: 1.5, letterSpacing: "-0.02em" }}>
+        <p style={{ fontSize: 14, color: "var(--ws-text-muted)", margin: "0 0 28px", lineHeight: 1.5, letterSpacing: "-0.02em" }}>
           {subtitle}
         </p>
 
         {loadingCreators ? (
-          <p style={{ fontSize: 14, color: "#9A9A9A" }}>{lang === "fr" ? "Chargement des créateurs…" : "Loading creators…"}</p>
+          <p style={{ fontSize: 14, color: "var(--ws-text-dim)" }}>{lang === "fr" ? "Chargement des créateurs…" : "Loading creators…"}</p>
         ) : creators.length === 0 ? (
           <div>
-            <p style={{ fontSize: 15, color: "#6B7280", margin: "0 0 20px", lineHeight: 1.5 }}>
+            <p style={{ fontSize: 15, color: "var(--ws-text-muted)", margin: "0 0 20px", lineHeight: 1.5 }}>
               {campaign
                 ? lang === "fr"
                   ? "Ajoutez d'abord des créateurs à cette campagne avant d'enregistrer une vente."
@@ -500,7 +500,7 @@ export function AddSalePanel({
                         ) : null}
                       </div>
                       {commission != null ? (
-                        <span style={{ fontSize: 13, fontWeight: 600, color: selected ? "#FFFFFF" : "#1A1A1A", whiteSpace: "nowrap" }}>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: selected ? "#FFFFFF" : "var(--ws-text)", whiteSpace: "nowrap" }}>
                           {commission}%
                         </span>
                       ) : (
@@ -520,11 +520,11 @@ export function AddSalePanel({
                   marginBottom: 24,
                   padding: "14px 16px",
                   borderRadius: 10,
-                  border: "1px solid #EFEFEF",
-                  background: "#FFFFFF",
+                  border: "1px solid var(--ws-border)",
+                  background: "var(--ws-surface)",
                 }}
               >
-                <p style={{ fontSize: 14, color: "#1A1A1A", margin: "0 0 12px", lineHeight: 1.5 }}>
+                <p style={{ fontSize: 14, color: "var(--ws-text)", margin: "0 0 12px", lineHeight: 1.5 }}>
                   {commissionNotConfiguredMessage(lang)}
                 </p>
                 <button
@@ -535,7 +535,7 @@ export function AddSalePanel({
                   }}
                   style={{
                     border: "none",
-                    background: "#0047FF",
+                    background: "var(--ws-accent)",
                     color: "#FFFFFF",
                     borderRadius: 8,
                     padding: "8px 14px",
@@ -591,7 +591,7 @@ export function AddSalePanel({
               <p
                 style={{
                   fontSize: 14,
-                  color: messageTone === "success" ? "#1A1A1A" : "#C0392B",
+                  color: messageTone === "success" ? "var(--ws-text)" : "#C0392B",
                   margin: "0 0 20px",
                   lineHeight: 1.5,
                 }}

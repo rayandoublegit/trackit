@@ -90,7 +90,7 @@ export function WorkspaceNotes({
 
   if (loading) {
     return (
-      <div style={{ fontSize: 14, color: "#9A9A9A", padding: variant === "page" ? 0 : "8px 0" }}>
+      <div style={{ fontSize: 14, color: "var(--ws-text-dim)", padding: variant === "page" ? 0 : "8px 0" }}>
         {lang === "fr" ? "Chargement…" : "Loading…"}
       </div>
     );
@@ -114,15 +114,15 @@ export function WorkspaceNotes({
               ? 360
               : "calc(100vh - 200px)",
         boxSizing: "border-box",
-        border: "1px solid #EFEFEF",
+        border: "1px solid var(--ws-border)",
         borderRadius: 12,
         outline: "none",
         resize: "vertical",
-        background: "#FAFAFA",
+        background: "var(--ws-surface-2)",
         padding: variant === "widget" ? "14px 16px" : "20px 24px",
         fontSize: 14,
         lineHeight: 1.65,
-        color: "#1A1A1A",
+        color: "var(--ws-text)",
         fontFamily: "inherit",
         letterSpacing: "-0.01em",
         display: "block",
@@ -152,16 +152,16 @@ export function WorkspaceNotes({
           }}
         >
           <div>
-            <h3 style={{ fontSize: 16, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", margin: 0, marginBottom: 4 }}>
+            <h3 style={{ fontSize: 16, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.02em", margin: 0, marginBottom: 4 }}>
               {lang === "fr" ? "Notes" : "Notes"}
             </h3>
-            <p style={{ fontSize: 13, color: "#7A7A7A", margin: 0, letterSpacing: "-0.01em" }}>
+            <p style={{ fontSize: 13, color: "var(--ws-text-muted)", margin: 0, letterSpacing: "-0.01em" }}>
               {lang === "fr"
                 ? "Vos objectifs, idées et priorités."
                 : "Your goals, ideas, and priorities."}
             </p>
           </div>
-          <span style={{ fontSize: 12, color: "#9A9A9A", flexShrink: 0 }}>
+          <span style={{ fontSize: 12, color: "var(--ws-text-dim)", flexShrink: 0 }}>
             {open ? (lang === "fr" ? "Masquer" : "Hide") : (lang === "fr" ? "Afficher" : "Show")}
           </span>
         </button>

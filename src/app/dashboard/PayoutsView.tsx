@@ -2420,7 +2420,7 @@ export function PayoutsView({
 
   const handleManualCreatorPay = (creator: (typeof creators)[number]) => {
     if (!canUseManualPayouts(plan as PlanTier)) {
-      alert(lang === "fr" ? "Les paiements créateurs manuels sont disponibles à partir du plan Growth." : "Manual creator payouts are available on the Growth plan and above.");
+      alert(lang === "fr" ? "Les paiements créateurs manuels sont disponibles à partir du plan Pro." : "Manual creator payouts are available on the Pro plan and above.");
       return;
     }
     const amount = Number(creator.balance) || 0;
@@ -2606,7 +2606,7 @@ export function PayoutsView({
       onPayManual={() => void paySelectedCreator()}
       onPayStripe={async () => {
         if (!canUseManualPayouts(plan as PlanTier)) {
-          alert(lang === "fr" ? "Les paiements créateurs manuels sont disponibles à partir du plan Growth." : "Manual creator payouts are available on the Growth plan and above.");
+          alert(lang === "fr" ? "Les paiements créateurs manuels sont disponibles à partir du plan Pro." : "Manual creator payouts are available on the Pro plan and above.");
           return;
         }
         const amount = Number(activeCreator.balance) || 0;
@@ -2748,13 +2748,13 @@ export function PayoutsView({
                   </div>
                   {!canUseStripeConnectPayouts(plan) && (
                     <p style={{ fontSize: 13, color: "var(--ws-text-muted)", margin: "10px 0 0", letterSpacing: "-0.01em" }}>
-                      {lang === "fr" ? "Disponible sur le plan Scale. " : "Available on the Scale plan. "}
+                      {lang === "fr" ? "Disponible sur le plan Pro. " : "Available on the Pro plan. "}
                       <button
                         type="button"
-                        onClick={() => void (onUpgradeScale ?? onUpgradePro ?? onUpgrade)()}
+                        onClick={() => void (onUpgradePro ?? onUpgrade)()}
                         style={{ background: "none", border: "none", color: "var(--ws-accent)", fontSize: 13, cursor: "pointer", padding: 0, fontFamily: "inherit" }}
                       >
-                        {lang === "fr" ? "Passer à Scale →" : "Upgrade to Scale →"}
+                        {lang === "fr" ? "Passer à Pro →" : "Upgrade to Pro →"}
                       </button>
                     </p>
                   )}

@@ -33,8 +33,8 @@ const drawerBtnPrimary: React.CSSProperties = {
   fontSize: 14,
   borderRadius: 8,
   fontWeight: 600,
-  color: "#FFF",
-  background: "#1A1A1A",
+  color: "var(--ws-btn-text)",
+  background: "var(--ws-btn)",
   border: "none",
   padding: "11px 16px",
   cursor: "pointer",
@@ -250,12 +250,12 @@ export function AddBrandContentPanel({
     width: "100%",
     padding: "12px 14px",
     borderRadius: 10,
-    border: "1px solid #E5E5E5",
+    border: "1px solid var(--ws-border)",
     fontSize: 15,
     fontFamily: "inherit",
     outline: "none",
     boxSizing: "border-box",
-    color: "#1A1A1A",
+    color: "var(--ws-text)",
     letterSpacing: "-0.01em",
   };
 
@@ -288,7 +288,7 @@ export function AddBrandContentPanel({
         style={{
           width: "min(560px, 100%)",
           height: "100%",
-          background: "#FFF",
+          background: "var(--ws-surface)",
           overflowY: "auto",
           transform: shown ? "translateX(0)" : "translateX(40px)",
           opacity: shown ? 1 : 0,
@@ -306,7 +306,7 @@ export function AddBrandContentPanel({
             style={{
               background: "none",
               border: "none",
-              color: "#9A9A9A",
+              color: "var(--ws-text-dim)",
               fontWeight: 500,
               fontSize: 14,
               cursor: submitting ? "default" : "pointer",
@@ -337,17 +337,17 @@ export function AddBrandContentPanel({
           </button>
         </div>
 
-        <h2 style={{ fontSize: 22, fontWeight: 600, color: "#1A1A1A", margin: "0 0 8px", letterSpacing: "-0.03em" }}>
+        <h2 style={{ fontSize: 22, fontWeight: 600, color: "var(--ws-text)", margin: "0 0 8px", letterSpacing: "-0.03em" }}>
           {lang === "fr" ? "Ajouter du contenu" : "Add content"}
         </h2>
-        <p style={{ fontSize: 14, color: "#6B7280", margin: "0 0 28px", lineHeight: 1.5, letterSpacing: "-0.02em" }}>
+        <p style={{ fontSize: 14, color: "var(--ws-text-muted)", margin: "0 0 28px", lineHeight: 1.5, letterSpacing: "-0.02em" }}>
           {subtitle}
         </p>
 
         {loadingCreators ? (
-          <p style={{ fontSize: 14, color: "#9A9A9A" }}>{lang === "fr" ? "Chargement des créateurs…" : "Loading creators…"}</p>
+          <p style={{ fontSize: 14, color: "var(--ws-text-dim)" }}>{lang === "fr" ? "Chargement des créateurs…" : "Loading creators…"}</p>
         ) : creators.length === 0 ? (
-          <p style={{ fontSize: 15, color: "#6B7280", margin: 0, lineHeight: 1.5 }}>
+          <p style={{ fontSize: 15, color: "var(--ws-text-muted)", margin: 0, lineHeight: 1.5 }}>
             {campaignCreatorIds?.length
               ? lang === "fr"
                 ? "Aucun créateur de cette campagne n'a de compte actif. Ajoutez des créateurs à la campagne via Invitations."
@@ -359,7 +359,7 @@ export function AddBrandContentPanel({
         ) : (
           <>
             <div style={{ marginBottom: 24 }}>
-              <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", marginBottom: 10 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "var(--ws-text)", marginBottom: 10 }}>
                 {lang === "fr" ? "Créateur" : "Creator"}
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -407,7 +407,7 @@ export function AddBrandContentPanel({
             </div>
 
             <div style={{ marginBottom: 16 }}>
-              <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#1A1A1A", marginBottom: 8 }}>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "var(--ws-text)", marginBottom: 8 }}>
                 {lang === "fr" ? "Titre" : "Title"}
               </label>
               <input
@@ -420,7 +420,7 @@ export function AddBrandContentPanel({
             </div>
 
             <div style={{ marginBottom: 16 }}>
-              <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#1A1A1A", marginBottom: 8 }}>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "var(--ws-text)", marginBottom: 8 }}>
                 {lang === "fr" ? "Notes" : "Notes"}
               </label>
               <textarea
@@ -433,7 +433,7 @@ export function AddBrandContentPanel({
             </div>
 
             <div style={{ marginBottom: 16 }}>
-              <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#1A1A1A", marginBottom: 8 }}>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "var(--ws-text)", marginBottom: 8 }}>
                 {lang === "fr" ? "Fichiers" : "Files"}
               </label>
               <div
@@ -449,15 +449,15 @@ export function AddBrandContentPanel({
                 }}
                 onClick={() => fileRef.current?.click()}
                 style={{
-                  border: `2px dashed ${dragOver ? BLUE : "#E5E5E5"}`,
+                  border: `2px dashed ${dragOver ? BLUE : "var(--ws-border)"}`,
                   borderRadius: 14,
                   padding: "32px 20px",
                   textAlign: "center",
                   cursor: "pointer",
-                  background: dragOver ? "rgba(0,71,255,0.04)" : "#FAFAFA",
+                  background: dragOver ? "rgba(0,71,255,0.04)" : "var(--ws-surface-2)",
                 }}
               >
-                <p style={{ margin: 0, fontSize: 14, color: "#6B7280", lineHeight: 1.5 }}>
+                <p style={{ margin: 0, fontSize: 14, color: "var(--ws-text-muted)", lineHeight: 1.5 }}>
                   {lang === "fr"
                     ? `Glissez des images ou vidéos ici (max ${CREATOR_CONTENT_MAX_FILE_LABEL}, 1–2 min+), ou cliquez pour parcourir`
                     : `Drag images or videos here (max ${CREATOR_CONTENT_MAX_FILE_LABEL}, 1–2+ min), or click to browse`}
@@ -483,7 +483,7 @@ export function AddBrandContentPanel({
                         fontSize: 13,
                         color: "#4B5563",
                         padding: "8px 0",
-                        borderBottom: "1px solid #F0F0F0",
+                        borderBottom: "1px solid var(--ws-border)",
                       }}
                     >
                       <span>{file.name}</span>
@@ -493,7 +493,7 @@ export function AddBrandContentPanel({
                         style={{
                           background: "none",
                           border: "none",
-                          color: "#9A9A9A",
+                          color: "var(--ws-text-dim)",
                           cursor: "pointer",
                           fontFamily: "inherit",
                           fontSize: 12,
@@ -509,7 +509,7 @@ export function AddBrandContentPanel({
 
             <div style={{ marginBottom: 16 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 8 }}>
-                <label style={{ fontSize: 13, fontWeight: 600, color: "#1A1A1A", margin: 0 }}>
+                <label style={{ fontSize: 13, fontWeight: 600, color: "var(--ws-text)", margin: 0 }}>
                   {lang === "fr" ? "Liens URL" : "URL links"}
                 </label>
                 <InfoTip
@@ -532,7 +532,7 @@ export function AddBrandContentPanel({
                 }
                 style={inputStyle}
               />
-              <p style={{ fontSize: 12, color: "#9A9A9A", margin: "8px 0 0", lineHeight: 1.45 }}>
+              <p style={{ fontSize: 12, color: "var(--ws-text-dim)", margin: "8px 0 0", lineHeight: 1.45 }}>
                 {lang === "fr"
                   ? "Optionnel — associé au premier fichier envoyé."
                   : "Optional — linked to the first uploaded file."}
@@ -544,7 +544,7 @@ export function AddBrandContentPanel({
                 style={{
                   fontSize: 14,
                   margin: 0,
-                  color: messageTone === "success" ? "#1A1A1A" : "#A32D2D",
+                  color: messageTone === "success" ? "var(--ws-text)" : "#A32D2D",
                 }}
               >
                 {message}

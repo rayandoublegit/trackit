@@ -86,7 +86,7 @@
 .cf-head, .cf-row { display: grid; grid-template-columns: minmax(200px, 1.5fr) 188px minmax(110px, 1fr) 92px 132px 118px 150px; align-items: center; gap: 14px; }
 .cf-head { padding: 12px 18px; background: var(--ws-pill); border-bottom: 1px solid var(--ws-border); font-size: 12.5px; font-weight: 600; color: var(--ws-text-muted); }
 .cf-list { display: flex; flex-direction: column; }
-.cf-row { padding: 14px 18px; border-bottom: 1px solid var(--ws-border); animation: cf-row-in .4s cubic-bezier(.2, .8, .2, 1) both; animation-delay: calc(min(var(--i), 12) * 35ms); transition: background .2s ease; }
+.cf-row { padding: 14px 18px; border-bottom: 1px solid var(--ws-border); animation: cf-row-in .4s cubic-bezier(.2, .8, .2, 1) backwards; animation-delay: calc(min(var(--i), 12) * 35ms); transition: background .2s ease; }
 .cf-row:last-child { border-bottom: none; }
 .cf-row:hover { background: var(--ws-hover); }
 .cf-row.is-dimmed { opacity: .5; filter: grayscale(.8); }
@@ -166,3 +166,23 @@
 .cf-growth { padding: 1px 6px; border-radius: 6px; font-size: 11px; font-weight: 700; letter-spacing: 0; }
 .cf-growth.is-up { background: rgba(16, 185, 129, .12); color: #059669; }
 .cf-growth.is-down { background: rgba(239, 68, 68, .12); color: #dc2626; }
+
+/* Live lookup of a searched @handle / profile link (DiscoveryFeed LookupStatus). */
+.cf-lookup { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin: 0 0 12px; padding: 14px 18px; border: 1px solid var(--ws-border); border-radius: 14px; background: var(--ws-surface); animation: cf-pop .25s ease-out; }
+.cf-lookup.is-loading { border-style: dashed; }
+.cf-lookup.is-error { border-color: var(--ws-border-strong, var(--ws-border)); }
+.cf-lookup__text { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1 1 240px; }
+.cf-lookup__text strong { font-size: 13.5px; font-weight: 600; color: var(--ws-text); letter-spacing: -.01em; line-height: 1.4; }
+.cf-lookup__text small { font-size: 12px; color: var(--ws-text-muted); }
+.cf-lookup__actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.cf-lookup__btn { display: inline-flex; align-items: center; gap: 7px; padding: 7px 12px; border-radius: 10px; border: 1px solid var(--ws-border); background: var(--ws-surface); color: var(--ws-text); font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: background .15s ease; }
+.cf-lookup__btn:hover { background: var(--ws-hover); }
+.cf-lookup__btn.is-primary { background: var(--ws-btn, var(--ws-accent)); color: var(--ws-btn-text, #fff); border-color: transparent; }
+.cf-lookup__btn.is-primary:hover { opacity: .9; }
+.cf-lookup__spin { flex-shrink: 0; width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--ws-border); border-top-color: var(--ws-accent); animation: cf-spin .8s linear infinite; }
+.cf-lookup-row .cf-row { background: var(--ws-accent-soft, var(--ws-hover)); }
+.cf-new { padding: 1px 7px; border-radius: 6px; background: var(--ws-accent); color: #fff; font-size: 10.5px; font-weight: 700; letter-spacing: .01em; text-transform: uppercase; }
+@keyframes cf-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .cf-lookup, .cf-lookup__spin { animation: none !important; }
+}

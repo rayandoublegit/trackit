@@ -25,6 +25,10 @@ export type ScrapedProfile = {
   seller?: boolean | null;
   /** Business category shown on the profile ("Clothing (Brand)", "Digital creator"…). */
   category?: string | null;
+  /** Public contact e-mail (Instagram's email_from_biography / public_email, else one written in the bio). */
+  email?: string | null;
+  /** Private account: its posts can't be read (Instagram). */
+  isPrivate?: boolean;
 };
 
 /**
@@ -57,7 +61,15 @@ export type ScrapedVideo = {
   language?: string;
   /** Country of the account that posted it (TikTok author.region), when given. */
   region?: string;
+  /**
+   * Other accounts on the post (Instagram: tagged people, co-authors, @mentions
+   * in the caption). Never stored as such: Instagram discovery follows them.
+   */
+  related?: RelatedAccount[];
 };
+
+/** An account seen next to a creator (tagged, co-author, mention, similar account, hashtag post owner). */
+export type RelatedAccount = { username: string; displayName: string; via: "coauthor" | "tag" | "mention" | "bio" | "similar" | "hashtag" | "search" };
 
 /** followers is null when the search result does not say (the hit is then skipped). */
 export type ScrapedSearchHit = { username: string; displayName: string; followers: number | null; avatarUrl: string };
@@ -92,6 +104,10 @@ export interface CreatorSource {
   profile(handle: string, meter?: CallMeter): Promise<ScrapedProfile | null>;
   videos(handle: string, count: number, meter?: CallMeter): Promise<ScrapedVideo[]>;
   search(keyword: string, count: number, meter?: CallMeter): Promise<ScrapedSearchHit[]>;
+  /** Accounts the platform suggests next to this one (Instagram, optional: 1 call). */
+  similar?(handle: string, meter?: CallMeter): Promise<ScrapedSearchHit[]>;
+  /** Owners of recent posts under a hashtag (Instagram, optional: 1 call). */
+  hashtag?(tag: string, meter?: CallMeter): Promise<ScrapedSearchHit[]>;
 }
 
 export function hashtagsOf(caption: string): string[] {

@@ -1,8 +1,20 @@
 import type { FeedCreator } from "@/lib/discovery-feed";
 import type { MinoWidget } from "@/lib/mino-widgets";
+import type { MinoAnalysisMeta } from "@/lib/mino-analysis";
+import type { MinoCatalogFilters } from "@/lib/mino-filters";
 import { workspaceStorageKey } from "@/lib/workspaces";
 
-export type MinoSearchMeta = { label: string; sources: string[] };
+export type MinoSearchMeta = {
+  label: string;
+  sources: string[];
+  /** The search as Creators > Search filters ("Open in Creators with these filters"). */
+  filters?: MinoCatalogFilters;
+};
+
+/** What the user attached to a message: a small preview only, never the full image. */
+export type MinoAttachmentMeta =
+  | { kind: "image"; name: string; thumb?: string }
+  | { kind: "site"; url: string };
 
 export type MinoChatMessage = {
   role: "user" | "assistant";
@@ -10,6 +22,10 @@ export type MinoChatMessage = {
   /** Creators found by a Mino search, rendered as cards under the reply. */
   creators?: FeedCreator[];
   search?: MinoSearchMeta;
+  /** Attachments shown on the user's message. */
+  attachments?: MinoAttachmentMeta[];
+  /** Brand analysis from a website or a photo. */
+  analysis?: MinoAnalysisMeta;
   /** UI Mino built for this answer (revenue dashboard, action card, error with retry). */
   widget?: MinoWidget;
 };

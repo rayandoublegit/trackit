@@ -29,6 +29,19 @@ function formatSenderAddress(displayName: string, email: string): string {
   return `${safeName} <${email}>`;
 }
 
+/** Whether this account can send directly (no mail app). Parked by default: false. */
+export async function GET(request: NextRequest) {
+  const userId = await getAuthedUserId(request);
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const domains = allowedDirectSendDomains();
+  if (!resend || domains.length === 0) return NextResponse.json({ directSend: false });
+  const admin = getSupabaseAdmin();
+  if (!admin) return NextResponse.json({ directSend: false });
+  const { data } = await admin.auth.admin.getUserById(userId);
+  const email = normalizeOutreachEmail(data?.user?.email ?? "");
+  return NextResponse.json({ directSend: isValidEmailAddress(email) && domains.includes(senderEmailDomain(email)) });
+}
+
 export async function POST(request: NextRequest) {
   const userId = await getAuthedUserId(request);
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

@@ -1,5 +1,6 @@
 "use client";
 
+import { LockedEmailChip } from "@/components/PlanLock";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import type { FeedCreator } from "@/lib/discovery-feed";
@@ -13,6 +14,7 @@ import { SaveCreatorDropdown } from "./SaveCreatorDropdown";
 import { InAppVideoPlayer } from "./TikTokEmbedPlayer";
 import { CountUp } from "./sample-motion";
 import "./mino-search.css";
+import "./mino-analysis.css";
 
 // Mino's creator search, in two parts: the motion shown while it searches,
 // then the creators as profiles (photo, numbers, videos that play in the app,
@@ -45,14 +47,14 @@ const SEARCH_STEPS_FR = [
   "Classement des meilleurs profils",
 ];
 
-export function MinoSearchMotion({ label }: { label: string }) {
+export function MinoSearchMotion({ label, title, steps: customSteps }: { label: string; title?: string; steps?: string[] }) {
   const fr = useLang() === "fr";
-  const steps = fr ? SEARCH_STEPS_FR : SEARCH_STEPS;
+  const steps = customSteps?.length ? customSteps : fr ? SEARCH_STEPS_FR : SEARCH_STEPS;
   const [step, setStep] = useState(0);
   useEffect(() => {
-    const id = window.setInterval(() => setStep((s) => Math.min(s + 1, SEARCH_STEPS.length - 1)), 1100);
+    const id = window.setInterval(() => setStep((s) => Math.min(s + 1, steps.length - 1)), customSteps?.length ? 1800 : 1100);
     return () => window.clearInterval(id);
-  }, []);
+  }, [steps.length, customSteps?.length]);
 
   return (
     <div className="mino-search" role="status" aria-live="polite">
@@ -61,7 +63,7 @@ export function MinoSearchMotion({ label }: { label: string }) {
           <MinoCompanion size={30} />
         </span>
         <div className="mino-search__title">
-          <strong>{fr ? "Recherche de créateurs" : "Searching creators"}</strong>
+          <strong>{title || (fr ? "Recherche de créateurs" : "Searching creators")}</strong>
           <span>{label}</span>
         </div>
       </div>
@@ -193,9 +195,33 @@ function VideoTile({ video, index, fr, onPlay }: { video: PlayableVideo; index: 
 function VerifiedMark({ fr }: { fr: boolean }) {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" aria-label={fr ? "Vérifié" : "Verified"}>
-      <path fill="#0047ff" d="M12 2l2.4 2.1 3.2-.3.9 3.1 2.8 1.6-1 3 1 3-2.8 1.6-.9 3.1-3.2-.3L12 22l-2.4-2.1-3.2.3-.9-3.1-2.8-1.6 1-3-1-3 2.8-1.6.9-3.1 3.2.3z" />
+      <path fill="var(--ws-accent)" d="M12 2l2.4 2.1 3.2-.3.9 3.1 2.8 1.6-1 3 1 3-2.8 1.6-.9 3.1-3.2-.3L12 22l-2.4-2.1-3.2.3-.9-3.1-2.8-1.6 1-3-1-3 2.8-1.6.9-3.1 3.2.3z" />
       <path d="M8.5 12.2l2.3 2.3 4.7-4.8" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
+  );
+}
+
+/** The stored contact email, with a copy button (real data only: shown when the catalog has one). */
+function EmailRow({ email, fr }: { email: string; fr: boolean }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(email);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1600);
+    } catch {
+      // Clipboard blocked: the address stays selectable.
+    }
+  };
+  return (
+    <div className="mino-profile__email">
+      <a href={`mailto:${email}`} title={email}>
+        {email}
+      </a>
+      <button type="button" className={copied ? "is-done" : ""} onClick={() => void copy()} aria-label={fr ? `Copier ${email}` : `Copy ${email}`}>
+        {copied ? (fr ? "Copié" : "Copied") : fr ? "Copier" : "Copy"}
+      </button>
+    </div>
   );
 }
 
@@ -284,6 +310,8 @@ function ProfileCard({
           </span>
         ) : null}
       </div>
+
+      {creator.email ? <EmailRow email={creator.email} fr={fr} /> : creator.emailLocked && creator.hasEmail ? <div className="mino-card__locked"><LockedEmailChip lang={fr ? "fr" : "en"} /></div> : null}
 
       <dl className="mino-card__stats">
         <div>
@@ -503,7 +531,7 @@ export function MinoCreatorResults({
     const reach = creators.reduce((s, c) => s + (Number(c.followersCount) || 0), 0);
     const rates = creators.map((c) => Number(c.engagementRate) || 0).filter((n) => n > 0);
     const engagement = rates.length ? rates.reduce((s, n) => s + n, 0) / rates.length : 0;
-    const withEmail = creators.filter((c) => c.email).length;
+    const withEmail = creators.filter((c) => c.email || c.hasEmail).length;
     const videos = creators.reduce((s, c) => s + creatorVideos(c).length, 0);
     const platforms = [...new Set(creators.map((c) => platformKey(c.platform)))];
     return { reach, engagement, withEmail, videos, platforms };

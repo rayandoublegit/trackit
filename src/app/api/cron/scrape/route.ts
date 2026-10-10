@@ -9,7 +9,7 @@ export const maxDuration = 300;
  * /api/cron/scrape — the queue worker (every 10 minutes on Vercel). Call it
  * with `Authorization: Bearer $CRON_SECRET`.
  *
- *   ?budget=60   jobs to run this pass at most (SCRAPE_BATCH, max 200)
+ *   ?budget=60   jobs to run this pass at most (SCRAPE_BATCH, max 300)
  *
  * It spends API calls only when jobs are queued: the weekly refresh
  * (/api/cron/scrape/weekly-refresh) and the weekly discovery
@@ -25,8 +25,8 @@ export async function GET(request: Request) {
   if (!admin) return NextResponse.json({ error: "Database not configured" }, { status: 503 });
 
   const params = new URL(request.url).searchParams;
-  const budget = Math.min(Math.max(Number(params.get("budget") || process.env.SCRAPE_BATCH || 60) || 60, 1), 200);
-  const concurrency = Math.min(Math.max(Number(process.env.SCRAPE_CONCURRENCY ?? 6) || 6, 1), 8);
+  const budget = Math.min(Math.max(Number(params.get("budget") || process.env.SCRAPE_BATCH || 60) || 60, 1), 300);
+  const concurrency = Math.min(Math.max(Number(process.env.SCRAPE_CONCURRENCY ?? 10) || 10, 1), 12);
   try {
     const summary = await runScrapeWorker(admin, { budget, concurrency, trigger: params.get("trigger") || "worker" });
     return NextResponse.json(summary);

@@ -203,13 +203,13 @@ export function CreatorScriptPanel({
     width: "100%",
     padding: "12px 14px",
     borderRadius: 12,
-    border: "1px solid #E5E5E5",
+    border: "1px solid var(--ws-border)",
     fontSize: 15,
     fontFamily: "inherit",
     outline: "none",
     boxSizing: "border-box",
-    color: "#1A1A1A",
-    background: "#FFFFFF",
+    color: "var(--ws-text)",
+    background: "var(--ws-surface)",
   };
 
   if (openedScript) {
@@ -244,7 +244,7 @@ export function CreatorScriptPanel({
             cursor: "pointer",
             fontSize: 15,
             fontWeight: 600,
-            color: "#1A1A1A",
+            color: "var(--ws-text)",
             fontFamily: "inherit",
             padding: 0,
             marginBottom: 28,
@@ -267,7 +267,7 @@ export function CreatorScriptPanel({
         >
           {!isMobile && (
             <div>
-              <p style={{ fontSize: 13, fontWeight: 600, color: "#9A9A9A", margin: "0 0 8px", letterSpacing: "0.04em", textTransform: "uppercase" }}>
+              <p style={{ fontSize: 13, fontWeight: 600, color: "var(--ws-text-dim)", margin: "0 0 8px", letterSpacing: "0.04em", textTransform: "uppercase" }}>
                 {lang === "fr" ? "Scripts envoyés" : "Sent scripts"}
               </p>
               <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
@@ -284,7 +284,7 @@ export function CreatorScriptPanel({
                           textAlign: "left",
                           border: "none",
                           borderRadius: 10,
-                          background: active ? "#F0F4FF" : "transparent",
+                          background: active ? "var(--ws-accent-soft)" : "transparent",
                           padding: "10px 12px",
                           cursor: "pointer",
                           fontFamily: "inherit",
@@ -296,7 +296,7 @@ export function CreatorScriptPanel({
                             display: "block",
                             fontSize: 13,
                             fontWeight: active ? 600 : 500,
-                            color: active ? "#0047FF" : "#1A1A1A",
+                            color: active ? "var(--ws-accent)" : "var(--ws-text)",
                             letterSpacing: "-0.01em",
                             overflow: "hidden",
                             textOverflow: "ellipsis",
@@ -306,7 +306,7 @@ export function CreatorScriptPanel({
                         >
                           {s.title}
                         </span>
-                        <span style={{ display: "block", fontSize: 11, color: "#9A9A9A" }}>{formatDate(s.created_at)}</span>
+                        <span style={{ display: "block", fontSize: 11, color: "var(--ws-text-dim)" }}>{formatDate(s.created_at)}</span>
                       </button>
                     </li>
                   );
@@ -317,8 +317,8 @@ export function CreatorScriptPanel({
 
           <div
             style={{
-              background: "#FFFFFF",
-              border: "1px solid #EFEFEF",
+              background: "var(--ws-surface)",
+              border: "1px solid var(--ws-border)",
               borderRadius: 16,
               padding: isMobile ? "22px 18px" : "30px 34px",
             }}
@@ -327,7 +327,7 @@ export function CreatorScriptPanel({
               style={{
                 fontSize: isMobile ? 22 : 26,
                 fontWeight: 600,
-                color: "#1A1A1A",
+                color: "var(--ws-text)",
                 margin: "0 0 6px",
                 letterSpacing: "-0.03em",
                 lineHeight: 1.3,
@@ -335,7 +335,7 @@ export function CreatorScriptPanel({
             >
               {openedScript.title}
             </h1>
-            <p style={{ fontSize: 13, color: "#9A9A9A", margin: "0 0 22px" }}>
+            <p style={{ fontSize: 13, color: "var(--ws-text-dim)", margin: "0 0 22px" }}>
               {formatDate(openedScript.created_at)} · {displayName}
             </p>
 
@@ -343,7 +343,7 @@ export function CreatorScriptPanel({
               <p
                 style={{
                   fontSize: 15,
-                  color: "#1A1A1A",
+                  color: "var(--ws-text)",
                   margin: 0,
                   lineHeight: 1.7,
                   whiteSpace: "pre-wrap",
@@ -353,7 +353,7 @@ export function CreatorScriptPanel({
                 {openedScript.content}
               </p>
             ) : (
-              <p style={{ fontSize: 14, color: "#9A9A9A", margin: 0 }}>
+              <p style={{ fontSize: 14, color: "var(--ws-text-dim)", margin: 0 }}>
                 {lang === "fr" ? "Ce script n'a pas de texte." : "This script has no text content."}
               </p>
             )}
@@ -369,7 +369,7 @@ export function CreatorScriptPanel({
                   gap: 8,
                   marginTop: 24,
                   fontSize: 14,
-                  color: "#0047FF",
+                  color: "var(--ws-accent)",
                   fontWeight: 600,
                   textDecoration: "none",
                 }}
@@ -381,7 +381,7 @@ export function CreatorScriptPanel({
 
           {isMobile && existing.length > 1 && (
             <div>
-              <p style={{ fontSize: 13, fontWeight: 600, color: "#9A9A9A", margin: "0 0 8px", letterSpacing: "0.04em", textTransform: "uppercase" }}>
+              <p style={{ fontSize: 13, fontWeight: 600, color: "var(--ws-text-dim)", margin: "0 0 8px", letterSpacing: "0.04em", textTransform: "uppercase" }}>
                 {lang === "fr" ? "Autres scripts" : "Other scripts"}
               </p>
               <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
@@ -399,11 +399,11 @@ export function CreatorScriptPanel({
                         padding: "10px 0",
                         cursor: "pointer",
                         fontFamily: "inherit",
-                        borderBottom: "1px solid #F0F0F0",
+                        borderBottom: "1px solid var(--ws-border)",
                       }}
                     >
-                      <span style={{ display: "block", fontSize: 13, fontWeight: 500, color: "#1A1A1A", marginBottom: 2 }}>{s.title}</span>
-                      <span style={{ display: "block", fontSize: 11, color: "#9A9A9A" }}>{formatDate(s.created_at)}</span>
+                      <span style={{ display: "block", fontSize: 13, fontWeight: 500, color: "var(--ws-text)", marginBottom: 2 }}>{s.title}</span>
+                      <span style={{ display: "block", fontSize: 11, color: "var(--ws-text-dim)" }}>{formatDate(s.created_at)}</span>
                     </button>
                   </li>
                 ))}
@@ -434,7 +434,7 @@ export function CreatorScriptPanel({
           cursor: "pointer",
           fontSize: 15,
           fontWeight: 600,
-          color: "#1A1A1A",
+          color: "var(--ws-text)",
           fontFamily: "inherit",
           padding: 0,
           marginBottom: 28,
@@ -454,14 +454,14 @@ export function CreatorScriptPanel({
             style={{
               fontSize: isMobile ? 24 : 28,
               fontWeight: 600,
-              color: "#1A1A1A",
+              color: "var(--ws-text)",
               margin: "0 0 4px",
               letterSpacing: "-0.04em",
             }}
           >
             {t.scriptPanelTitle}
           </h1>
-          <p style={{ fontSize: 14, color: "#7A7A7A", margin: 0 }}>{t.scriptPanelSubtitle(displayName)}</p>
+          <p style={{ fontSize: 14, color: "var(--ws-text-muted)", margin: 0 }}>{t.scriptPanelSubtitle(displayName)}</p>
         </div>
       </div>
 
@@ -485,8 +485,8 @@ export function CreatorScriptPanel({
             pickFile(e.dataTransfer.files[0]);
           }}
           style={{
-            background: dragOver ? "#F0F4FF" : "#F7F7F7",
-            border: dragOver ? "2px dashed #0047FF" : "2px solid transparent",
+            background: dragOver ? "var(--ws-accent-soft)" : "var(--ws-surface-2)",
+            border: dragOver ? "2px dashed var(--ws-accent)" : "2px solid transparent",
             borderRadius: 16,
             minHeight: isMobile ? 280 : 360,
             display: "flex",
@@ -505,8 +505,8 @@ export function CreatorScriptPanel({
               width: 48,
               height: 48,
               borderRadius: 12,
-              background: "#FFFFFF",
-              border: "1px solid #EFEFEF",
+              background: "var(--ws-surface)",
+              border: "1px solid var(--ws-border)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -515,21 +515,21 @@ export function CreatorScriptPanel({
             }}
           >
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
-              <rect x="4" y="5" width="16" height="14" rx="2" stroke="#1A1A1A" strokeWidth="1.5" />
-              <circle cx="9" cy="10" r="1.5" fill="#1A1A1A" />
-              <path d="M4 16l4.5-4.5 3 3L16 10l4 4" stroke="#1A1A1A" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              <rect x="4" y="5" width="16" height="14" rx="2" stroke="var(--ws-text)" strokeWidth="1.5" />
+              <circle cx="9" cy="10" r="1.5" fill="var(--ws-text)" />
+              <path d="M4 16l4.5-4.5 3 3L16 10l4 4" stroke="var(--ws-text)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </div>
-          <p style={{ fontSize: 16, fontWeight: 600, color: "#1A1A1A", margin: "0 0 6px", letterSpacing: "-0.02em" }}>
+          <p style={{ fontSize: 16, fontWeight: 600, color: "var(--ws-text)", margin: "0 0 6px", letterSpacing: "-0.02em" }}>
             {t.scriptDragTitle}
           </p>
-          <p style={{ fontSize: 13, color: "#9A9A9A", margin: "0 0 20px" }}>{t.scriptFileTypes}</p>
+          <p style={{ fontSize: 13, color: "var(--ws-text-dim)", margin: "0 0 20px" }}>{t.scriptFileTypes}</p>
           <button
             type="button"
             onClick={() => fileRef.current?.click()}
             disabled={saving}
             style={{
-              background: "#0047FF",
+              background: "var(--ws-accent)",
               color: "#FFFFFF",
               border: "none",
               borderRadius: 10,
@@ -550,12 +550,12 @@ export function CreatorScriptPanel({
             onChange={(e) => pickFile(e.target.files?.[0])}
           />
           {fileName && (
-            <p style={{ fontSize: 12, color: "#7A7A7A", marginTop: 16, marginBottom: 0 }}>{fileName}</p>
+            <p style={{ fontSize: 12, color: "var(--ws-text-muted)", marginTop: 16, marginBottom: 0 }}>{fileName}</p>
           )}
         </div>
 
         <div>
-          <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#1A1A1A", marginBottom: 8 }}>
+          <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "var(--ws-text)", marginBottom: 8 }}>
             {t.scriptTitleLabel}
           </label>
           <input
@@ -566,7 +566,7 @@ export function CreatorScriptPanel({
             style={{ ...inputStyle, marginBottom: 16 }}
           />
 
-          <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#1A1A1A", marginBottom: 8 }}>
+          <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "var(--ws-text)", marginBottom: 8 }}>
             {t.scriptContentLabel}
           </label>
           <textarea
@@ -577,7 +577,7 @@ export function CreatorScriptPanel({
             style={{ ...inputStyle, resize: "vertical", lineHeight: 1.5, marginBottom: 16 }}
           />
 
-          <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#1A1A1A", marginBottom: 8 }}>
+          <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "var(--ws-text)", marginBottom: 8 }}>
             {t.scriptLinkLabel}
           </label>
           <input
@@ -604,18 +604,18 @@ export function CreatorScriptPanel({
 
           {(loadingExisting || existing.length > 0) && (
             <div style={{ marginTop: 32 }}>
-              <p style={{ fontSize: 13, fontWeight: 600, color: "#9A9A9A", margin: "0 0 8px", letterSpacing: "0.04em", textTransform: "uppercase" }}>
+              <p style={{ fontSize: 13, fontWeight: 600, color: "var(--ws-text-dim)", margin: "0 0 8px", letterSpacing: "0.04em", textTransform: "uppercase" }}>
                 {t.scriptExisting}
               </p>
               {loadingExisting ? (
-                <p style={{ fontSize: 13, color: "#7A7A7A", margin: 0 }}>{t.loading}</p>
+                <p style={{ fontSize: 13, color: "var(--ws-text-muted)", margin: 0 }}>{t.loading}</p>
               ) : (
                 <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
                   {existing.map((s, index) => (
                     <li
                       key={s.id}
                       style={{
-                        borderBottom: index < existing.length - 1 ? "1px solid #F0F0F0" : "none",
+                        borderBottom: index < existing.length - 1 ? "1px solid var(--ws-border)" : "none",
                       }}
                     >
                       <button
@@ -633,15 +633,15 @@ export function CreatorScriptPanel({
                         }}
                       >
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: s.content || s.file_url ? 4 : 0 }}>
-                          <span style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          <span style={{ fontSize: 14, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.02em", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                             {s.title}
                           </span>
-                          <span style={{ fontSize: 12, color: "#0047FF", fontWeight: 500, flexShrink: 0, whiteSpace: "nowrap" }}>
+                          <span style={{ fontSize: 12, color: "var(--ws-accent)", fontWeight: 500, flexShrink: 0, whiteSpace: "nowrap" }}>
                             {lang === "fr" ? "Ouvrir →" : "Open →"}
                           </span>
                         </div>
                         {s.content && (
-                          <p style={{ fontSize: 13, color: "#7A7A7A", margin: 0, lineHeight: 1.45, whiteSpace: "pre-wrap" }}>
+                          <p style={{ fontSize: 13, color: "var(--ws-text-muted)", margin: 0, lineHeight: 1.45, whiteSpace: "pre-wrap" }}>
                             {s.content.length > 160 ? `${s.content.slice(0, 160)}…` : s.content}
                           </p>
                         )}

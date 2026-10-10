@@ -1,0 +1,86 @@
+/* ── Mino attachments (prompt box) and brand analysis answer ─────────────── */
+.mino-attach { position: relative; display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0; }
+.mino-attach__btn { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--ws-border); background: var(--ws-surface); color: var(--ws-text-muted); font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; transition: color .15s ease, border-color .15s ease, background .15s ease; }
+.mino-attach__btn:hover:not(:disabled), .mino-attach__btn.is-on { color: var(--ws-text); border-color: var(--ws-border-strong); background: var(--ws-hover); }
+.mino-attach__btn:disabled { opacity: .5; cursor: default; }
+.mino-attach__site { position: absolute; left: 0; bottom: calc(100% + 8px); z-index: 30; display: flex; align-items: center; gap: 8px; width: min(340px, calc(100vw - 48px)); padding: 6px 6px 6px 12px; border-radius: 14px; border: 1px solid var(--ws-border-strong); background: var(--ws-surface); box-shadow: var(--ws-shadow); color: var(--ws-text-muted); box-sizing: border-box; animation: mino-an-in .18s ease both; }
+.mino-attach__site input { flex: 1; min-width: 0; height: 32px; border: 0; outline: 0; background: transparent; color: var(--ws-text); font: inherit; font-size: 14px; }
+.mino-attach__site button { height: 32px; padding: 0 12px; border-radius: 10px; border: 0; background: var(--ws-btn); color: var(--ws-btn-text); font: inherit; font-size: 13px; font-weight: 650; cursor: pointer; }
+.mino-attach__site button:disabled { opacity: .45; cursor: default; }
+
+.mino-attach-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 2px 0 8px; }
+.mino-attach-chip { display: inline-flex; align-items: center; gap: 8px; max-width: 100%; min-height: 36px; padding: 4px 6px 4px 4px; border-radius: 12px; border: 1px solid var(--ws-border); background: var(--ws-surface-2); color: var(--ws-text); font-size: 13px; box-sizing: border-box; animation: mino-an-in .2s ease both; }
+.mino-attach-chip img { width: 36px; height: 36px; border-radius: 8px; object-fit: cover; flex-shrink: 0; }
+.mino-attach-chip__icon { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; background: var(--ws-accent-soft); color: var(--ws-accent); flex-shrink: 0; }
+.mino-attach-chip__text { display: flex; flex-direction: column; min-width: 0; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 240px; }
+.mino-attach-chip__text small { font-size: 11px; font-weight: 500; color: var(--ws-text-muted); overflow: hidden; text-overflow: ellipsis; }
+.mino-attach-chip button { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; border: 0; background: transparent; color: var(--ws-text-muted); cursor: pointer; flex-shrink: 0; }
+.mino-attach-chip button:hover { background: var(--ws-hover); color: var(--ws-text); }
+.mino-attach-chip.is-loading { padding: 4px 12px; color: var(--ws-text-muted); }
+.mino-attach-error { font-size: 12.5px; color: var(--ws-danger); }
+
+.mino-drop { position: absolute; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; gap: 10px; border-radius: inherit; border: 2px dashed var(--ws-accent); background: color-mix(in srgb, var(--ws-surface) 88%, transparent); color: var(--ws-accent); font-size: 14px; font-weight: 650; pointer-events: none; }
+
+/* User message attachments */
+.mino-msg-attachments { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; margin-bottom: 6px; }
+.mino-msg-attachments .mino-attach-chip { min-height: 30px; padding-right: 10px; }
+.mino-msg-attachments .mino-attach-chip img { width: 30px; height: 30px; }
+
+/* Analysis answer */
+.mino-an { align-self: stretch; width: 100%; max-width: 900px; margin: 2px 0 10px; padding: 18px 20px; border-radius: 20px; border: 1px solid var(--ws-border); background: var(--ws-surface); box-shadow: 0 1px 2px rgba(0, 0, 0, .04); box-sizing: border-box; display: flex; flex-direction: column; gap: 12px; animation: mino-an-in .35s ease both; }
+.mino-an.is-empty { gap: 10px; }
+.mino-an__head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.mino-an__eyebrow, .mino-an__label { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ws-text-dim); }
+.mino-an__sources { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+.mino-an__source { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 999px; background: var(--ws-pill); color: var(--ws-text-muted); font-size: 12px; font-weight: 600; }
+.mino-an__brand { margin: 0; font-size: 18px; letter-spacing: -.02em; color: var(--ws-text); }
+.mino-an__summary { margin: 0; font-size: 14px; line-height: 1.55; color: var(--ws-text); }
+.mino-an__facts { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px 18px; margin: 0; padding: 12px 0 0; border-top: 1px solid var(--ws-border); }
+.mino-an__facts div { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.mino-an__facts dt { font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--ws-text-dim); }
+.mino-an__facts dd { margin: 0; font-size: 13.5px; line-height: 1.45; color: var(--ws-text); overflow-wrap: anywhere; }
+.mino-an__why { display: block; margin-top: 2px; font-size: 12.5px; color: var(--ws-text-muted); }
+.mino-an__platforms { display: flex; flex-wrap: wrap; gap: 10px; }
+.mino-an__platforms span { display: inline-flex; align-items: center; gap: 5px; }
+.mino-an__block { display: flex; flex-direction: column; gap: 8px; padding-top: 12px; border-top: 1px solid var(--ws-border); }
+.mino-an__chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.mino-an__chip { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 999px; background: var(--ws-accent-soft); color: var(--ws-accent); font-size: 12.5px; font-weight: 650; }
+.mino-an__chip.is-mail { background: rgba(16, 185, 129, .12); color: #059669; }
+.mino-an__note { margin: 0; font-size: 12.5px; color: var(--ws-text-muted); }
+.mino-an__open { align-self: flex-start; display: inline-flex; align-items: center; gap: 8px; padding: 9px 14px; border-radius: 10px; border: 0; background: var(--ws-btn); color: var(--ws-btn-text); font: inherit; font-size: 13px; font-weight: 650; cursor: pointer; transition: transform .15s ease, opacity .15s ease; }
+.mino-an__open:hover { transform: translateY(-1px); }
+.mino-an__open.is-ghost { border: 1px solid var(--ws-border); background: var(--ws-surface); color: var(--ws-text); }
+.mino-an__searches { display: flex; flex-wrap: wrap; gap: 8px; }
+.mino-an__search { display: inline-flex; align-items: center; gap: 7px; max-width: 100%; padding: 7px 12px; border-radius: 999px; border: 1px solid var(--ws-border); background: var(--ws-surface-2); color: var(--ws-text); font: inherit; font-size: 13px; text-align: left; cursor: pointer; transition: border-color .15s ease, background .15s ease; }
+.mino-an__search:hover:not(:disabled) { border-color: var(--ws-accent); background: var(--ws-hover); }
+.mino-an__search:disabled { opacity: .5; cursor: default; }
+.mino-an__search svg { flex-shrink: 0; color: var(--ws-text-muted); }
+
+/* Email on creator cards */
+.mino-profile__email { display: flex; align-items: center; gap: 6px; min-width: 0; padding: 6px 6px 6px 10px; border-radius: 10px; background: rgba(16, 185, 129, .08); border: 1px solid rgba(16, 185, 129, .22); }
+.mino-profile__email a { flex: 1; min-width: 0; font-size: 12.5px; font-weight: 600; color: #059669; text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mino-profile__email a:hover { text-decoration: underline; }
+.mino-profile__email button { flex-shrink: 0; display: inline-flex; align-items: center; gap: 4px; height: 26px; padding: 0 8px; border-radius: 8px; border: 1px solid var(--ws-border); background: var(--ws-surface); color: var(--ws-text); font: inherit; font-size: 11.5px; font-weight: 650; cursor: pointer; }
+.mino-profile__email button.is-done { color: #059669; border-color: rgba(16, 185, 129, .4); }
+
+@media (max-width: 640px) {
+  .mino-an { padding: 14px; border-radius: 16px; }
+  .mino-an__facts { grid-template-columns: 1fr; }
+  .mino-an__open { align-self: stretch; justify-content: center; }
+  .mino-attach__label { display: none; }
+  .mino-attach__btn { width: 32px; padding: 0; justify-content: center; }
+  .mino-attach-chip__text { max-width: 180px; }
+}
+
+@keyframes mino-an-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .mino-an, .mino-attach-chip, .mino-attach__site { animation: none; }
+}
+
+/* Home hero: attachments under the field */
+.hm-hero__attachments { position: relative; z-index: 2; width: min(680px, 100%); padding: 10px 6px 0; box-sizing: border-box; }
+.hm-hero__attachments .mino-attach-chips { justify-content: flex-start; }
+.hm-hero__attachments:empty { display: none; }
+.hm-hero__attachments .mino-attach-chips { padding: 0; }
+.hm-hero__field .mino-attach { flex-shrink: 0; flex-wrap: nowrap; }
+.mtg-promptbox.is-dragging { outline: none; }

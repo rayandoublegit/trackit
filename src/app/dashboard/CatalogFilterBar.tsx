@@ -641,10 +641,7 @@ export function CatalogFilterBar({
       setNotice(fr ? "La recherche YouTube arrive bientôt. TikTok et Instagram sont disponibles." : "YouTube search is coming soon. TikTok and Instagram are live.");
       return;
     }
-    if (id === "instagram" && isFree) {
-      onLocked();
-      return;
-    }
+    // Instagram follows the same plan rules as TikTok (Free: first results of each search).
     setNotice(null);
     onChange({ platform: id });
   };
@@ -692,8 +689,8 @@ export function CatalogFilterBar({
                   : "Search video captions, hashtags…"
                 : instagram
                   ? fr
-                    ? "Recherche Instagram en direct : une niche, un nom ou un @pseudo"
-                    : "Search Instagram live: a niche, a name or @handle"
+                    ? "Rechercher des créateurs Instagram, @pseudos, e-mails…"
+                    : "Search Instagram creators, @handles, emails…"
                   : fr
                     ? "Rechercher des créateurs, @pseudos, e-mails…"
                     : "Search creators, @handles, emails…"
@@ -763,20 +760,18 @@ export function CatalogFilterBar({
           {(["tiktok", "instagram", "youtube"] as const).map((id) => {
             const active = filters.platform === id;
             const soon = id === "youtube";
-            const locked = id === "instagram" && isFree;
             return (
               <button
                 key={id}
                 type="button"
                 role="tab"
                 aria-selected={active}
-                className={`cf-tab${active ? " is-on" : ""}${soon || locked ? " is-muted" : ""}`}
+                className={`cf-tab${active ? " is-on" : ""}${soon ? " is-muted" : ""}`}
                 onClick={() => pickPlatform(id)}
               >
                 <PlatformLogo platform={id} size={16} />
                 {id === "tiktok" ? "TikTok" : id === "instagram" ? "Instagram" : "YouTube"}
                 {soon ? <span className="cf-tab__badge">{fr ? "Bientôt" : "Soon"}</span> : null}
-                {locked ? <span className="cf-tab__badge">Pro</span> : null}
               </button>
             );
           })}
@@ -997,8 +992,9 @@ export function CatalogFilterBar({
           )}
         </label>
         {notice ? <p className="cf-notice">{notice}</p> : null}
-        {instagram && !filters.search.trim() && !filters.niche ? (
-          <p className="cf-notice">{fr ? "Instagram est recherché en direct : choisissez une niche ou tapez un mot-clé pour commencer." : "Instagram is searched live: pick a niche or type a keyword to start."}</p>
+        {/* Instagram creators are stored like TikTok ones (ig_ keys); a keyword with no stored match is searched live by /api/catalog. */}
+        {instagram && !loading && count === 0 && !(total ?? 0) && !filters.search.trim() && !filters.niche ? (
+          <p className="cf-notice">{fr ? "Les créateurs Instagram arrivent au fil des analyses : tapez un mot-clé pour chercher en direct." : "Instagram creators are being added as they are analysed: type a keyword to search live."}</p>
         ) : null}
       </div>
     </div>

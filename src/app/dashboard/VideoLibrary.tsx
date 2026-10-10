@@ -6,7 +6,10 @@ import { PlatformLogo } from "@/components/PlatformLogo";
 import { CreatorAvatar } from "./CreatorAvatar";
 import { useLang, type Lang } from "@/lib/useLang";
 import { videoFiltersToParams } from "@/lib/catalog-filter-params";
+import { createFetchCache } from "@/lib/client-fetch-cache";
+import { CoverImage } from "./CoverImage";
 import "./video-library.css";
+import { UpgradeNudge } from "@/components/PlanLock";
 
 // Creators > Videos: every tracked video, like an ad library. Filters come from
 // the catalog bar; this component fetches /api/videos and renders the cards.
@@ -42,6 +45,29 @@ export const EMPTY_VIDEO_FILTERS: VideoFilters = {
   viral: false,
   sort: "views",
 };
+
+/** First page small so the grid paints fast; the next pages load on scroll. */
+const FIRST_PAGE = 24;
+const NEXT_PAGE = 24;
+
+// Results per filter set (first page plus what was loaded on scroll), so going
+// back to a filter or reopening the tab paints at once.
+const libraryCache = createFetchCache<VideoLibraryResult>({ ttlMs: 2 * 60_000, max: 30 });
+
+async function fetchLibrary(query: string): Promise<VideoLibraryResult> {
+  const r = await fetch(`/api/videos?${query}`);
+  if (!r.ok) throw new Error(String(r.status));
+  return (await r.json()) as VideoLibraryResult;
+}
+
+/** The nearest scrolling ancestor (the catalog pane), for the infinite-scroll observer. */
+function scrollParent(el: HTMLElement | null): HTMLElement | null {
+  for (let p = el?.parentElement ?? null; p; p = p.parentElement) {
+    const o = getComputedStyle(p).overflowY;
+    if (o === "auto" || o === "scroll") return p;
+  }
+  return null;
+}
 
 /** "shop.example.com" from a product link, for the card. */
 function linkHost(url: string): string {
@@ -116,8 +142,7 @@ function VideoCard({ v, index, onOpenCreator }: { v: LibraryVideo; index: number
         </p>
       ) : null}
       <a className="vl-card__media" href={v.shareUrl || undefined} target="_blank" rel="noreferrer">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        {v.cover ? <img src={v.cover} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" /> : null}
+        <CoverImage src={v.cover} fallback={v.coverFallback} width={270} height={420} priority={index < 4} />
         <span className="vl-card__play" aria-hidden>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4v16l13-8z" /></svg>
         </span>
@@ -189,44 +214,99 @@ export function VideoLibrary({
   const [source, setSource] = useState<VideoLibraryResult["source"]>("tracked");
   const [loading, setLoading] = useState(true);
   const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState(false);
   const [needsTracking, setNeedsTracking] = useState(false);
+  const [teaserLocked, setTeaserLocked] = useState(false);
   const gen = useRef(0);
+  const firstLoad = useRef(true);
+  const moreBusy = useRef(false);
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
-  const params = useCallback((offset: number) => videoFiltersToParams(filters, search, platform, offset), [filters, search, platform]);
+  const params = useCallback(
+    (offset: number, limit: number, snapshot = false) => {
+      const query = videoFiltersToParams(filters, search, platform, offset, limit);
+      return snapshot ? `${query}&source=snapshot` : query;
+    },
+    [filters, search, platform],
+  );
+  const cacheKey = params(0, FIRST_PAGE);
 
   useEffect(() => {
     const my = ++gen.current;
-    setLoading(true);
+    const show = (d: VideoLibraryResult) => {
+      setVideos(d.videos);
+      setHasMore(d.hasMore);
+      setSource(d.source);
+      setNeedsTracking(Boolean(d.needsTracking));
+      setTeaserLocked(Boolean(d.teaserLocked));
+      setLoading(false);
+    };
     setError(false);
-    const t = window.setTimeout(() => {
-      fetch(`/api/videos?${params(0)}`)
-        .then((r) => (r.ok ? (r.json() as Promise<VideoLibraryResult>) : Promise.reject(new Error(String(r.status)))))
-        .then((d) => {
+    const cached = libraryCache.get(cacheKey);
+    if (cached) {
+      firstLoad.current = false;
+      show(cached);
+      return;
+    }
+    setLoading(true);
+    const run = () => {
+      libraryCache
+        .load(cacheKey, () => fetchLibrary(cacheKey))
+        .then((d) => my === gen.current && show(d))
+        .catch(() => {
           if (my !== gen.current) return;
-          setVideos(d.videos);
-          setHasMore(d.hasMore);
-          setSource(d.source);
-          setNeedsTracking(Boolean(d.needsTracking));
-        })
-        .catch(() => my === gen.current && setError(true))
-        .finally(() => my === gen.current && setLoading(false));
-    }, 250);
+          setError(true);
+          setLoading(false);
+        });
+    };
+    // The first load goes at once; later filter changes (typing) wait a moment.
+    if (firstLoad.current) {
+      firstLoad.current = false;
+      run();
+      return;
+    }
+    const t = window.setTimeout(run, 250);
     return () => window.clearTimeout(t);
-  }, [params]);
+  }, [cacheKey]);
 
   useEffect(() => {
     onCount?.(videos.length, loading);
   }, [videos.length, loading, onCount]);
 
-  const loadMore = async () => {
+  const loadMore = useCallback(async () => {
+    if (moreBusy.current || !hasMore) return;
+    moreBusy.current = true;
+    setLoadingMore(true);
     const my = gen.current;
-    const r = await fetch(`/api/videos?${params(videos.length)}`);
-    if (!r.ok || my !== gen.current) return;
-    const d = (await r.json()) as VideoLibraryResult;
-    setVideos((prev) => [...prev, ...d.videos.filter((v) => !prev.some((x) => x.id === v.id))]);
-    setHasMore(d.hasMore);
-  };
+    try {
+      const d = await fetchLibrary(params(videos.length, NEXT_PAGE, source === "snapshot"));
+      if (my !== gen.current) return;
+      const seen = new Set(videos.map((x) => `${x.platform}-${x.id}`));
+      const merged = [...videos, ...d.videos.filter((v) => !seen.has(`${v.platform}-${v.id}`))];
+      setVideos(merged);
+      setHasMore(d.hasMore && d.videos.length > 0);
+      const cached = libraryCache.get(cacheKey);
+      if (cached) libraryCache.set(cacheKey, { ...cached, videos: merged, hasMore: d.hasMore && d.videos.length > 0 });
+    } catch {
+      /* the button stays; the next scroll retries */
+    } finally {
+      moreBusy.current = false;
+      if (my === gen.current) setLoadingMore(false);
+    }
+  }, [cacheKey, hasMore, params, source, videos]);
+
+  // Infinite scroll: the next page starts loading well before the end of the grid.
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || !hasMore) return;
+    const io = new IntersectionObserver((entries) => entries.some((e) => e.isIntersecting) && void loadMore(), {
+      root: scrollParent(el),
+      rootMargin: "0px 0px 900px 0px",
+    });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [hasMore, loadMore, videos.length]);
 
   if (loading && !videos.length) {
     return (
@@ -271,9 +351,22 @@ export function VideoLibrary({
         ))}
       </div>
       {hasMore ? (
-        <button type="button" className="vl-more" onClick={() => void loadMore()}>
-          {fr ? "Charger plus de vidéos" : "Load more videos"}
-        </button>
+        <>
+          <div ref={sentinelRef} aria-hidden style={{ height: 1 }} />
+          <button type="button" className="vl-more" disabled={loadingMore} onClick={() => void loadMore()}>
+            {loadingMore ? (fr ? "Chargement…" : "Loading…") : fr ? "Charger plus de vidéos" : "Load more videos"}
+          </button>
+        </>
+      ) : null}
+      {teaserLocked ? (
+        <div style={{ maxWidth: 560, margin: "20px auto 0" }}>
+          <UpgradeNudge
+            lang={lang}
+            feature="discovery"
+            title={fr ? "Plus de vidéos avec Growth" : "More videos with Growth"}
+            body={fr ? "Le plan Gratuit affiche les premières vidéos de chaque recherche. Growth débloque toute la bibliothèque." : "Free shows the first videos of each search. Growth unlocks the whole library."}
+          />
+        </div>
       ) : null}
     </>
   );

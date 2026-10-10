@@ -187,14 +187,14 @@ export function CreatorAffiliatePanel({
         gap: 10,
         padding: "14px 16px",
         borderRadius: 12,
-        border: "1px solid #E5E5E5",
-        background: "#FAFAFA",
+        border: "1px solid var(--ws-border)",
+        background: "var(--ws-surface-2)",
       }) as const,
     [],
   );
 
   return (
-    <div style={{ padding: pad, background: "#FFFFFF", minHeight: "100%", fontFamily: externFont }}>
+    <div style={{ padding: pad, background: "var(--ws-surface)", minHeight: "100%", fontFamily: externFont }}>
       <button
         type="button"
         onClick={onClose}
@@ -203,7 +203,7 @@ export function CreatorAffiliatePanel({
           background: "transparent",
           cursor: "pointer",
           fontSize: 15,
-          color: "#7A7A7A",
+          color: "var(--ws-text-muted)",
           fontFamily: externFont,
           padding: 0,
           marginBottom: 20,
@@ -228,7 +228,7 @@ export function CreatorAffiliatePanel({
               style={{
                 fontSize: isMobile ? 26 : 30,
                 fontWeight: 600,
-                color: "#1A1A1A",
+                color: "var(--ws-text)",
                 margin: 0,
                 letterSpacing: "-0.03em",
                 fontFamily: externFont,
@@ -237,18 +237,18 @@ export function CreatorAffiliatePanel({
               {t.colAffiliateLink}
             </h1>
           </div>
-          <p style={{ margin: 0, fontSize: 15, color: "#7A7A7A", letterSpacing: "-0.01em" }}>
+          <p style={{ margin: 0, fontSize: 15, color: "var(--ws-text-muted)", letterSpacing: "-0.01em" }}>
             {t.affiliatePanelSubtitle(name)}
           </p>
         </div>
       </div>
 
       {!ready ? (
-        <div style={{ color: "#9A9A9A", fontSize: 14 }}>{t.loading}</div>
+        <div style={{ color: "var(--ws-text-dim)", fontSize: 14 }}>{t.loading}</div>
       ) : !link ? (
         <div style={{ maxWidth: 560, display: "flex", flexDirection: "column", gap: 16 }}>
           <div>
-            <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 8 }}>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "var(--ws-text-dim)", marginBottom: 8 }}>
               {lang === "fr" ? "URL de destination" : "Destination URL"}
             </label>
             <input
@@ -261,7 +261,7 @@ export function CreatorAffiliatePanel({
                 boxSizing: "border-box",
                 padding: "12px 14px",
                 borderRadius: 10,
-                border: "1px solid #E5E5E5",
+                border: "1px solid var(--ws-border)",
                 fontSize: 14,
                 fontFamily: externFont,
               }}
@@ -274,7 +274,7 @@ export function CreatorAffiliatePanel({
             onClick={() => void generateLink()}
             style={{
               border: "none",
-              background: "#0047FF",
+              background: "var(--ws-accent)",
               color: "#FFF",
               borderRadius: 10,
               padding: "12px 18px",
@@ -295,7 +295,7 @@ export function CreatorAffiliatePanel({
               style={{
                 fontSize: 16,
                 fontWeight: 600,
-                color: "#1A1A1A",
+                color: "var(--ws-text)",
                 marginBottom: 12,
                 letterSpacing: "-0.02em",
                 fontFamily: externFont,
@@ -309,7 +309,7 @@ export function CreatorAffiliatePanel({
                   flex: 1,
                   minWidth: 0,
                   fontSize: 15,
-                  color: "#0047FF",
+                  color: "var(--ws-accent)",
                   fontFamily: externFont,
                   letterSpacing: "-0.02em",
                   overflow: "hidden",
@@ -325,7 +325,7 @@ export function CreatorAffiliatePanel({
                 style={{
                   flexShrink: 0,
                   border: "none",
-                  background: "#0047FF",
+                  background: "var(--ws-accent)",
                   color: "#FFF",
                   borderRadius: 10,
                   padding: "10px 16px",
@@ -345,7 +345,7 @@ export function CreatorAffiliatePanel({
               style={{
                 fontSize: 16,
                 fontWeight: 600,
-                color: "#1A1A1A",
+                color: "var(--ws-text)",
                 marginBottom: 12,
                 letterSpacing: "-0.02em",
                 fontFamily: externFont,
@@ -359,7 +359,7 @@ export function CreatorAffiliatePanel({
                   flex: 1,
                   fontSize: 18,
                   fontWeight: 700,
-                  color: "#1A1A1A",
+                  color: "var(--ws-text)",
                   fontFamily: externFont,
                   letterSpacing: "-0.02em",
                 }}
@@ -371,9 +371,9 @@ export function CreatorAffiliatePanel({
                 onClick={() => void copyText(code, "code")}
                 style={{
                   flexShrink: 0,
-                  border: "1px solid #E5E5E5",
-                  background: "#FFF",
-                  color: "#1A1A1A",
+                  border: "1px solid var(--ws-border)",
+                  background: "var(--ws-surface)",
+                  color: "var(--ws-text)",
                   borderRadius: 10,
                   padding: "10px 16px",
                   fontSize: 13,

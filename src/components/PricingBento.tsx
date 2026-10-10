@@ -13,7 +13,7 @@ import {
   planDisplayName,
   PLAN_PRICES,
 } from "@/lib/plan-marketing";
-import { getPlanPricingHighlights, type PricingHighlight } from "@/lib/plan-pricing-highlights";
+import { formatBentoHighlightLine, getPlanPricingHighlights, type PricingHighlight } from "@/lib/plan-pricing-highlights";
 import { openStripeBillingPortal } from "@/lib/open-billing-portal";
 import { planCtaAction, planCtaLabel, type PaidTier } from "@/lib/pricing-cta";
 import type { OnboardingSavePayload } from "@/lib/onboarding-save";
@@ -43,51 +43,8 @@ function priceIdForTier(
   return annual ? bucket[currency].year : bucket[currency].month;
 }
 
-function formatBentoFeatureLine(item: PricingHighlight, lang: "en" | "fr"): string {
-  const fr = lang === "fr";
-  const leadingNumber = item.value.match(/^(\d+)/)?.[1];
-
-  switch (item.id) {
-    case "discoveries":
-      if (/illimit/i.test(item.value)) return fr ? "Découvertes illimitées" : "Unlimited discoveries";
-      if (leadingNumber) return fr ? `${leadingNumber} Découvertes / mois` : `${leadingNumber} Discoveries / month`;
-      return item.label;
-    case "campaigns":
-      if (/illimit/i.test(item.value)) return fr ? "Campagnes illimitées" : "Unlimited campaigns";
-      if (leadingNumber) return fr ? `${leadingNumber} campagnes actives` : `${leadingNumber} active campaigns`;
-      return item.label;
-    case "shopify":
-      if (leadingNumber === "1") return fr ? "1 boutique Shopify connectée" : "1 connected Shopify store";
-      if (leadingNumber) return fr ? `${leadingNumber} boutiques Shopify` : `${leadingNumber} Shopify stores`;
-      return item.label;
-    case "affiliate":
-      return fr ? "Liens d’affiliation suivis (clics, ventes, CA)" : "Tracked affiliate links (clicks, sales, revenue)";
-    case "commissions":
-      return fr ? "Calcul automatique des commissions" : "Automatic commission calculation";
-    case "templates":
-      return fr ? "Modèles et historique d’outreach" : "Outreach templates and history";
-    case "payout":
-      if (/manuel|manual/i.test(item.value)) return fr ? "Paiements créateurs manuels" : "Manual creator payouts";
-      return fr ? "Paiements créateurs automatiques via Stripe" : "Automatic creator payouts via Stripe";
-    case "includes-starter":
-      return fr ? "Tout Growth, et en plus :" : "Everything in Growth, plus";
-    case "includes-pro":
-      return fr ? "Tout Pro, et en plus :" : "Everything in Pro, plus";
-    case "ai":
-      return fr ? "Outreach IA illimité" : "Unlimited AI outreach";
-    case "creator-dashboard":
-      return fr ? "Tableau de bord dédié à vos créateurs" : "Dedicated dashboard for your creators";
-    case "creator-content":
-      return fr ? "Import de contenus et statistiques de performance" : "Content upload and performance stats";
-    case "automation":
-      return fr ? "Scripts et briefs inclus" : "Scripts and briefs included";
-    case "support":
-      return fr ? "Support dédié et prioritaire" : "Dedicated support, priority response";
-    default:
-      if (!item.value.trim()) return item.label;
-      if (leadingNumber) return `${leadingNumber} ${item.label}`;
-      return item.value;
-  }
+function formatBentoFeatureLine(item: PricingHighlight, _lang: "en" | "fr"): string {
+  return formatBentoHighlightLine(item);
 }
 
 function BentoFeatures({ features, lang }: { features: PricingHighlight[]; lang: "en" | "fr" }) {
@@ -338,8 +295,8 @@ export function PricingBento({
           </button>
         </div>
         <p className="pb-card__headline">
-          <span className="is-strong">{lang === "fr" ? "Vos premières ventes." : "Your first sales."}</span>
-          <span className="is-mute">{lang === "fr" ? "Lancez vos affiliés Trackit." : "Launch your Trackit affiliates."}</span>
+          <span className="is-strong">{lang === "fr" ? "Trouvez vos créateurs." : "Find your creators."}</span>
+          <span className="is-mute">{lang === "fr" ? "Recherche illimitée, e-mails inclus." : "Unlimited search, emails included."}</span>
         </p>
         <div className="pb-card__buy">
           <div className="pb-price">
@@ -397,7 +354,7 @@ export function PricingBento({
         <div className="pb-card__head">
           <div className="pb-card__title-row">
             <h3 className="pb-card__name">{businessName}</h3>
-            <span className="pb-badge pb-badge--green">{lang === "fr" ? "Agences & multi-marques" : "Agencies & multi-brand"}</span>
+            <span className="pb-badge pb-badge--green">{lang === "fr" ? "Pro + votre équipe" : "Pro + your team"}</span>
           </div>
           <button
             type="button"
@@ -411,8 +368,8 @@ export function PricingBento({
         </div>
         <div className="pb-card__wide-body">
           <p className="pb-card__headline">
-            <span className="is-mute">{lang === "fr" ? "Pour les équipes qui" : "Great for those who"}</span>
-            <span className="is-strong">{lang === "fr" ? "gèrent plusieurs marques." : "want quality + scale."}</span>
+            <span className="is-mute">{lang === "fr" ? "Tout Pro, pour" : "All of Pro, for"}</span>
+            <span className="is-strong">{lang === "fr" ? "toute votre équipe." : "your whole team."}</span>
           </p>
           <div className="pb-card__buy">
             <div className="pb-price">

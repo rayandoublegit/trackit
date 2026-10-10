@@ -8,6 +8,8 @@ export type MinoCreatorSearch = {
   minFollowers?: number;
   maxFollowers?: number;
   country?: string;
+  /** Content language ("fr"), set by Mino's brand analysis, never read from the text. */
+  language?: string;
   hasEmail?: boolean;
   /** Percent: "5% engagement" = 5. */
   minEngagement?: number;

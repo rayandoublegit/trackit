@@ -67,16 +67,16 @@ function ImportExamplesTable({ lang }: { lang: "en" | "fr" }) {
     <div
       style={{
         marginTop: 14,
-        border: "1px solid #EFEFEF",
+        border: "1px solid var(--ws-border)",
         borderRadius: 14,
         overflow: "hidden",
-        background: "#FFFFFF",
+        background: "var(--ws-surface)",
         boxShadow: "0 2px 12px rgba(0,0,0,0.04)",
       }}
     >
-      <div style={{ padding: "14px 16px 12px", borderBottom: "1px solid #F0F0F0" }}>
-        <p style={{ fontSize: 13, fontWeight: 600, color: "#1A1A1A", margin: "0 0 4px" }}>{t.importExamplesTitle}</p>
-        <p style={{ fontSize: 12, color: "#7A7A7A", margin: 0, lineHeight: 1.45 }}>{t.importExamplesSubtitle}</p>
+      <div style={{ padding: "14px 16px 12px", borderBottom: "1px solid var(--ws-border)" }}>
+        <p style={{ fontSize: 13, fontWeight: 600, color: "var(--ws-text)", margin: "0 0 4px" }}>{t.importExamplesTitle}</p>
+        <p style={{ fontSize: 12, color: "var(--ws-text-muted)", margin: 0, lineHeight: 1.45 }}>{t.importExamplesSubtitle}</p>
       </div>
 
       <div style={{ overflowX: "auto" }}>
@@ -90,9 +90,9 @@ function ImportExamplesTable({ lang }: { lang: "en" | "fr" }) {
                     padding: "10px 12px",
                     fontSize: 11,
                     fontWeight: 600,
-                    color: col.required ? "#0047FF" : "#7A7A7A",
-                    background: "#FAFAFA",
-                    borderBottom: "1px solid #EFEFEF",
+                    color: col.required ? "var(--ws-accent)" : "var(--ws-text-muted)",
+                    background: "var(--ws-surface-2)",
+                    borderBottom: "1px solid var(--ws-border)",
                     textAlign: "left",
                     whiteSpace: "nowrap",
                     fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
@@ -101,7 +101,7 @@ function ImportExamplesTable({ lang }: { lang: "en" | "fr" }) {
                 >
                   {col.key}
                   {col.required && (
-                    <span style={{ marginLeft: 4, fontSize: 9, color: "#0047FF", fontWeight: 700 }}>*</span>
+                    <span style={{ marginLeft: 4, fontSize: 9, color: "var(--ws-accent)", fontWeight: 700 }}>*</span>
                   )}
                 </th>
               ))}
@@ -116,8 +116,8 @@ function ImportExamplesTable({ lang }: { lang: "en" | "fr" }) {
                     style={{
                       padding: "10px 12px",
                       fontSize: 12,
-                      color: row[col.key] === "—" ? "#C4C4C4" : "#1A1A1A",
-                      borderBottom: i < IMPORT_EXAMPLE_ROWS.length - 1 ? "1px solid #F5F5F5" : "none",
+                      color: row[col.key] === "—" ? "#C4C4C4" : "var(--ws-text)",
+                      borderBottom: i < IMPORT_EXAMPLE_ROWS.length - 1 ? "1px solid var(--ws-border)" : "none",
                       whiteSpace: "nowrap",
                       fontFamily: col.key === "username" || col.key === "email" ? "inherit" : "inherit",
                     }}
@@ -134,7 +134,7 @@ function ImportExamplesTable({ lang }: { lang: "en" | "fr" }) {
       <div
         style={{
           padding: "12px 16px",
-          borderTop: "1px solid #F0F0F0",
+          borderTop: "1px solid var(--ws-border)",
           display: "flex",
           flexWrap: "wrap",
           gap: 8,
@@ -143,15 +143,15 @@ function ImportExamplesTable({ lang }: { lang: "en" | "fr" }) {
         }}
       >
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-          <span style={{ fontSize: 11, fontWeight: 600, color: "#9A9A9A", marginRight: 2 }}>{t.importExamplesRequired}:</span>
+          <span style={{ fontSize: 11, fontWeight: 600, color: "var(--ws-text-dim)", marginRight: 2 }}>{t.importExamplesRequired}:</span>
           {IMPORT_EXAMPLE_COLUMNS.filter((c) => c.required).map((c) => (
             <span
               key={c.key}
               style={{
                 fontSize: 10,
                 fontWeight: 600,
-                color: "#0047FF",
-                background: "#EEF4FF",
+                color: "var(--ws-accent)",
+                background: "var(--ws-accent-soft)",
                 padding: "2px 8px",
                 borderRadius: 20,
                 fontFamily: "ui-monospace, monospace",
@@ -160,7 +160,7 @@ function ImportExamplesTable({ lang }: { lang: "en" | "fr" }) {
               {c.key}
             </span>
           ))}
-          <span style={{ fontSize: 11, fontWeight: 600, color: "#9A9A9A", marginLeft: 6, marginRight: 2 }}>
+          <span style={{ fontSize: 11, fontWeight: 600, color: "var(--ws-text-dim)", marginLeft: 6, marginRight: 2 }}>
             {t.importExamplesOptional}:
           </span>
           {IMPORT_EXAMPLE_COLUMNS.filter((c) => !c.required).map((c) => (
@@ -169,8 +169,8 @@ function ImportExamplesTable({ lang }: { lang: "en" | "fr" }) {
               style={{
                 fontSize: 10,
                 fontWeight: 500,
-                color: "#7A7A7A",
-                background: "#F5F5F5",
+                color: "var(--ws-text-muted)",
+                background: "var(--ws-hover)",
                 padding: "2px 8px",
                 borderRadius: 20,
                 fontFamily: "ui-monospace, monospace",
@@ -186,7 +186,7 @@ function ImportExamplesTable({ lang }: { lang: "en" | "fr" }) {
           style={{
             border: "none",
             background: "transparent",
-            color: "#0047FF",
+            color: "var(--ws-accent)",
             fontSize: 12,
             fontWeight: 600,
             cursor: "pointer",
@@ -296,7 +296,7 @@ export function CreatorImportPanel({
           cursor: "pointer",
           fontSize: 15,
           fontWeight: 600,
-          color: "#1A1A1A",
+          color: "var(--ws-text)",
           fontFamily: "inherit",
           padding: 0,
           marginBottom: 28,
@@ -329,8 +329,8 @@ export function CreatorImportPanel({
             void processFile(e.dataTransfer.files[0]);
           }}
           style={{
-            background: dragOver ? "#F0F4FF" : "#F7F7F7",
-            border: dragOver ? "2px dashed #0047FF" : "2px solid transparent",
+            background: dragOver ? "var(--ws-accent-soft)" : "var(--ws-surface-2)",
+            border: dragOver ? "2px dashed var(--ws-accent)" : "2px solid transparent",
             borderRadius: 16,
             minHeight: isMobile ? 280 : 360,
             display: "flex",
@@ -349,8 +349,8 @@ export function CreatorImportPanel({
               width: 48,
               height: 48,
               borderRadius: 12,
-              background: "#FFFFFF",
-              border: "1px solid #EFEFEF",
+              background: "var(--ws-surface)",
+              border: "1px solid var(--ws-border)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -361,23 +361,23 @@ export function CreatorImportPanel({
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
               <path
                 d="M8 12l4-4 4 4M12 8v9M6 20h12a2 2 0 002-2V9l-5-5H8L6 9v9a2 2 0 002 2z"
-                stroke="#1A1A1A"
+                stroke="var(--ws-text)"
                 strokeWidth="1.5"
                 strokeLinecap="round"
                 strokeLinejoin="round"
               />
             </svg>
           </div>
-          <p style={{ fontSize: 16, fontWeight: 600, color: "#1A1A1A", margin: "0 0 6px", letterSpacing: "-0.02em" }}>
+          <p style={{ fontSize: 16, fontWeight: 600, color: "var(--ws-text)", margin: "0 0 6px", letterSpacing: "-0.02em" }}>
             {t.importDragTitle}
           </p>
-          <p style={{ fontSize: 13, color: "#9A9A9A", margin: "0 0 20px" }}>{t.importFileTypes}</p>
+          <p style={{ fontSize: 13, color: "var(--ws-text-dim)", margin: "0 0 20px" }}>{t.importFileTypes}</p>
           <button
             type="button"
             onClick={() => fileRef.current?.click()}
             disabled={importing}
             style={{
-              background: "#0047FF",
+              background: "var(--ws-accent)",
               color: "#FFFFFF",
               border: "none",
               borderRadius: 10,
@@ -399,7 +399,7 @@ export function CreatorImportPanel({
             onChange={(e) => void processFile(e.target.files?.[0])}
           />
           {fileName && !importing && (
-            <p style={{ fontSize: 12, color: "#7A7A7A", marginTop: 16, marginBottom: 0 }}>{fileName}</p>
+            <p style={{ fontSize: 12, color: "var(--ws-text-muted)", marginTop: 16, marginBottom: 0 }}>{fileName}</p>
           )}
         </div>
 
@@ -408,7 +408,7 @@ export function CreatorImportPanel({
             style={{
               fontSize: isMobile ? 22 : 26,
               fontWeight: 600,
-              color: "#1A1A1A",
+              color: "var(--ws-text)",
               margin: "0 0 10px",
               letterSpacing: "-0.03em",
               lineHeight: 1.2,
@@ -416,24 +416,24 @@ export function CreatorImportPanel({
           >
             {t.importHeading}
           </h2>
-          <p style={{ fontSize: 14, color: "#7A7A7A", margin: "0 0 28px", lineHeight: 1.55 }}>{t.importBody}</p>
+          <p style={{ fontSize: 14, color: "var(--ws-text-muted)", margin: "0 0 28px", lineHeight: 1.55 }}>{t.importBody}</p>
 
-          <p style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", margin: "0 0 14px", lineHeight: 1.45 }}>
+          <p style={{ fontSize: 14, fontWeight: 600, color: "var(--ws-text)", margin: "0 0 14px", lineHeight: 1.45 }}>
             {t.importReqTitle}
           </p>
           <ul style={{ listStyle: "none", margin: "0 0 28px", padding: 0, display: "flex", flexDirection: "column", gap: 10 }}>
             {requirements.map((item) => (
-              <li key={item} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 14, color: "#1A1A1A" }}>
+              <li key={item} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 14, color: "var(--ws-text)" }}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden style={{ flexShrink: 0 }}>
-                  <path d="M5 12l5 5L20 7" stroke="#1A1A1A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M5 12l5 5L20 7" stroke="var(--ws-text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
                 {item}
               </li>
             ))}
           </ul>
 
-          <p style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", margin: "0 0 8px" }}>{t.importAdvancedTitle}</p>
-          <p style={{ fontSize: 14, color: "#7A7A7A", margin: "0 0 16px", lineHeight: 1.55 }}>{t.importAdvancedBody}</p>
+          <p style={{ fontSize: 14, fontWeight: 600, color: "var(--ws-text)", margin: "0 0 8px" }}>{t.importAdvancedTitle}</p>
+          <p style={{ fontSize: 14, color: "var(--ws-text-muted)", margin: "0 0 16px", lineHeight: 1.55 }}>{t.importAdvancedBody}</p>
 
           <button
             type="button"
@@ -442,13 +442,13 @@ export function CreatorImportPanel({
               display: "inline-flex",
               alignItems: "center",
               gap: 6,
-              background: "#F5F5F5",
-              border: "1px solid #EFEFEF",
+              background: "var(--ws-hover)",
+              border: "1px solid var(--ws-border)",
               borderRadius: 10,
               padding: "8px 14px",
               fontSize: 13,
               fontWeight: 500,
-              color: "#1A1A1A",
+              color: "var(--ws-text)",
               cursor: "pointer",
               fontFamily: "inherit",
             }}
@@ -472,9 +472,9 @@ export function CreatorImportPanel({
             <p
               style={{
                 fontSize: 13,
-                color: feedback.kind === "success" ? "#15803D" : feedback.kind === "error" ? "#B45309" : "#1A1A1A",
+                color: feedback.kind === "success" ? "#15803D" : feedback.kind === "error" ? "#B45309" : "var(--ws-text)",
                 margin: "24px 0 0",
-                background: feedback.kind === "success" ? "#F0FDF4" : feedback.kind === "error" ? "#FFFBEB" : "#F5F5F5",
+                background: feedback.kind === "success" ? "#F0FDF4" : feedback.kind === "error" ? "#FFFBEB" : "var(--ws-hover)",
                 padding: "12px 14px",
                 borderRadius: 10,
                 lineHeight: 1.45,

@@ -1,0 +1,247 @@
+/* Contact-a-creator email composer. Colors only from --ws-* tokens
+   (workspace.css), so light and dark both work. */
+
+.cc-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  background: rgba(0, 0, 0, 0.42);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.cc-sheet {
+  width: 100%;
+  max-width: 560px;
+  max-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
+  background: var(--ws-surface);
+  color: var(--ws-text);
+  border: 1px solid var(--ws-border);
+  border-radius: 16px;
+  box-shadow: var(--ws-shadow);
+  overflow: hidden;
+}
+.cc-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid var(--ws-border);
+}
+.cc-head__text { min-width: 0; }
+.cc-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cc-sub { margin-top: 2px; font-size: 12.5px; color: var(--ws-text-dim); }
+.cc-icon-btn {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  border: 1px solid var(--ws-border);
+  background: var(--ws-surface);
+  color: var(--ws-text-muted);
+  cursor: pointer;
+}
+.cc-icon-btn:hover { background: var(--ws-hover); }
+
+.cc-body {
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+}
+.cc-field { display: flex; flex-direction: column; gap: 6px; }
+.cc-label { font-size: 12px; font-weight: 500; color: var(--ws-text-muted); }
+.cc-input,
+.cc-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--ws-input);
+  border: 1px solid var(--ws-border);
+  border-radius: 10px;
+  padding: 9px 12px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--ws-text);
+  outline: none;
+}
+.cc-textarea { resize: vertical; line-height: 1.5; min-height: 180px; }
+.cc-input:focus,
+.cc-textarea:focus { border-color: var(--ws-border-strong); }
+.cc-input.is-invalid { border-color: var(--ws-danger); }
+.cc-input::placeholder,
+.cc-textarea::placeholder { color: var(--ws-text-dim); }
+
+.cc-note {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--ws-pill);
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--ws-text-muted);
+}
+.cc-note strong { font-weight: 600; color: var(--ws-text); }
+.cc-error { font-size: 12px; color: var(--ws-danger); }
+.cc-hint { font-size: 12px; color: var(--ws-text-dim); line-height: 1.45; }
+.cc-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--ws-text-muted);
+  cursor: pointer;
+}
+.cc-link { color: var(--ws-accent); font-weight: 600; text-decoration: none; }
+.cc-link:hover { text-decoration: underline; }
+
+.cc-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 120px;
+  justify-content: center;
+  border: 1px dashed var(--ws-border);
+  border-radius: 10px;
+  font-size: 13px;
+  color: var(--ws-text-muted);
+}
+.cc-spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--ws-border);
+  border-top-color: var(--ws-text-muted);
+  animation: cc-spin 0.8s linear infinite;
+}
+@keyframes cc-spin { to { transform: rotate(360deg); } }
+
+.cc-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--ws-border);
+  border-radius: 12px;
+}
+.cc-picker__title { font-size: 13px; font-weight: 600; }
+.cc-choices { display: flex; flex-wrap: wrap; gap: 8px; }
+.cc-choice {
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--ws-border);
+  background: var(--ws-surface);
+  color: var(--ws-text);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.cc-choice:hover { background: var(--ws-hover); }
+.cc-choice.is-active { background: var(--ws-accent-soft); border-color: var(--ws-accent); color: var(--ws-text); }
+
+.cc-foot {
+  display: flex;
+  justify-content: flex-end;
+  padding: 14px 20px;
+  border-top: 1px solid var(--ws-border);
+}
+.cc-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 16px;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  border: 1px solid var(--ws-border);
+  background: var(--ws-surface);
+  color: var(--ws-text);
+  white-space: nowrap;
+}
+.cc-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.cc-btn--primary { background: var(--ws-btn); color: var(--ws-btn-text); border-color: var(--ws-btn); }
+.cc-btn--primary:hover:not(:disabled) { opacity: 0.9; }
+
+.cc-split { position: relative; display: inline-flex; }
+.cc-split__main { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.cc-split__toggle {
+  padding: 0 10px;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  border-left: 1px solid color-mix(in srgb, var(--ws-btn-text) 25%, transparent);
+}
+.cc-menu {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  min-width: 240px;
+  padding: 6px;
+  background: var(--ws-surface);
+  border: 1px solid var(--ws-border);
+  border-radius: 12px;
+  box-shadow: var(--ws-shadow);
+  z-index: 2;
+}
+.cc-menu__title { padding: 6px 10px 4px; font-size: 11.5px; font-weight: 600; color: var(--ws-text-dim); }
+.cc-menu__item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ws-text);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.cc-menu__item:hover { background: var(--ws-hover); }
+.cc-menu__item.is-active { background: var(--ws-accent-soft); font-weight: 600; }
+
+.cc-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 28px;
+  transform: translateX(-50%);
+  z-index: 1300;
+  max-width: calc(100vw - 32px);
+  padding: 11px 16px;
+  border-radius: 12px;
+  background: var(--ws-btn);
+  color: var(--ws-btn-text);
+  font-size: 13.5px;
+  font-weight: 500;
+  box-shadow: var(--ws-shadow);
+}
+
+@media (max-width: 640px) {
+  .cc-backdrop { align-items: flex-end; padding: 0; }
+  .cc-sheet { max-width: none; max-height: 92vh; border-radius: 16px 16px 0 0; border-bottom: 0; }
+  .cc-head, .cc-body, .cc-foot { padding-left: 16px; padding-right: 16px; }
+  .cc-foot { justify-content: stretch; }
+  .cc-split { width: 100%; }
+  .cc-split__main { flex: 1; }
+}

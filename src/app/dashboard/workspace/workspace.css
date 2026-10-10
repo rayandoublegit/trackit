@@ -57,6 +57,19 @@ body.dashboard-page {
   color: var(--ws-text);
 }
 
+/* Theme-aware defaults for form fields that set no colors of their own (zero specificity,
+   so any class or inline style still wins). Keeps dark mode from showing white inputs. */
+:where(.ws-shell, body.dashboard-page) :where(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]), select, textarea) {
+  background-color: var(--ws-input);
+  color: var(--ws-text);
+}
+:where(.ws-shell, body.dashboard-page) :where(input, textarea)::placeholder {
+  color: var(--ws-text-dim);
+}
+:where(.ws-shell, body.dashboard-page) :where(input[type="checkbox"], input[type="radio"]) {
+  accent-color: var(--ws-accent);
+}
+
 .ws-shell {
   display: flex;
   flex-direction: column;
@@ -7138,6 +7151,13 @@ body.dashboard-page {
 .es-rail__index{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:700;background:var(--ws-surface);border:1px solid var(--ws-border);color:var(--ws-text);font-variant-numeric:tabular-nums}
 .es-rail li:nth-child(2){animation-delay:.15s}
 .es-rail__label{font-size:11.5px;font-weight:600;letter-spacing:-.01em;color:var(--ws-text-muted)}
+/* Narrow scenes: share the width evenly and never let labels overlap. */
+.es-scene{container-type:inline-size}
+.es-rail li{flex:1 1 0}
+.es-rail__label{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center}
+@container (max-width:360px){.es-rail__label{font-size:10.5px}}
+@container (max-width:280px){.es-rail__label{display:none}}
+@media (max-width:1100px){.es-page:not(.is-mobile){grid-template-columns:1fr;gap:28px;padding:32px 28px 56px;align-items:start}}
 .es-card,.es-pay{position:relative;z-index:1;align-self:center;width:min(100%,340px);border-radius:16px;border:1px solid var(--ws-border);background:var(--ws-surface);box-shadow:0 18px 40px rgba(0,0,0,.06);padding:16px 16px 14px;animation:es-float 4.6s ease-in-out infinite}
 .es-card__top,.es-card__row,.es-pay__sale{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .es-card__top span,.es-pay__sale span{font-size:13px;font-weight:600;letter-spacing:-.02em;color:var(--ws-text)}
@@ -7170,3 +7190,41 @@ body.dashboard-page {
 @keyframes es-bar{0%,100%{transform:scaleY(.35)}50%{transform:scaleY(1)}}
 @keyframes es-glow{0%,100%{transform:translate3d(0,0,0)}50%{transform:translate3d(-16px,10px,0)}}
 @media (prefers-reduced-motion:reduce){.es-scene__glow,.es-rail__fill,.es-rail li,.es-card,.es-pay,.es-meter span,.es-pay__sent,.es-bars span,.es-steps li{animation:none}.es-rail__fill{width:100%}.es-meter span{width:72%}.es-bars span{transform:none}}
+
+/* "Find @x" in the top search (live creator lookup). */
+.ws-search-panel__find {
+  flex-shrink: 0;
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--ws-accent-soft, var(--ws-pill));
+  color: var(--ws-accent);
+  font-size: 12px;
+  font-weight: 700;
+}
+.ws-search-panel__find.is-loading {
+  color: transparent;
+  border: 2px solid var(--ws-border);
+  border-top-color: var(--ws-accent);
+  background: transparent;
+  animation: ws-find-spin 0.8s linear infinite;
+}
+.ws-search-panel__note {
+  padding: 10px 14px 12px;
+  border-top: 1px solid var(--ws-border);
+  color: var(--ws-text-muted);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+@keyframes ws-find-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ws-search-panel__find.is-loading {
+    animation: none;
+  }
+}

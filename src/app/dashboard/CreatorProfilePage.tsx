@@ -1,5 +1,6 @@
 "use client";
 
+import { LockedEmailChip } from "@/components/PlanLock";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { FeedCreator } from "@/lib/discovery-feed";
 import type { CreatorProfileData, HistoryPoint, LibraryVideo } from "@/lib/creator-intel-types";
@@ -8,6 +9,8 @@ import { CreatorAvatar } from "./CreatorAvatar";
 import { CountUp } from "./sample-motion";
 import { useLang, type Lang } from "@/lib/useLang";
 import { nicheLabel } from "@/lib/niche-tree";
+import { CreatorProfileError, getCachedCreatorProfile, loadCreatorProfile } from "@/lib/creator-profile-cache";
+import { CoverImage } from "./CoverImage";
 import "./creator-profile.css";
 
 // A creator's page, market-research style: identity and links, key numbers
@@ -159,8 +162,7 @@ function VideoCard({ v, rank }: { v: LibraryVideo; rank?: number }) {
   return (
     <a className="cp-video" href={v.shareUrl || undefined} target="_blank" rel="noreferrer">
       <span className="cp-video__media">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        {v.cover ? <img src={v.cover} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" /> : null}
+        <CoverImage src={v.cover} fallback={v.coverFallback} width={180} height={260} />
         {rank ? <span className="cp-video__rank">#{rank}</span> : null}
         <span className="cp-video__views">
           <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden><path d="M7 4v16l13-8z" /></svg>
@@ -228,22 +230,19 @@ export function CreatorProfilePage({
   const lang = useLang();
   const fr = lang === "fr";
   const f = (n: number | null | undefined) => fmt(n, lang);
-  const [data, setData] = useState<CreatorProfileData | null>(null);
+  // A creator prefetched from the catalog (hover) or opened before paints at once.
+  const [data, setData] = useState<CreatorProfileData | null>(() => getCachedCreatorProfile(username));
   const [error, setError] = useState<"missing" | "failed" | null>(null);
   const [tab, setTab] = useState<"top" | "latest">("top");
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    setData(null);
+    setData(getCachedCreatorProfile(username));
     setError(null);
-    fetch(`/api/creator-profile?username=${encodeURIComponent(username)}`)
-      .then(async (r) => {
-        if (!r.ok) throw new Error(r.status === 404 ? "missing" : "failed");
-        return r.json() as Promise<CreatorProfileData>;
-      })
+    loadCreatorProfile(username)
       .then((d) => !cancelled && setData(d))
-      .catch((e) => !cancelled && setError(e instanceof Error && e.message === "missing" ? "missing" : "failed"));
+      .catch((e) => !cancelled && setError(e instanceof CreatorProfileError && e.kind === "missing" ? "missing" : "failed"));
     return () => {
       cancelled = true;
     };
@@ -331,7 +330,7 @@ export function CreatorProfilePage({
         {c.countryCode ? <span className="cp-chip"><Icon d="M12 22s-8-6-8-12a8 8 0 0 1 16 0c0 6-8 12-8 12zM12 12a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" />{c.countryCode}</span> : null}
         {c.language && c.language !== "unknown" ? <span className="cp-chip"><Icon d="M5 8l6 6M4 14l6-6 2-3M2 5h12M7 2h1M22 22l-5-10-5 10M14 18h6" />{c.language.toUpperCase()}</span> : null}
         {c.primaryNiche ? <span className="cp-chip is-niche">{fr ? nicheLabel(c.primaryNiche, "fr") : c.primaryNiche}</span> : null}
-        {c.email ? <span className="cp-chip is-mail"><Icon d="M3 5h18v14H3zM3 7l9 6 9-6" />{fr ? "E-mail disponible" : "Email on file"}</span> : null}
+        {c.email ? <span className="cp-chip is-mail"><Icon d="M3 5h18v14H3zM3 7l9 6 9-6" />{fr ? "E-mail disponible" : "Email on file"}</span> : c.emailLocked && c.hasEmail ? <LockedEmailChip lang={lang} /> : null}
         {g?.bioLink ? (
           <a className="cp-chip" href={g.bioLink} target="_blank" rel="noreferrer"><Icon d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7" />{g.bioLink.replace(/^https?:\/\//, "").slice(0, 32)}</a>
         ) : null}

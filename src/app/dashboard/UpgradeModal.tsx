@@ -87,7 +87,7 @@ export function UpgradeModal({
       <div
         className="um-pricing"
         style={{
-          background: "#FFFFFF",
+          background: "var(--ws-surface)",
           borderRadius: 24,
           maxWidth: 1080,
           width: "100%",
@@ -112,9 +112,9 @@ export function UpgradeModal({
             width: 32,
             height: 32,
             borderRadius: 8,
-            border: "1px solid #E5E5E5",
-            background: "#FFFFFF",
-            color: "#7A7A7A",
+            border: "1px solid var(--ws-border)",
+            background: "var(--ws-surface)",
+            color: "var(--ws-text-muted)",
             cursor: "pointer",
             fontFamily: "inherit",
             display: "flex",
@@ -138,7 +138,7 @@ export function UpgradeModal({
             style={{
               fontSize: 24,
               fontWeight: 700,
-              color: "#111",
+              color: "var(--ws-text)",
               margin: "0 0 8px",
               letterSpacing: "-0.04em",
               lineHeight: 1.2,
@@ -178,7 +178,7 @@ export function UpgradeModal({
               style={{
                 background: "none",
                 border: "none",
-                color: "#7A7A7A",
+                color: "var(--ws-text-muted)",
                 fontSize: 13,
                 fontWeight: 500,
                 cursor: "pointer",

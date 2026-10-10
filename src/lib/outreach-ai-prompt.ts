@@ -8,7 +8,7 @@ type OutreachCreatorInput = {
   bio: string;
 };
 
-const TONE_MAP: Record<string, string> = {
+export const TONE_MAP: Record<string, string> = {
   casual: "casual and friendly — like a real founder, not a marketer",
   professional: "professional, credible, and respectful",
   friendly: "warm, enthusiastic, and personable",
@@ -82,8 +82,8 @@ Creator profile:
 - Handle: @${creator.username}
 - Platform: ${creator.platform}
 - Niche: ${creator.niche || "unknown"}
-- Followers: ${creator.followersCount}
-- Engagement rate: ${creator.engagementRate}%
+- Followers: ${creator.followersCount > 0 ? creator.followersCount : "unknown"}
+- Engagement rate: ${creator.engagementRate > 0 ? `${creator.engagementRate}%` : "unknown"}
 - Bio: ${creator.bio || "(empty)"}
 
 Brand / offer:
@@ -98,6 +98,8 @@ ${channelRules(platform)}
 Global quality bar:
 - Elite-tier outreach only — what top brands and agencies would actually send
 - Reference something specific and defensible about their niche or positioning
+- Never state a number, statistic, price or result that is not in the creator profile above
+- No placeholders like [Your name]: sign off with the brand name "${brand}"
 - Partnership opportunity must feel real, not a mass blast
 - Sound like a founder or partnerships lead, not a marketing automation tool
 - No hashtags; emojis only if tone is casual and channel is DM (max 1)

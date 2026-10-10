@@ -26,9 +26,18 @@ function envDays(name: string, fallback: number, min: number, max: number): numb
   return Number.isFinite(n) && process.env[name] !== "" && process.env[name] != null ? Math.min(max, Math.max(min, n)) : fallback;
 }
 
-/** Days between two refreshes of a creator (default 7). */
-export function refreshIntervalDays(): number {
-  return envDays("SCRAPE_REFRESH_INTERVAL_DAYS", 7, 1, 28);
+/**
+ * Days between two refreshes of a creator (default 7). Instagram has its own
+ * SCRAPE_INSTAGRAM_REFRESH_INTERVAL_DAYS: on the RapidAPI plan (50,000 calls a
+ * month, 3 calls a refresh) a weekly refresh of 20,000 creators is out of reach,
+ * so Instagram creators served by RapidAPI default to every 28 days and the
+ * plan goes to new creators first (docs/SCRAPING.md).
+ */
+export function refreshIntervalDays(platform?: string, sourceName?: string): number {
+  const base = envDays("SCRAPE_REFRESH_INTERVAL_DAYS", 7, 1, 28);
+  if (platform !== "instagram") return base;
+  const onRapid = String(sourceName ?? "").startsWith("rapidapi");
+  return envDays("SCRAPE_INSTAGRAM_REFRESH_INTERVAL_DAYS", onRapid ? 28 : base, 1, 56);
 }
 
 /** Days after which a creator a brand works with is refreshed again (default 3.5, 0 = off). */
@@ -55,9 +64,9 @@ export function scrapePriority(c: ScheduleInput, nowMs = Date.now()): number {
 }
 
 /** Next refresh: one interval for priorities 1-4, two for 6, four for 8 (inactive). */
-export function nextScrapeAt(priority: number, nowMs = Date.now()): string {
+export function nextScrapeAt(priority: number, nowMs = Date.now(), intervalDays = refreshIntervalDays()): string {
   const factor = priority >= 8 ? 4 : priority >= 5 ? 2 : 1;
-  return new Date(nowMs + refreshIntervalDays() * factor * DAY).toISOString();
+  return new Date(nowMs + intervalDays * factor * DAY).toISOString();
 }
 
 /** After a failure (or "account not found"): 1, 2, 4 then 8 weeks. */

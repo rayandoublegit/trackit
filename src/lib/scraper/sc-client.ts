@@ -50,6 +50,12 @@ export function firstUrlIn(value: unknown, depth = 0): string | null {
   return null;
 }
 
+/** First e-mail address written in a text (a bio), lowercase, else null. */
+export function emailIn(text: unknown): string | null {
+  const m = str(text).match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}/);
+  return m ? m[0].toLowerCase() : null;
+}
+
 /** "1.2M subscribers" → 1200000, "9,221 videos" → 9221, "" → null. */
 export function compactNumber(v: unknown): number | null {
   if (typeof v === "number") return Number.isFinite(v) ? v : null;

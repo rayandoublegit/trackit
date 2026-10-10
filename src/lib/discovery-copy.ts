@@ -1,9 +1,5 @@
 import type { Lang } from "@/lib/useLang";
-import {
-  BASIC_MONTHLY_DISCOVERIES,
-  FREE_LIFETIME_DISCOVERIES,
-  PRO_MONTHLY_DISCOVERIES,
-} from "@/lib/plan-limits";
+import { FREE_LIFETIME_DISCOVERIES } from "@/lib/plan-limits";
 
 export function discoveryCopy(lang: Lang) {
   const fr = lang === "fr";
@@ -151,14 +147,14 @@ export function discoveryCopy(lang: Lang) {
     discoveryLimitTitle: (limit: number) =>
       fr ? `Vous avez utilisé vos ${limit} découvertes` : `You've used your ${limit} discoveries`,
     discoveryLimitSubtitleBasic: fr
-      ? `Passez à Pro pour ${PRO_MONTHLY_DISCOVERIES} découvertes/mois.`
-      : `Upgrade to Pro for ${PRO_MONTHLY_DISCOVERIES} discoveries/month.`,
+      ? "Votre plan inclut une recherche illimitée."
+      : "Your plan includes unlimited search.",
     discoveryLimitSubtitleFree: fr
-      ? `Passez à Growth pour ${BASIC_MONTHLY_DISCOVERIES} découvertes/mois.`
-      : `Upgrade to Growth for ${BASIC_MONTHLY_DISCOVERIES} discoveries/month.`,
+      ? "Passez à Growth pour une recherche de créateurs illimitée."
+      : "Upgrade to Growth for unlimited creator search.",
     discoveryLimitSubtitlePro: fr
-      ? "Passez à Scale pour des découvertes illimitées."
-      : "Upgrade to Scale for unlimited discoveries.",
+      ? "Votre plan inclut une recherche illimitée."
+      : "Your plan includes unlimited search.",
     discoveryResetIn: (countdown: string) =>
       fr ? `Réinitialisation dans ${countdown}` : `Resets in ${countdown}`,
     discoveryUpgradeCta: (planName: string) =>

@@ -1,10 +1,20 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { remaining, weeklyCaps, weeklyUsage } from "./budget";
-import { CreatorNotFound, discoverKeyword, discoverMarketplace, recordCreatorFailure, refreshCreator } from "./ingest";
+import { instagramAllowance, instagramCalls, remaining, weekStart, weeklyCaps, weeklyUsage, type InstagramAllowance } from "./budget";
+import {
+  CreatorDeferred,
+  CreatorNotFound,
+  CreatorSkipped,
+  discoverInstagramHashtag,
+  discoverKeyword,
+  discoverMarketplace,
+  isHashtagTarget,
+  recordCreatorFailure,
+  refreshCreator,
+} from "./ingest";
 import { isMarketTarget } from "./marketplace";
 import { normalizePlatform } from "./identity";
 import { trackedIntervalDays } from "./schedule";
-import { AllProvidersFailed, enabledPlatforms, sourceFor } from "./sources";
+import { AllProvidersFailed, enabledPlatforms, providerOrder, sourceFor } from "./sources";
 import { CallMeter, type CreatorSource, type ScrapePlatform } from "./types";
 
 // The queue worker. It runs often (every 10 minutes) and only spends API
@@ -14,8 +24,17 @@ import { CallMeter, type CreatorSource, type ScrapePlatform } from "./types";
 //   3. otherwise claim discovery jobs, then refresh jobs, within this week's
 //      remaining caps, run them with a time budget, and log the pass in
 //      scrape_runs (API calls per provider, jobs, new creators, errors).
-// When every provider of a platform is out of credits, the pass stops and
-// hands its jobs back untouched.
+// When every provider of a platform is out of credits, the pass stops that
+// platform and hands its jobs back untouched (the other platforms go on).
+//
+// Instagram (RapidAPI plan counted in requests) has its own call caps
+// (budget.ts: SCRAPE_INSTAGRAM_MAX_CALLS_PER_WEEK / _PER_30D): each Instagram
+// job reserves the calls it may spend before it runs, and waits for the next
+// window when they are not left. Instagram searches do not use the shared
+// SCRAPE_WEEKLY_MAX_DISCOVERY_KEYWORDS (they are bounded by the call caps).
+// A refresh of a creator not in the catalog yet (an Instagram lead) goes
+// through the discovery gate (ingest.ts): 1 call when it is left out, a full
+// refresh when it is kept, which then counts as a new creator.
 
 type Job = { id: number; kind: string; platform: string; target: string; attempts: number };
 
@@ -38,12 +57,21 @@ export type WorkerSummary = {
   failed: number;
   deferred: number;
   refreshJobs: number;
+  /** Every discovery job run (Instagram ones included). */
   discoverJobs: number;
+  /** Instagram discovery jobs (searches, hashtags): bounded by the Instagram call caps, not the shared search cap. */
+  discoverJobsInstagram: number;
   apiCalls: number;
   credits: number;
   callsByProvider: Record<string, number>;
   creatorsNew: number;
   discovered: number;
+  /** Instagram accounts queued to be looked at (snowball and search hits without a follower count). */
+  leadsQueued: number;
+  /** Accounts looked at and left out by the discovery gate (too small, private, brand…). */
+  skipped: number;
+  /** Instagram calls still allowed this week / 30 days, before this pass (null when Instagram is off). */
+  instagramCallsLeft: number | null;
   videos: number;
   coversStored: number;
   seconds: number;
@@ -70,11 +98,15 @@ export async function runScrapeWorker(admin: SupabaseClient, opts: WorkerOptions
     deferred: 0,
     refreshJobs: 0,
     discoverJobs: 0,
+    discoverJobsInstagram: 0,
     apiCalls: 0,
     credits: 0,
     callsByProvider: {},
     creatorsNew: 0,
     discovered: 0,
+    leadsQueued: 0,
+    skipped: 0,
+    instagramCallsLeft: null,
     videos: 0,
     coversStored: 0,
     seconds: 0,
@@ -110,10 +142,19 @@ export async function runScrapeWorker(admin: SupabaseClient, opts: WorkerOptions
     : await admin.from("scrape_jobs").select("id").eq("status", "running").lt("locked_at", new Date(Date.now() - 15 * 60_000).toISOString()).limit(1);
   if (!ready.data?.length && !stale.data?.length) return finish({ idle: true, reason: "queue empty" });
 
-  // 3. This week's remaining caps.
+  // 3. This week's remaining caps (and the Instagram call caps).
   const caps = weeklyCaps();
-  const left = remaining(caps, await weeklyUsage(admin));
-  const discoverLimit = Math.min(left.discoveryKeywords, opts.budget);
+  const usage = await weeklyUsage(admin);
+  const left = remaining(caps, usage);
+  const ig: InstagramAllowance | null = platforms.includes("instagram") ? await instagramAllowance(admin, Date.now(), usage) : null;
+  summary.instagramCallsLeft = ig?.left ?? null;
+  // Instagram searches are bounded by the Instagram call caps, not the shared search cap.
+  let igDiscovery = Boolean(ig && ig.left > 0);
+  if (igDiscovery && left.discoveryKeywords <= 0 && left.refreshes <= 0) {
+    const { data } = await admin.from("scrape_jobs").select("id").eq("kind", "creator_discover").eq("platform", "instagram").eq("status", "queued").lte("run_after", nowIso).limit(1);
+    igDiscovery = Boolean(data?.length);
+  }
+  const discoverLimit = Math.min(opts.budget, left.discoveryKeywords + (igDiscovery ? opts.budget : 0));
   if (discoverLimit <= 0 && left.refreshes <= 0) return finish({ idle: true, reason: "weekly caps reached" });
 
   const claim = async (limit: number, kind: string): Promise<Job[]> => {
@@ -143,15 +184,31 @@ export async function runScrapeWorker(admin: SupabaseClient, opts: WorkerOptions
   let newCreatorsLeft = left.newCreators;
   const minFollowers = opts.minFollowers ?? envInt("SCRAPE_DISCOVERY_MIN_FOLLOWERS", 5_000);
   const maxFollowers = opts.maxFollowers ?? envInt("SCRAPE_DISCOVERY_MAX_FOLLOWERS", 2_000_000);
-  const marketMaxPage = envInt("SCRAPE_MARKET_MAX_PAGE", 100);
+  const marketMaxPage = envInt("SCRAPE_MARKET_MAX_PAGE", 500);
+  const leadsPerRefresh = Math.max(0, envInt("SCRAPE_INSTAGRAM_LEADS_PER_REFRESH", 15));
+  const similarCalls = process.env.SCRAPE_INSTAGRAM_SIMILAR === "1";
   const handBack: Job[] = [];
   const handBackLater: Job[] = [];
-  let stopped = false;
+  const handBackAt: { job: Job; at: string }[] = [];
+  const nextWeek = new Date(weekStart().getTime() + 7 * 86_400_000).toISOString();
+  let sharedSearchesLeft = left.discoveryKeywords;
+  let igReserved = 0;
+  const igCapped = providerOrder("instagram")[0]?.name === "rapidapi-instagram";
+  // Platforms whose every provider is out of credits (or refuses the key): their jobs go back untouched.
+  const stopped = new Set<ScrapePlatform>();
+
+  const countJob = (job: Job, platform: ScrapePlatform, delta: number) => {
+    if (job.kind !== "creator_discover") summary.refreshJobs += delta;
+    else {
+      summary.discoverJobs += delta;
+      if (platform === "instagram") summary.discoverJobsInstagram += delta;
+    }
+  };
 
   const runJob = async (job: Job) => {
     const platform = normalizePlatform(job.platform);
     const source = platform ? sourceOf(platform) : null;
-    if (stopped || Date.now() - started > timeBudget) {
+    if ((platform && stopped.has(platform)) || Date.now() - started > timeBudget) {
       handBack.push(job);
       return;
     }
@@ -160,34 +217,80 @@ export async function runScrapeWorker(admin: SupabaseClient, opts: WorkerOptions
       handBackLater.push(job);
       return;
     }
+    const discover = job.kind === "creator_discover";
+    if (discover && platform !== "instagram") {
+      // The shared search cap (TikTok, YouTube, Creator Marketplace pages).
+      if (sharedSearchesLeft <= 0) {
+        handBackAt.push({ job, at: nextWeek });
+        return;
+      }
+      sharedSearchesLeft -= 1;
+    }
+    // Instagram: reserve the calls this job may spend, or wait for the next window.
+    // Only when RapidAPI serves Instagram first: ScrapeCreators is outside the RapidAPI plan.
+    const igNeed = platform !== "instagram" || !igCapped ? 0 : discover ? 1 : source.callsPerRefresh + (similarCalls ? 1 : 0);
+    if (igNeed && ig) {
+      if (igReserved + igNeed > ig.left) {
+        handBackAt.push({ job, at: ig.retryAt });
+        return;
+      }
+      igReserved += igNeed;
+    }
     const jobMeter = new CallMeter();
-    if (job.kind === "creator_discover") summary.discoverJobs += 1;
-    else summary.refreshJobs += 1;
+    countJob(job, platform, 1);
     try {
-      if (job.kind === "creator_discover" && isMarketTarget(job.target)) {
+      if (discover && isMarketTarget(job.target)) {
         const r = await discoverMarketplace(admin, job.target, { meter: jobMeter, minFollowers, maxFollowers, maxNew: newCreatorsLeft, maxPage: marketMaxPage });
         newCreatorsLeft = Math.max(0, newCreatorsLeft - r.added);
         summary.discovered += r.added;
         summary.creatorsNew += r.added;
-      } else if (job.kind === "creator_discover") {
+      } else if (discover && platform === "instagram" && isHashtagTarget(job.target)) {
+        const r = await discoverInstagramHashtag(admin, source, job.target, { meter: jobMeter, maxLeads: 30 });
+        summary.leadsQueued += r.leads;
+      } else if (discover) {
         const r = await discoverKeyword(admin, source, job.target, { meter: jobMeter, minFollowers, maxFollowers, maxNew: newCreatorsLeft });
         newCreatorsLeft = Math.max(0, newCreatorsLeft - r.added);
         summary.discovered += r.added;
         summary.creatorsNew += r.added;
+        summary.leadsQueued += r.leads;
       } else {
-        const r = await refreshCreator(admin, source, job.target, { meter: jobMeter });
+        const r = await refreshCreator(admin, source, job.target, {
+          meter: jobMeter,
+          // A creator not in the catalog yet (an Instagram lead) is looked at first.
+          gate: { minFollowers, maxFollowers, allowNew: newCreatorsLeft > 0 },
+          snowball: platform === "instagram" ? { maxLeads: newCreatorsLeft > 0 ? leadsPerRefresh : 0, similar: similarCalls } : undefined,
+        });
         summary.videos += r.videos;
         summary.coversStored += r.coversStored;
+        summary.leadsQueued += r.leadsQueued;
+        if (r.isNew) {
+          newCreatorsLeft = Math.max(0, newCreatorsLeft - 1);
+          summary.discovered += 1;
+          summary.creatorsNew += 1;
+        }
       }
       summary.done += 1;
       await admin.from("scrape_jobs").update({ status: "done", finished_at: new Date().toISOString(), last_error: null }).eq("id", job.id);
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
+      if (e instanceof CreatorDeferred) {
+        // No call spent: back to the queue for tomorrow, as it was.
+        countJob(job, platform, -1);
+        handBackLater.push(job);
+        return;
+      }
+      if (e instanceof CreatorSkipped) {
+        // Looked at and left out: done, nothing written, no failure counted.
+        summary.done += 1;
+        summary.skipped += 1;
+        await admin.from("scrape_jobs").update({ status: "done", finished_at: new Date().toISOString(), last_error: message.slice(0, 500) }).eq("id", job.id);
+        return;
+      }
       if (e instanceof AllProvidersFailed && e.allDown) {
-        // Out of credits everywhere: stop the pass, give the job back as it was.
-        stopped = true;
-        if (job.kind === "creator_discover") summary.discoverJobs -= 1;
-        else summary.refreshJobs -= 1;
+        // Out of credits everywhere for this platform: stop it for this pass (the
+        // others go on, e.g. TikTok when the Instagram plan is used up), give the job back as it was.
+        stopped.add(platform);
+        countJob(job, platform, -1);
         handBack.push(job);
         if (summary.errors.length < 10) summary.errors.push(`stopped: ${message}`.slice(0, 300));
         return;
@@ -209,6 +312,8 @@ export async function runScrapeWorker(admin: SupabaseClient, opts: WorkerOptions
       }
     } finally {
       meter.merge(jobMeter);
+      // Keep the reservation to what the job really spent.
+      if (igNeed) igReserved += instagramCalls(jobMeter.byProvider) - igNeed;
     }
   };
 
@@ -227,7 +332,8 @@ export async function runScrapeWorker(admin: SupabaseClient, opts: WorkerOptions
   };
   await giveBack(handBack);
   await giveBack(handBackLater, new Date(Date.now() + 24 * 3_600_000).toISOString());
-  summary.deferred = handBack.length + handBackLater.length;
+  for (const { job, at } of handBackAt) await giveBack([job], at);
+  summary.deferred = handBack.length + handBackLater.length + handBackAt.length;
   summary.apiCalls = meter.calls;
   summary.credits = meter.credits;
   summary.callsByProvider = meter.byProvider;
@@ -248,14 +354,20 @@ export async function runScrapeWorker(admin: SupabaseClient, opts: WorkerOptions
           budget: opts.budget,
           platforms,
           refreshJobs: summary.refreshJobs,
-          discoverJobs: summary.discoverJobs,
+          // What the shared search cap reads: Instagram searches are bounded by the Instagram call caps.
+          discoverJobs: summary.discoverJobs - summary.discoverJobsInstagram,
+          discoverJobsInstagram: summary.discoverJobsInstagram,
           discovered: summary.discovered,
+          leadsQueued: summary.leadsQueued,
+          skipped: summary.skipped,
+          instagramCallsLeft: summary.instagramCallsLeft,
           credits: meter.credits,
           callsByProvider: meter.byProvider,
           trackedQueued: summary.trackedQueued,
           deferred: summary.deferred,
           coversStored: summary.coversStored,
-          stoppedNoCredits: stopped,
+          stoppedNoCredits: stopped.size > 0,
+          stoppedPlatforms: [...stopped],
           errors: summary.errors,
         },
       })

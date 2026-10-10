@@ -1,4 +1,5 @@
 import type { DashboardView } from "@/lib/dashboard-view-storage";
+import { isExplicitLookup, lookupPlatformLabel, parseCreatorLookup, type LookupPlatform } from "@/lib/creator-live-lookup";
 
 export type DashboardSearchHit = {
   id: string;
@@ -9,6 +10,8 @@ export type DashboardSearchHit = {
   campaignId?: string;
   boardId?: string;
   chatId?: string;
+  /** "Find @x": looks the creator up (catalog, else live) and opens its page. */
+  creatorLookup?: { handle: string; platform: LookupPlatform | null; query: string };
 };
 
 type CatalogOpts = {
@@ -464,4 +467,34 @@ export function highlightSearchMatch(label: string, query: string): { before: st
     match: label.slice(idx, idx + q.length),
     after: label.slice(idx + q.length),
   };
+}
+
+/**
+ * "Find @x" for a query that is a handle or a profile link (brands only).
+ * Null for anything else (several words, a post link, a 1-2 letter word).
+ */
+export function creatorLookupHit(query: string, lang: "en" | "fr"): DashboardSearchHit | null {
+  const parsed = parseCreatorLookup(query);
+  if (!parsed || (parsed.kind === "plain" && parsed.handle.length < 3)) return null;
+  const fr = lang === "fr";
+  const on = parsed.platform ? (fr ? ` sur ${lookupPlatformLabel(parsed.platform)}` : ` on ${lookupPlatformLabel(parsed.platform)}`) : "";
+  return {
+    id: `creator-lookup-${parsed.platform ?? "any"}-${parsed.handle}`,
+    label: `${fr ? "Trouver" : "Find"} @${parsed.handle}${on}`,
+    view: "discovery",
+    group: fr ? "Créateur" : "Creator",
+    keywords: [],
+    creatorLookup: { handle: parsed.handle, platform: parsed.platform, query: query.trim() },
+  };
+}
+
+/**
+ * Page results plus "Find @x": first for an @handle or a link (clearly a
+ * creator), last for a bare word (it may be a page name).
+ */
+export function withCreatorLookup(results: DashboardSearchHit[], query: string, lang: "en" | "fr"): DashboardSearchHit[] {
+  const hit = creatorLookupHit(query, lang);
+  if (!hit) return results;
+  const explicit = isExplicitLookup(parseCreatorLookup(query));
+  return explicit ? [hit, ...results.slice(0, 11)] : [...results.slice(0, 11), hit];
 }

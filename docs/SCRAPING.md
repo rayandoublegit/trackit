@@ -28,9 +28,10 @@ every video) without calling a scraping API when someone opens the app.
 
 | Cron | When (UTC) | What | API calls |
 | --- | --- | --- | --- |
-| `/api/cron/scrape/weekly-discovery` | Mondays 00:05 | queues this week's keyword searches (next slice of the niche tree, split across platforms) | none |
+| `/api/cron/scrape/weekly-discovery` | Mondays 00:05 | queues this week's keyword searches (next slice of the niche tree, split across TikTok and YouTube) and the Creator Marketplace walks | none |
+| `/api/cron/scrape/instagram-seed?searches=700` | Mondays 00:10 | queues the next 700 Instagram searches not run in 30 days, French first (see "Instagram" below) | none |
 | `/api/cron/scrape/weekly-refresh` | Mondays 00:15 | queues every creator due this week (`enqueue_weekly_refresh`) | none |
-| `/api/cron/scrape?budget=150` | every 10 minutes | the worker: runs up to 150 queued jobs within the weekly caps | only when jobs are queued |
+| `/api/cron/scrape?budget=240` | every 10 minutes | the worker: runs up to 240 queued jobs within the weekly caps | only when jobs are queued |
 
 - The worker costs nothing when the queue is empty: it asks the database to queue
   creators brands work with (database only), sees nothing is ready, and returns
@@ -43,6 +44,22 @@ every video) without calling a scraping API when someone opens the app.
 - The old hourly pass (`budget=25`), the daily discovery pass and the daily
   `seed-niches` cron are no longer scheduled (the routes still exist for manual use;
   `seed-niches` and `enrich-creators` now write lowercase platforms).
+
+### No-limit burst (2026-10-09)
+
+The owner asked for no practical limit (plans to be upgraded): default caps are
+now 1,000,000 refreshes and new creators a week, 100,000 discovery jobs a week,
+and Instagram RapidAPI caps of 10,000,000 a week / 40,000,000 per 30 days. Set
+the env vars to bring limits back. The worker runs every 2 minutes with
+`budget=300` and `SCRAPE_CONCURRENCY` 10 (overlapping passes are safe: jobs are
+claimed with `for update skip locked`). Creator Marketplace walks page up to 500
+(`SCRAPE_MARKET_MAX_PAGE`). `instagram-seed?searches=5000` runs hourly (a query is
+searched at most once per 30 days, so reruns cost nothing). `weekly-discovery`
+stays on Mondays: run it once by hand to start a burst (with the caps lifted it
+queues every Marketplace walk and the whole niche tree at once).
+
+Watch provider credits: a provider out of credits stops its platform cleanly;
+RapidAPI plans may bill overage per request beyond the monthly quota.
 
 ## When is a creator refreshed
 
@@ -103,9 +120,23 @@ the country TikTok has on file, and pages deep (`lib/scraper/marketplace.ts`).
 | `SCRAPE_WEEKLY_MAX_DISCOVERY_KEYWORDS` | 1,200 | keyword searches + Creator Marketplace pages per week (all platforms) |
 | `SCRAPE_MARKET_MAX_PAGE` | 100 | deepest Creator Marketplace page a walk goes to |
 | `SCRAPE_WEEKLY_MAX_NEW_CREATORS` | 12,000 | creators discovery may add per week |
-| `SCRAPE_DISCOVERY_MIN_FOLLOWERS` / `_MAX_FOLLOWERS` | 5,000 / 2,000,000 | size of creators discovery adds (hits without a follower count are skipped) |
-| `SCRAPE_BATCH`, `SCRAPE_CONCURRENCY` | 60 (the cron passes budget=150), 6 | jobs per worker pass, parallel jobs |
+| `SCRAPE_DISCOVERY_MIN_FOLLOWERS` / `_MAX_FOLLOWERS` | 5,000 / 2,000,000 | size of creators discovery adds (hits without a follower count are skipped; on Instagram they are looked at as leads, see "Instagram") |
+| `SCRAPE_BATCH`, `SCRAPE_CONCURRENCY` | 60 (the cron passes budget=240, max 300), 8 (max 10) | jobs per worker pass, parallel jobs |
 | `SCRAPE_PLATFORMS` | `tiktok,instagram,youtube` | platforms scraped (a platform also needs a provider key) |
+| `SCRAPE_INSTAGRAM_MAX_CALLS_PER_WEEK` | 11,000 | Instagram API calls per week, every Instagram provider (sized to the 50,000-request RapidAPI plan) |
+| `SCRAPE_INSTAGRAM_MAX_CALLS_PER_30D` | 45,000 | Instagram API calls over the last 30 days, rolling, so no billing month can go over the plan (5,000 left for live searches from the catalog and manual tests) |
+| `SCRAPE_INSTAGRAM_REFRESH_INTERVAL_DAYS` | 28 on RapidAPI, else `SCRAPE_REFRESH_INTERVAL_DAYS` | days between two refreshes of an Instagram creator (×2 under 100K followers, ×4 when inactive, like every platform) |
+| `SCRAPE_INSTAGRAM_LEADS_PER_REFRESH` | 15 | accounts seen next to a refreshed Instagram creator queued to be looked at (0 = no snowball) |
+| `SCRAPE_INSTAGRAM_REELS` | on | `0`: no reels call (2 calls a refresh instead of 3, but no views on Instagram) |
+| `SCRAPE_INSTAGRAM_SIMILAR` | off | `1`: also ask for similar accounts after each refresh (+1 call; the endpoint answered "not found" for every account tested) |
+| `SCRAPE_INSTAGRAM_SEARCHES_PER_WEEK` | 700 | searches `instagram-seed` queues when called without `?searches=` |
+
+Instagram searches and hashtags do not count against
+`SCRAPE_WEEKLY_MAX_DISCOVERY_KEYWORDS` (TikTok and YouTube keep the whole shared
+cap): they are bounded by the Instagram call caps. Before an Instagram job runs,
+the worker reserves the calls it may spend (3 for a refresh, 1 for a search);
+when they are not left, the job goes back to the queue until next Monday (week
+cap) or tomorrow (30-day cap), untouched.
 
 A week starts Monday 00:00 UTC. The worker reads this week's usage back from
 `scrape_runs` before claiming, so the caps hold across every pass. When the
@@ -118,7 +149,7 @@ otherwise the tail of the base is refreshed every other week.
 | Platform | Providers (order) | One refresh | Search |
 | --- | --- | --- | --- |
 | TikTok | ScrapeCreators, then RapidAPI `tiktok-scraper7` (`SCRAPER_PROVIDER_TIKTOK=scrapecreators\|rapidapi` picks the first) | 2 calls: `/v1/tiktok/profile` + `/v3/tiktok/profile/videos` (RapidAPI: `/user/info` + `/user/posts`) | `/v1/tiktok/search/users` (RapidAPI `/user/search`) |
-| Instagram | ScrapeCreators | 2 calls: `/v1/instagram/profile` + `/v2/instagram/user/posts` (12 latest posts) | `/v1/instagram/search/profiles` (follower counts for the first 10 hits) |
+| Instagram | ScrapeCreators, then RapidAPI "Instagram Scraper Stable API" (`SCRAPER_PROVIDER_INSTAGRAM=rapidapi` puts it first; with no ScrapeCreators key it is the only one) | ScrapeCreators 2 calls: `/v1/instagram/profile` + `/v2/instagram/user/posts` (12 latest posts). RapidAPI 3 calls: `POST /ig_get_fb_profile.php` + `POST /get_ig_user_posts.php` (up to 24 latest posts) + `POST /get_ig_user_reels.php` (play counts) | ScrapeCreators `/v1/instagram/search/profiles` (follower counts for the first 10 hits); RapidAPI `POST /search_ig.php` (~5 accounts, follower count as text and often missing) |
 | YouTube | ScrapeCreators | 3 calls: `/v1/youtube/channel` + `/v1/youtube/channel-videos?sort=latest` + `/v1/youtube/channel/shorts?sort=newest` | `/v1/youtube/search?type=channels` |
 
 - ScrapeCreators charges **1 credit per call** for every endpoint above
@@ -139,6 +170,138 @@ otherwise the tail of the base is refreshed every other week.
   `creators_index.bio_link`.
 - Not available from the list endpoints: Instagram saves, YouTube likes/comments on
   long videos (the per-video endpoint would cost 1 call per video), YouTube shares.
+
+## Instagram (RapidAPI "Instagram Scraper Stable API")
+
+Host `instagram-scraper-stable-api.p.rapidapi.com`, key `RAPIDAPI_INSTAGRAM_KEY`
+(else `RAPIDAPI_KEY`), read from env only. Plan seen on 2026-10-09: 50,000
+requests a month (`X-RateLimit-Requests-Limit`). Code:
+`src/lib/scraper/sources-instagram-rapid.ts`.
+
+**One refresh = 3 calls** (profile, latest posts, reels). The posts endpoint has
+captions, dates, likes, comments, media type, covers, paid-partnership flag,
+product tags, tagged people and co-authors, but **no view count** (`view_count`
+null, no `play_count`). The reels endpoint has the play counts (but no caption or
+date), so the worker merges them into the video posts by shortcode. Views drive
+avg views, reach and "viral", so the third call is worth it; an account with no
+video post skips it (2 calls); `SCRAPE_INSTAGRAM_REELS=0` drops it everywhere.
+
+Same rows as ScrapeCreators: the posts and the profile are Instagram's own
+objects, read by the same parsers (`sources-instagram.ts`): video id = shortcode,
+link `https://www.instagram.com/p/<code>/`, key `ig_` + handle. Tests parse
+mia.style from both providers and compare.
+
+| Field | RapidAPI Instagram | vs TikTok |
+| --- | --- | --- |
+| followers, following, posts count, verified, bio, bio link, category, avatar (HD) | yes | same |
+| public e-mail | `email_from_biography`, else an address in the bio → `creators_index.email` (never cleared) | TikTok: address in the bio only |
+| private account | `is_private`: a lead is skipped, a stored creator backs off like "not found" | n/a |
+| per post: caption, hashtags, date, likes, comments, type (reel/photo/carousel), cover, ad flag, product link | yes | same |
+| per post: views | reels only, from the reels call | every video |
+| shares, saves | no | yes |
+| video length | no (not in the posts answer) | yes |
+| total likes, language and country from the platform | no (language/niche are read from captions and bio) | yes |
+
+Errors come back as HTTP 200 with `{ "error" }` or `{ "message" }`:
+"…does not exist on Instagram" = not found; "Please try again later", "data not
+found. Please try again later", "Received 429" = busy (`rate_limited`, the next
+provider is tried); "Endpoint … does not exist" = our bug (`bad_response`);
+"exceeded the MONTHLY quota" = out of credits (the provider is skipped for 15
+minutes and the worker stops when no Instagram provider is left).
+
+### Discovery (how the base grows past what search gives)
+
+Instagram search returns ~5 accounts per query and most come without a follower
+count, so search alone cannot reach 20,000. Discovery is a snowball:
+
+1. **Searches** (`instagram-seed`, 1 call each): 4,182 queries built from the
+   niche tree (`instagramSearchQueries` in `discovery-plan.ts`): the French niche
+   queries, every sub-niche × France / Paris / Lyon / Marseille / influenceuse /
+   blogueuse / créateur, then the English queries, then sub-niches × Belgium,
+   Switzerland, Quebec, UK, USA, Germany, Spain, Italy. French first, 700 a week,
+   each one searched at most once per 30 days. Hits with a follower count in the
+   range are added (light row + first refresh, like TikTok); hits without one are
+   queued as **leads**.
+2. **Snowball** (no extra call): every Instagram refresh queues up to 15 accounts
+   seen next to the creator (co-authors of collab posts first, then @mentions in
+   the bio, tagged people, @mentions in captions) as leads. French creators' leads
+   go first (priority 4, others 5).
+3. **Leads** are `creator_refresh` jobs on keys not in the catalog. The worker
+   runs them through a gate: the profile call first (1 call); only accounts with
+   5,000 to 2,000,000 followers (`SCRAPE_DISCOVERY_MIN/MAX_FOLLOWERS`), public, and
+   not a brand (`detectBrand` on name, bio, link and category) go on to the posts
+   and reels calls and are stored. Others stop there: the job is `done` with the
+   reason in `last_error`, nothing is written, `notes.skipped` counts them, and the
+   same handle is not looked at again for 30 days. Kept leads count as new
+   creators (`SCRAPE_WEEKLY_MAX_NEW_CREATORS`).
+4. Optional, off by default because they failed in every test on 2026-10-09:
+   similar accounts (`SCRAPE_INSTAGRAM_SIMILAR=1`, +1 call per refresh) and
+   hashtag posts (`instagram-seed?hashtags=200`, 1 call per hashtag). Both are
+   parsed generically and their answers become leads when they work.
+
+Manual backfill (with `Authorization: Bearer $CRON_SECRET`):
+
+```
+GET /api/cron/scrape/instagram-seed?searches=2000                 # queue 2,000 searches now
+GET /api/cron/scrape/instagram-seed?searches=0&handles=a,b,c     # look at these accounts
+GET /api/cron/scrape/instagram-seed?searches=0&refreshStored=5000 # first refresh of stored IG rows never scraped
+```
+
+The worker then spends at most the Instagram caps; anything queued beyond them
+waits for the next week.
+
+### The math: 20,000 Instagram creators
+
+Per creator kept: 3 calls (first refresh). Per lead left out: 1 call. Per search:
+1 call for ~1-2 accounts added and ~3 leads. With 40 % of leads kept (to be
+measured: `notes.discovered` vs `notes.skipped`), a new creator costs about
+**4.5 calls**: 20,000 creators ≈ 60,000 calls of first refreshes + ~30,000 calls
+of leads left out + ~5,000 searches ≈ **95,000 calls**.
+
+On the current plan (50,000 a month; caps 11,000 a week / 45,000 per 30 days,
+≈ 10,400 a week usable) about 2,300 new creators a week:
+
+| Re-refresh of the Instagram base while it grows | Weeks to 20,000 |
+| --- | --- |
+| none (`SCRAPE_INSTAGRAM_REFRESH_INTERVAL_DAYS=56` keeps it close: ~12 weeks) | ~9 |
+| every 28 days (default on RapidAPI) | ~21: at 20,000 creators the refreshes alone use ~9,200 calls a week |
+| weekly (7 days) | never: the base stalls around 5,000 (5,000 × 3 calls ≈ 15,000 a week) |
+
+So on the 50,000 plan 20,000 creators can be reached, but not kept fresh: at
+steady state the plan refreshes ~22,000 creators every 28 days at most and adds
+nobody. To have **20,000 creators in ~2 weeks and refresh them weekly**:
+
+- growth: ~95,000 calls in 2 weeks ≈ 48,000 a week;
+- weekly refresh: 20,000 × 3 = 60,000 calls a week ≈ **260,000 a month**
+  (≈ 175,000 with `SCRAPE_INSTAGRAM_REELS=0`, without views), plus discovery to
+  keep growing.
+
+That is a plan of ~300,000 requests a month. After upgrading, raise
+`SCRAPE_INSTAGRAM_MAX_CALLS_PER_WEEK` (e.g. 70,000), `SCRAPE_INSTAGRAM_MAX_CALLS_PER_30D`
+(plan − 5 %), set `SCRAPE_INSTAGRAM_REFRESH_INTERVAL_DAYS=7`, raise
+`SCRAPE_WEEKLY_MAX_CREATORS` by the Instagram base and call `instagram-seed` with
+more searches. The worker (150 jobs every 10 minutes) drains ~21,000 jobs a day,
+so the pipeline itself is not the limit.
+
+## Live lookup of one creator (search bars)
+
+`/api/creators/lookup?q=<@handle | profile link>&platform=<tiktok|instagram|youtube|auto>`
+(`src/lib/creator-live-lookup.ts`, `creator-live-lookup-server.ts`) is the only
+user-triggered scraping call. Used by the catalog search (an `@handle` or a link
+is looked up at once; a bare word when the catalog finds nobody, else a button)
+and the top search bar ("Find @x" opens the creator page).
+
+- Stored and refreshed in the last 3 days: answered from `creators_index`, no call.
+- Otherwise one `refreshCreator` (same cost as a refresh: 2-3 calls), without the
+  discovery gate (any size, brands stored and flagged); private accounts are
+  reported, not stored. `auto` tries the link's platform, else the catalog tab,
+  else TikTok then Instagram (a handle already stored on one platform is that one).
+- Paid plans only; `CREATOR_LOOKUP_MAX_PER_HOUR` (default 20) live lookups per
+  workspace per hour; concurrent lookups of one creator share one refresh; answer
+  within 25 s (the refresh may finish after). Each live lookup writes a
+  `scrape_runs` row (`trigger = 'lookup:<owner id>'`, `notes.callsByProvider`), so
+  Instagram lookups count against the Instagram call caps; they do not count as
+  worker refresh jobs or discovered creators.
 
 ## Identity and storage keys
 
@@ -174,14 +337,18 @@ horizon, platforms)`, `enqueue_tracked_creators(limit, min_age, platforms)`,
 - `src/lib/scraper/identity.ts`: platform and key rules.
 - `src/lib/scraper/http.ts`: provider calls, error classes (`not_found`, `no_credits`…).
 - `src/lib/scraper/sources.ts` (TikTok + provider choice and fallback),
-  `sources-instagram.ts`, `sources-youtube.ts`: parsers are pure and tested.
+  `sources-instagram.ts`, `sources-instagram-rapid.ts`, `sources-youtube.ts`:
+  parsers are pure and tested (`instagram.test.ts` for the RapidAPI Instagram source,
+  gate, caps and backlog).
 - `src/lib/scraper/ingest.ts`: `refreshCreator` (covers and avatar stored in
   Supabase Storage once, snapshots, videos, rollup, next date), `discoverKeyword`
-  (adds new creators and queues their first refresh), `recordCreatorFailure`.
-- `src/lib/scraper/worker.ts`: the queue worker; `budget.ts`: weekly caps;
+  (adds new creators and queues their first refresh), `queueInstagramLeads`,
+  `recordCreatorFailure`. `instagram-seed.ts`: the Instagram backlog.
+- `src/lib/scraper/worker.ts`: the queue worker; `budget.ts`: weekly caps and Instagram call caps;
   `discovery-plan.ts`: weekly keyword rotation; `schedule.ts`: intervals and back-off.
 - Routes: `src/app/api/cron/scrape/route.ts` (worker),
-  `scrape/weekly-refresh/route.ts`, `scrape/weekly-discovery/route.ts`.
+  `scrape/weekly-refresh/route.ts`, `scrape/weekly-discovery/route.ts`,
+  `scrape/instagram-seed/route.ts`.
 
 Manual runs (with `Authorization: Bearer $CRON_SECRET`):
 
@@ -195,8 +362,9 @@ GET /api/cron/scrape?budget=100
 
 | Action | API calls (= ScrapeCreators credits) |
 | --- | --- |
-| Refresh one TikTok or Instagram creator | 2 |
-| Refresh one YouTube creator | 3 |
+| Refresh one TikTok or Instagram (ScrapeCreators) creator | 2 |
+| Refresh one Instagram creator on RapidAPI, or one YouTube creator | 3 |
+| Look at one Instagram lead that is left out | 1 |
 | Search one keyword (any platform) | 1 |
 | Worker pass with an empty queue | 0 |
 

@@ -52,8 +52,8 @@ function ContentThumb({ item }: { item: PerfRow }) {
     borderRadius: 8,
     overflow: "hidden",
     flexShrink: 0,
-    background: "#F3F4F6",
-    border: "1px solid #EFEFEF",
+    background: "var(--ws-hover)",
+    border: "1px solid var(--ws-border)",
   };
 
   if (isImage) {
@@ -73,7 +73,7 @@ function ContentThumb({ item }: { item: PerfRow }) {
         alignItems: "center",
         justifyContent: "center",
         fontSize: 10,
-        color: "#9A9A9A",
+        color: "var(--ws-text-dim)",
         padding: 4,
         textAlign: "center",
         wordBreak: "break-word",
@@ -91,8 +91,8 @@ function StatsToast({ message }: { message: string }) {
         position: "fixed",
         bottom: 24,
         right: 24,
-        background: "#1A1A1A",
-        color: "#FFFFFF",
+        background: "var(--ws-btn)",
+        color: "var(--ws-btn-text)",
         padding: "12px 18px",
         borderRadius: 10,
         fontSize: 13,
@@ -210,18 +210,18 @@ export function CampaignContentPerformancePanel({
     padding: "12px 14px",
     fontSize: 12,
     fontWeight: 500,
-    color: "#9A9A9A",
+    color: "var(--ws-text-dim)",
     letterSpacing: "-0.01em",
     textAlign: "left",
-    borderBottom: "1px solid #EFEFEF",
+    borderBottom: "1px solid var(--ws-border)",
     whiteSpace: "nowrap",
   };
 
   const tdStyle: React.CSSProperties = {
     padding: "14px",
     fontSize: 13,
-    color: "#1A1A1A",
-    borderBottom: "1px solid #F5F5F5",
+    color: "var(--ws-text)",
+    borderBottom: "1px solid var(--ws-border)",
     verticalAlign: "middle",
   };
 
@@ -243,17 +243,17 @@ export function CampaignContentPerformancePanel({
 
       <div
         style={{
-          background: "#FFFFFF",
-          border: "1px solid #EFEFEF",
+          background: "var(--ws-surface)",
+          border: "1px solid var(--ws-border)",
           borderRadius: 16,
           padding: isMobile ? "18px 16px" : "22px 22px 20px",
           boxSizing: "border-box",
         }}
       >
         {loading ? (
-          <p style={{ margin: 0, fontSize: 13, color: "#9A9A9A" }}>{lang === "fr" ? "Chargement…" : "Loading…"}</p>
+          <p style={{ margin: 0, fontSize: 13, color: "var(--ws-text-dim)" }}>{lang === "fr" ? "Chargement…" : "Loading…"}</p>
         ) : empty ? (
-          <p style={{ margin: 0, fontSize: 14, color: "#6B7280", lineHeight: 1.5 }}>
+          <p style={{ margin: 0, fontSize: 14, color: "var(--ws-text-muted)", lineHeight: 1.5 }}>
             {lang === "fr"
               ? "Aucun contenu avec URL TikTok pour l’instant. Ajoutez une URL lors de l’envoi de contenu ou demandez aux créateurs de le faire."
               : "No content with a TikTok URL yet. Add a URL when uploading content or ask creators to include one."}
@@ -329,8 +329,8 @@ export function CampaignContentPerformancePanel({
                                   marginTop: 4,
                                   fontSize: 11,
                                   fontWeight: 500,
-                                  color: "#6B7280",
-                                  background: "#F3F4F6",
+                                  color: "var(--ws-text-muted)",
+                                  background: "var(--ws-hover)",
                                   borderRadius: 6,
                                   padding: "2px 7px",
                                 }}
@@ -338,7 +338,7 @@ export function CampaignContentPerformancePanel({
                                 {lang === "fr" ? "En attente" : "Pending"}
                               </span>
                             ) : canPlayPost ? (
-                              <span style={{ display: "inline-block", marginTop: 4, fontSize: 11, color: "#0047FF", fontWeight: 500 }}>
+                              <span style={{ display: "inline-block", marginTop: 4, fontSize: 11, color: "var(--ws-accent)", fontWeight: 500 }}>
                                 {lang === "fr" ? "▶ Lire la vidéo" : "▶ Play video"}
                               </span>
                             ) : null}
@@ -357,15 +357,15 @@ export function CampaignContentPerformancePanel({
                           onClick={() => void refreshStats(row.id)}
                           disabled={refreshing}
                           style={{
-                            border: "1px solid #E5E5E5",
-                            background: "#FFF",
+                            border: "1px solid var(--ws-border)",
+                            background: "var(--ws-surface)",
                             borderRadius: 8,
                             padding: "6px 12px",
                             fontSize: 12,
                             fontWeight: 500,
                             cursor: refreshing ? "wait" : "pointer",
                             fontFamily: "inherit",
-                            color: "#1A1A1A",
+                            color: "var(--ws-text)",
                             opacity: refreshing ? 0.6 : 1,
                             minWidth: 88,
                           }}

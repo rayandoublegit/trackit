@@ -11,6 +11,7 @@ import {
 import { creatorMatchesFollowerRange } from "@/lib/discovery-follower-ranges";
 import { estimatedCostPerPost, estimatedCpm, valueScore, valueTier } from "@/lib/creator-value";
 import { searchRapidApiCreators } from "@/lib/rapidapi-creators";
+import { rapidApiInstagram, rapidInstagramAvailable } from "@/lib/scraper/sources-instagram-rapid";
 import { feedAvatarUrlForCreator } from "@/lib/feed-avatar-url";
 import { imgProxyUrl } from "@/lib/client-image-url";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
@@ -97,6 +98,16 @@ let schemaLevel: SchemaLevel | null = null;
 /** Tests only: forget the detected schema. */
 export function resetCatalogSchemaCache() {
   schemaLevel = null;
+}
+
+/** The detected schema level, null until a query has succeeded. */
+export function knownSchemaLevel(): SchemaLevel | null {
+  return schemaLevel;
+}
+
+/** Another reader of creators_index found that a level works (lib/creator-intel-read). */
+export function rememberSchemaLevel(level: SchemaLevel) {
+  schemaLevel = level;
 }
 
 function columnsFor(level: SchemaLevel): string {
@@ -304,6 +315,28 @@ async function runCatalogQuery(admin: SupabaseClient, q: CatalogQuery, level: Sc
   }
 }
 
+/**
+ * Catalog rows by storage key (creators_index.username), with the catalog's
+ * columns and schema fallback. Used by the creator lookup (lib/creator-live-lookup-server).
+ */
+export async function readCatalogRowsByKey(admin: SupabaseClient, keys: string[]): Promise<Record<string, unknown>[]> {
+  const unique = [...new Set(keys.filter(Boolean))];
+  if (!unique.length) return [];
+  let level: SchemaLevel = schemaLevel ?? 3;
+  for (;;) {
+    const { data, error } = await admin.from("creators_index").select(columnsFor(level)).in("username", unique).limit(unique.length);
+    if (!error) {
+      schemaLevel = level;
+      return (data ?? []) as unknown as Record<string, unknown>[];
+    }
+    if (isMissingColumn(error.message) && level > 0) {
+      level = (level - 1) as SchemaLevel;
+      continue;
+    }
+    throw new Error(`creators_index: ${error.message}`);
+  }
+}
+
 /** A brand by its stored flag, or, when not classified yet, by name and bio. */
 export function isBrandRow(row: Record<string, unknown>): boolean {
   if (row.is_brand === true) return true;
@@ -336,10 +369,42 @@ function liveToFeedCreator(c: DiscoveryCreatorResult): FeedCreator {
 
 /** True when a live search provider is configured for this platform. */
 export function liveSearchAvailable(platform: CatalogPlatform): boolean {
+  // Instagram: the RapidAPI Instagram scraper the creator pipeline uses (RAPIDAPI_INSTAGRAM_KEY, else RAPIDAPI_KEY).
+  if (platform === "Instagram") return rapidInstagramAvailable();
   if (!process.env.RAPIDAPI_KEY) return false;
-  if (platform === "Instagram") return Boolean(process.env.RAPIDAPI_INSTAGRAM_HOST && process.env.RAPIDAPI_INSTAGRAM_SEARCH_URL);
   if (platform === "TikTok") return Boolean(process.env.RAPIDAPI_HOST && process.env.RAPIDAPI_SEARCH_URL);
   return false;
+}
+
+/**
+ * Live Instagram search (1 call of the RapidAPI plan, ~5 accounts). Follower
+ * counts come as text and are often missing: those hits show 0 and are left
+ * out as soon as a follower bound is set.
+ */
+async function liveInstagramSearch(keyword: string): Promise<DiscoveryCreatorResult[]> {
+  const hits = await rapidApiInstagram.search(keyword, 30);
+  return hits.map((h) => ({
+    username: h.username,
+    displayName: h.displayName || h.username,
+    avatarUrl: h.avatarUrl,
+    followersCount: h.followers ?? 0,
+    engagementRate: 0,
+    engagementByFollower: 0,
+    avgViews: 0,
+    postFrequency: 0,
+    lastPostAt: null,
+    authenticityScore: 0,
+    qualityStatus: "ok",
+    platform: "Instagram",
+    bio: "",
+    email: null,
+    niche: keyword,
+    primaryNiche: keyword,
+    language: "unknown",
+    location: null,
+    countryCode: null,
+    videoThumbnails: [],
+  }));
 }
 
 /** Live keyword search on the platform itself (RapidAPI), shaped like catalog rows. */
@@ -351,7 +416,7 @@ export async function liveCreatorSearch(
 ): Promise<FeedCreator[]> {
   if (!keyword.trim() || !liveSearchAvailable(platform)) return [];
   try {
-    const rows = await searchRapidApiCreators(keyword.trim(), platform, Math.min(30, limit * 2));
+    const rows = platform === "Instagram" ? await liveInstagramSearch(keyword.trim()) : await searchRapidApiCreators(keyword.trim(), platform, Math.min(30, limit * 2));
     return rows
       .filter((c) => creatorMatchesFollowerRange(c.followersCount, { min: bounds.minFollowers, max: bounds.maxFollowers }))
       .filter((c) => bounds.excludeBrands === false || !detectBrand({ username: c.username, displayName: c.displayName, bio: c.bio }).isBrand)

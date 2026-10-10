@@ -25,7 +25,10 @@ import { supabase } from "@/lib/supabase";
 import { useLang } from "@/lib/useLang";
 import { selectionPillColors } from "@/lib/selection-card-styles";
 import { buildCreatorEmailMap } from "@/lib/creator-crm";
-import { isValidEmailAddress, resolveCreatorEmail, sendOutreachEmail } from "@/lib/outreach-email";
+import { fetchDirectSendAvailable, isValidEmailAddress, openComposeLink, resolveCreatorEmail, sendOutreachEmail } from "@/lib/outreach-email";
+import { buildMailComposeLink, mailClientShortName, resolveMailClient } from "@/lib/mail-client";
+import { requestContactCreator } from "@/lib/contact-creator-events";
+import { AUTO_OUTREACH_ENABLED } from "@/lib/auto-outreach-flag";
 import {
   canGenerateAiOutreach,
   canPersistTemplates,
@@ -34,6 +37,7 @@ import {
 } from "@/lib/plan-limits";
 import { UpgradeModal } from "./UpgradeModal";
 import { runGateUpgrade, type GateFeatureKey } from "@/lib/plan-marketing";
+import { AutoOutreachEntry } from "./auto-outreach/AutoOutreachPanel";
 
 type OutreachHistoryStatus = "sent" | "opened" | "replied" | "no_response" | "converted";
 type HistoryFilter = "all" | OutreachHistoryStatus;
@@ -52,7 +56,7 @@ type OutreachHistoryEntry = {
 
 
 const btnPrimary: React.CSSProperties = {
-  background: "#0047FF",
+  background: "var(--ws-accent)",
   color: "#FFFFFF",
   border: "none",
   borderRadius: 10,
@@ -65,9 +69,9 @@ const btnPrimary: React.CSSProperties = {
 };
 
 const btnSecondary: React.CSSProperties = {
-  background: "#FFFFFF",
-  color: "#1A1A1A",
-  border: "1px solid #E5E5E5",
+  background: "var(--ws-surface)",
+  color: "var(--ws-text)",
+  border: "1px solid var(--ws-border)",
   borderRadius: 10,
   padding: "10px 16px",
   fontSize: 13,
@@ -78,8 +82,8 @@ const btnSecondary: React.CSSProperties = {
 };
 
 const btnBlack: React.CSSProperties = {
-  background: "#1A1A1A",
-  color: "#FFFFFF",
+  background: "var(--ws-btn)",
+  color: "var(--ws-btn-text)",
   border: "none",
   borderRadius: 10,
   padding: "10px 18px",
@@ -159,12 +163,12 @@ const inputStyle: React.CSSProperties = {
   boxSizing: "border-box",
   padding: "10px 12px",
   borderRadius: 10,
-  border: "1px solid #E5E5E5",
+  border: "1px solid var(--ws-border)",
   fontSize: 14,
   fontFamily: "inherit",
-  color: "#1A1A1A",
+  color: "var(--ws-text)",
   letterSpacing: "-0.02em",
-  background: "#FFFFFF",
+  background: "var(--ws-surface)",
 };
 
 function formatFollowUpDate(iso: string, lang: "en" | "fr" = "en") {
@@ -194,7 +198,7 @@ function outreachStatusBadge(status: OutreachHistoryStatus, lang: "en" | "fr") {
   const s = map[status];
   const label = lang === "fr" ? s.fr : s.en;
   return (
-    <span style={{ fontSize: 11, fontWeight: 600, color: "#1A1A1A", whiteSpace: "nowrap", textTransform: "capitalize", letterSpacing: "-0.01em" }}>
+    <span style={{ fontSize: 11, fontWeight: 600, color: "var(--ws-text)", whiteSpace: "nowrap", textTransform: "capitalize", letterSpacing: "-0.01em" }}>
       {label}
     </span>
   );
@@ -207,8 +211,8 @@ function Toast({ message }: { message: string }) {
         position: "fixed",
         bottom: 24,
         right: 24,
-        background: "#1A1A1A",
-        color: "#FFFFFF",
+        background: "var(--ws-btn)",
+        color: "var(--ws-btn-text)",
         padding: "12px 18px",
         borderRadius: 10,
         fontSize: 13,
@@ -316,7 +320,7 @@ function FollowUpPanel({
           right: 0,
           height: "100vh",
           width: 420,
-          background: "#FFFFFF",
+          background: "var(--ws-surface)",
           boxShadow: "-8px 0 32px rgba(0,0,0,0.12)",
           zIndex: 1001,
           display: "flex",
@@ -327,7 +331,7 @@ function FollowUpPanel({
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div style={{ padding: "20px 20px 16px", borderBottom: "1px solid #EFEFEF", position: "relative" }}>
+        <div style={{ padding: "20px 20px 16px", borderBottom: "1px solid var(--ws-border)", position: "relative" }}>
           <button
             type="button"
             onClick={onClose}
@@ -336,8 +340,8 @@ function FollowUpPanel({
               position: "absolute",
               top: 16,
               right: 16,
-              background: "#FAFAFA",
-              border: "1px solid #EFEFEF",
+              background: "var(--ws-surface-2)",
+              border: "1px solid var(--ws-border)",
               borderRadius: 8,
               width: 32,
               height: 32,
@@ -349,33 +353,33 @@ function FollowUpPanel({
             }}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-              <path d="M6 6l12 12M18 6L6 18" stroke="#7A7A7A" strokeWidth="1.8" strokeLinecap="round" />
+              <path d="M6 6l12 12M18 6L6 18" stroke="var(--ws-text-muted)" strokeWidth="1.8" strokeLinecap="round" />
             </svg>
           </button>
           <div style={{ display: "flex", alignItems: "center", gap: 10, paddingRight: 36 }}>
             <CreatorAvatar src={entry.avatar} username={entry.handle} displayName={entry.creator} size={40} alt={entry.creator} />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A" }}>{entry.creator}</div>
-              <div style={{ fontSize: 12, color: "#0047FF" }}>@{entry.handle}</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "var(--ws-text)" }}>{entry.creator}</div>
+              <div style={{ fontSize: 12, color: "var(--ws-accent)" }}>@{entry.handle}</div>
             </div>
-            <span style={{ fontSize: 10, fontWeight: 500, background: "#F0F0F0", padding: "4px 8px", borderRadius: 999, textTransform: "capitalize", flexShrink: 0 }}>
+            <span style={{ fontSize: 10, fontWeight: 500, background: "var(--ws-hover)", padding: "4px 8px", borderRadius: 999, textTransform: "capitalize", flexShrink: 0 }}>
               {entry.platform}
             </span>
           </div>
-          <p style={{ fontSize: 12, color: "#9A9A9A", margin: "10px 0 0" }}>
+          <p style={{ fontSize: 12, color: "var(--ws-text-dim)", margin: "10px 0 0" }}>
             {lang === "fr" ? `Message initial envoyé le ${formatSentDate(entry.sentDate, lang)}` : <>Original message sent {entry.sentDate}</>}
           </p>
         </div>
 
         <div style={{ flex: 1, overflowY: "auto", padding: 20 }}>
-          <h3 style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", margin: "0 0 12px" }}>{lang === "fr" ? "Message de relance" : "Follow up message"}</h3>
+          <h3 style={{ fontSize: 14, fontWeight: 600, color: "var(--ws-text)", margin: "0 0 12px" }}>{lang === "fr" ? "Message de relance" : "Follow up message"}</h3>
           <textarea
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             rows={12}
             style={{ ...inputStyle, resize: "vertical", lineHeight: 1.55, marginBottom: 8 }}
           />
-          <div style={{ fontSize: 12, color: "#9A9A9A", marginBottom: 14 }}>
+          <div style={{ fontSize: 12, color: "var(--ws-text-dim)", marginBottom: 14 }}>
             {lang === "fr" ? `${message.length} caractère${message.length > 1 ? "s" : ""}` : <>{message.length} characters</>}
           </div>
           <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
@@ -388,9 +392,9 @@ function FollowUpPanel({
                   ...btnSecondary,
                   padding: "6px 14px",
                   fontSize: 12,
-                  background: tone === t ? "#1A1A1A" : "#FFFFFF",
-                  color: tone === t ? "#FFFFFF" : "#1A1A1A",
-                  borderColor: tone === t ? "#1A1A1A" : "#E5E5E5",
+                  background: tone === t ? "var(--ws-btn)" : "var(--ws-surface)",
+                  color: tone === t ? "var(--ws-btn-text)" : "var(--ws-text)",
+                  borderColor: tone === t ? "var(--ws-text)" : "var(--ws-border)",
                 }}
               >
                 {displayTone(t, lang)}
@@ -410,13 +414,13 @@ function FollowUpPanel({
                 : "Regenerate with AI →"}
           </button>
 
-          <h3 style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", margin: "0 0 12px" }}>{lang === "fr" ? "Vérifier avant l'envoi" : "Review before sending"}</h3>
+          <h3 style={{ fontSize: 14, fontWeight: 600, color: "var(--ws-text)", margin: "0 0 12px" }}>{lang === "fr" ? "Vérifier avant l'envoi" : "Review before sending"}</h3>
           <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: showNotOpenedWarning ? 12 : 20 }}>
-            <div style={{ fontSize: 13, color: "#1A1A1A", display: "flex", gap: 8 }}>
+            <div style={{ fontSize: 13, color: "var(--ws-text)", display: "flex", gap: 8 }}>
               <span style={{ color: "#1FB567" }}>✓</span>
               <span>{lang === "fr" ? "Message personnalisé pour le créateur" : "Message personalized for creator"}</span>
             </div>
-            <div style={{ fontSize: 13, color: "#1A1A1A", display: "flex", gap: 8 }}>
+            <div style={{ fontSize: 13, color: "var(--ws-text)", display: "flex", gap: 8 }}>
               <span style={{ color: "#1FB567" }}>✓</span>
               <span>
                 {lang === "fr"
@@ -426,14 +430,14 @@ function FollowUpPanel({
             </div>
           </div>
           {showNotOpenedWarning && (
-            <p style={{ fontSize: 13, color: "#1A1A1A", margin: "0 0 20px", lineHeight: 1.5, letterSpacing: "-0.01em" }}>
+            <p style={{ fontSize: 13, color: "var(--ws-text)", margin: "0 0 20px", lineHeight: 1.5, letterSpacing: "-0.01em" }}>
               {lang === "fr"
                 ? "Ce créateur n'a pas encore ouvert votre premier message."
                 : "This creator hasn't opened your first message yet."}
             </p>
           )}
 
-          <h3 style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", margin: "0 0 8px" }}>{lang === "fr" ? "Envoyer via" : "Send via"}</h3>
+          <h3 style={{ fontSize: 14, fontWeight: 600, color: "var(--ws-text)", margin: "0 0 8px" }}>{lang === "fr" ? "Envoyer via" : "Send via"}</h3>
           <select value={platform} onChange={(e) => setPlatform(e.target.value)} style={{ ...inputStyle, marginBottom: 0 }}>
             {PLATFORM_DM_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
@@ -441,14 +445,14 @@ function FollowUpPanel({
               </option>
             ))}
           </select>
-          <p style={{ fontSize: 11, color: "#9A9A9A", marginTop: 6 }}>
+          <p style={{ fontSize: 11, color: "var(--ws-text-dim)", marginTop: 6 }}>
             {lang === "fr"
               ? `Message initial envoyé via ${platformLabel(entry.platform, lang)}`
               : <>Original sent on {platformLabel(entry.platform)}</>}
           </p>
         </div>
 
-        <div style={{ padding: "16px 20px 20px", borderTop: "1px solid #EFEFEF" }}>
+        <div style={{ padding: "16px 20px 20px", borderTop: "1px solid var(--ws-border)" }}>
           <button
             type="button"
             onClick={handleSend}
@@ -467,7 +471,7 @@ function FollowUpPanel({
             style={{
               background: "none",
               border: "none",
-              color: "#9A9A9A",
+              color: "var(--ws-text-dim)",
               fontSize: 12,
               fontFamily: "inherit",
               cursor: "pointer",
@@ -558,9 +562,9 @@ function SaveTemplateModal({
       style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100, padding: 24 }}
       onClick={onClose}
     >
-      <div style={{ background: "#FFFFFF", borderRadius: 16, padding: 24, maxWidth: 400, width: "100%" }} onClick={(e) => e.stopPropagation()}>
+      <div style={{ background: "var(--ws-surface)", borderRadius: 16, padding: 24, maxWidth: 400, width: "100%" }} onClick={(e) => e.stopPropagation()}>
         <h3 style={{ fontSize: 16, fontWeight: 600, margin: "0 0 12px" }}>{lang === "fr" ? "Sauvegarder comme modèle" : "Save as template"}</h3>
-        <label style={{ display: "block", fontSize: 12, color: "#9A9A9A", marginBottom: 6 }}>{lang === "fr" ? "Nom du modèle" : "Template name"}</label>
+        <label style={{ display: "block", fontSize: 12, color: "var(--ws-text-dim)", marginBottom: 6 }}>{lang === "fr" ? "Nom du modèle" : "Template name"}</label>
         <input type="text" value={name} onChange={(e) => setName(e.target.value)} style={{ ...inputStyle, marginBottom: 16 }} />
         <div style={{ display: "flex", gap: 8 }}>
           <button type="button" onClick={() => name.trim() && onSave(name.trim())} style={{ ...btnBlack, flex: 1 }} disabled={!name.trim()}>
@@ -613,6 +617,7 @@ function OutreachAIGeneratePanel({
   const [senderEmail, setSenderEmail] = useState("");
   const [creatorEmailMap, setCreatorEmailMap] = useState<Record<string, string>>({});
   const [sendingEmail, setSendingEmail] = useState(false);
+  const [directSend, setDirectSend] = useState(false);
   const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
   const [, setSavedTemplates] = useState<SavedOutreachTemplate[]>([]);
   const [upgradeFeature, setUpgradeFeature] = useState<GateFeatureKey | null>(null);
@@ -645,6 +650,17 @@ function OutreachAIGeneratePanel({
     };
     void load();
   }, []);
+
+  useEffect(() => {
+    if (!senderEmail) return;
+    let alive = true;
+    void fetchDirectSendAvailable(senderEmail).then((ok) => {
+      if (alive) setDirectSend(ok);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [senderEmail]);
 
   useEffect(() => {
     prefetchCreatorAvatars(savedCreators.map((c) => ({ username: c.username, avatarUrl: c.avatar })));
@@ -744,26 +760,12 @@ function OutreachAIGeneratePanel({
 
     if (platform === "Email") {
       const recipient = creatorEmail.trim();
-      if (!isValidEmailAddress(senderEmail) || !isValidEmailAddress(recipient)) {
-        onToast(lang === "fr" ? "Renseignez l'e-mail de la marque et celui du créateur" : "Enter brand and creator emails");
+      const subject = emailSubject.trim() || (lang === "fr" ? "Partenariat" : "Partnership");
+      if (recipient && !isValidEmailAddress(recipient)) {
+        onToast(lang === "fr" ? "L'e-mail du créateur n'est pas valide" : "The creator's email is not valid");
         return;
       }
-      setSendingEmail(true);
-      const result = await sendOutreachEmail({
-        fromEmail: senderEmail.trim(),
-        subject: emailSubject.trim() || (lang === "fr" ? "Partenariat" : "Partnership"),
-        body: generatedMessage,
-        recipients: [recipient],
-      });
-      setSendingEmail(false);
-      if (!result.ok) {
-        onToast(result.error);
-        return;
-      }
-      if (result.mode !== "api" && result.composeUrl) {
-        window.open(result.composeUrl, "_blank", "noopener,noreferrer");
-      }
-      await onMarkSent({
+      const historyEntry: OutreachHistoryEntry = {
         id: "",
         creator: selectedCreator.displayName,
         handle,
@@ -773,8 +775,66 @@ function OutreachAIGeneratePanel({
         sentDate: todayIso(),
         status: "sent",
         followUpDate: canUseAutoFollowUp(plan) ? followUpIn3Days() : null,
-      });
-      onToast(lang === "fr" ? "E-mail envoyé ✓" : "Email sent ✓");
+      };
+
+      // Direct send only when the server is set up for it (OUTREACH_DIRECT_SEND_DOMAINS).
+      if (directSend && recipient && isValidEmailAddress(senderEmail)) {
+        setSendingEmail(true);
+        const result = await sendOutreachEmail({
+          fromEmail: senderEmail.trim(),
+          subject,
+          body: generatedMessage,
+          recipients: [recipient],
+        });
+        setSendingEmail(false);
+        if (!result.ok) {
+          onToast(result.error);
+          return;
+        }
+        if (result.mode !== "api" && result.composeUrl && openComposeLink(result.composeUrl) === "blocked") {
+          onToast(lang === "fr" ? "Autorisez les pop-ups pour ouvrir votre messagerie" : "Allow pop-ups to open your mail app");
+          return;
+        }
+        await onMarkSent(historyEntry);
+        onToast(lang === "fr" ? "E-mail envoyé" : "Email sent");
+        resetPanel();
+        return;
+      }
+
+      // Otherwise open the brand's own mailbox with the email ready. Opened
+      // before any await so the browser does not block the new tab.
+      const draftTarget = {
+        username: handle,
+        displayName: selectedCreator.displayName,
+        platform: selectedCreator.platform,
+        avatarUrl: selectedCreator.avatar,
+        email: recipient || null,
+        niche: selectedCreator.niche,
+        draft: { subject, body: generatedMessage },
+      };
+      const client = resolveMailClient(senderEmail);
+      if (!client) {
+        // Mail app unknown (custom domain): the composer asks once, then opens it.
+        requestContactCreator(draftTarget);
+        resetPanel();
+        return;
+      }
+      const link = buildMailComposeLink({ client, to: recipient, subject, body: generatedMessage, fromEmail: senderEmail, lang });
+      if (link.truncated) void navigator.clipboard?.writeText(`${subject}
+
+${generatedMessage}`).catch(() => undefined);
+      if (openComposeLink(link.url) === "blocked") {
+        requestContactCreator(draftTarget);
+        resetPanel();
+        return;
+      }
+      await onMarkSent(historyEntry);
+      const app = mailClientShortName(client, lang);
+      onToast(
+        lang === "fr"
+          ? `Votre e-mail est prêt dans ${app}${link.truncated ? ". Texte complet copié dans le presse-papiers." : ""}`
+          : `Your email is ready in ${app}${link.truncated ? ". Full text copied to your clipboard." : ""}`,
+      );
       resetPanel();
       return;
     }
@@ -869,10 +929,10 @@ function OutreachAIGeneratePanel({
                 alignItems: "center",
                 justifyContent: "space-between",
                 padding: "20px 24px",
-                borderBottom: "1px solid #EFEFEF",
+                borderBottom: "1px solid var(--ws-border)",
               }}
             >
-              <h3 style={{ fontSize: 16, fontWeight: 600, color: "#1A1A1A", margin: 0, letterSpacing: "-0.02em" }}>
+              <h3 style={{ fontSize: 16, fontWeight: 600, color: "var(--ws-text)", margin: 0, letterSpacing: "-0.02em" }}>
                 {lang === "fr" ? "Générer un message de prospection avec Trackit IA" : "Generate outreach with Trackit AI"}
               </h3>
               <button
@@ -880,8 +940,8 @@ function OutreachAIGeneratePanel({
                 onClick={resetPanel}
                 aria-label={lang === "fr" ? "Fermer" : "Close"}
                 style={{
-                  background: "#FAFAFA",
-                  border: "1px solid #EFEFEF",
+                  background: "var(--ws-surface-2)",
+                  border: "1px solid var(--ws-border)",
                   borderRadius: 8,
                   width: 32,
                   height: 32,
@@ -893,17 +953,17 @@ function OutreachAIGeneratePanel({
                 }}
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                  <path d="M6 6l12 12M18 6L6 18" stroke="#7A7A7A" strokeWidth="1.8" strokeLinecap="round" />
+                  <path d="M6 6l12 12M18 6L6 18" stroke="var(--ws-text-muted)" strokeWidth="1.8" strokeLinecap="round" />
                 </svg>
               </button>
             </div>
 
             <div style={{ padding: 24 }}>
               <div style={{ marginBottom: 24 }}>
-                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#9A9A9A", marginBottom: 8, letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--ws-text-dim)", marginBottom: 8, letterSpacing: "0.04em", textTransform: "uppercase" }}>
                   {lang === "fr" ? "ÉTAPE 1 — SÉLECTIONNER UN CRÉATEUR" : "STEP 1 — SELECT CREATOR"}
                 </label>
-                <div style={{ fontSize: 14, fontWeight: 500, color: "#1A1A1A", marginBottom: 8 }}>{lang === "fr" ? "À qui souhaitez-vous vous adresser ?" : "Who are you reaching out to?"}</div>
+                <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ws-text)", marginBottom: 8 }}>{lang === "fr" ? "À qui souhaitez-vous vous adresser ?" : "Who are you reaching out to?"}</div>
                 <div style={{ position: "relative" }}>
                   <input
                     type="text"
@@ -925,8 +985,8 @@ function OutreachAIGeneratePanel({
                         left: 0,
                         right: 0,
                         marginTop: 4,
-                        background: "#FFFFFF",
-                        border: "1px solid #EFEFEF",
+                        background: "var(--ws-surface)",
+                        border: "1px solid var(--ws-border)",
                         borderRadius: 10,
                         boxShadow: "0 8px 24px rgba(0,0,0,0.1)",
                         zIndex: 10,
@@ -935,13 +995,13 @@ function OutreachAIGeneratePanel({
                       }}
                     >
                       {savedCreators.length === 0 ? (
-                        <div style={{ padding: "14px 12px", fontSize: 13, color: "#7A7A7A" }}>
+                        <div style={{ padding: "14px 12px", fontSize: 13, color: "var(--ws-text-muted)" }}>
                           {lang === "fr"
                             ? "Aucun créateur sauvegardé. Ajoutez-en depuis Créateurs ou Découverte."
                             : "No saved creators. Add some from Creators or Discovery."}
                         </div>
                       ) : filteredCreators.length === 0 ? (
-                        <div style={{ padding: "14px 12px", fontSize: 13, color: "#7A7A7A" }}>
+                        <div style={{ padding: "14px 12px", fontSize: 13, color: "var(--ws-text-muted)" }}>
                           {lang === "fr" ? "Aucun créateur ne correspond." : "No matching creators."}
                         </div>
                       ) : (
@@ -962,8 +1022,8 @@ function OutreachAIGeneratePanel({
                               gap: 10,
                               padding: "10px 12px",
                               border: "none",
-                              borderBottom: "1px solid #F5F5F5",
-                              background: "#FFFFFF",
+                              borderBottom: "1px solid var(--ws-border)",
+                              background: "var(--ws-surface)",
                               cursor: "pointer",
                               fontFamily: "inherit",
                               textAlign: "left",
@@ -972,9 +1032,9 @@ function OutreachAIGeneratePanel({
                             <CreatorAvatar src={c.avatar} username={c.username} displayName={c.displayName} size={32} alt={c.displayName} />
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <div style={{ fontSize: 13, fontWeight: 500 }}>{c.displayName}</div>
-                              <div style={{ fontSize: 12, color: "#0047FF" }}>@{c.username}</div>
+                              <div style={{ fontSize: 12, color: "var(--ws-accent)" }}>@{c.username}</div>
                             </div>
-                            <span style={{ fontSize: 10, background: "#F0F0F0", padding: "3px 8px", borderRadius: 999, textTransform: "capitalize" }}>
+                            <span style={{ fontSize: 10, background: "var(--ws-hover)", padding: "3px 8px", borderRadius: 999, textTransform: "capitalize" }}>
                               {c.platform}
                             </span>
                           </button>
@@ -984,13 +1044,13 @@ function OutreachAIGeneratePanel({
                   )}
                 </div>
                 {selectedCreator && (
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12, padding: 12, background: "#FAFAFA", borderRadius: 10, border: "1px solid #EFEFEF" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12, padding: 12, background: "var(--ws-surface-2)", borderRadius: 10, border: "1px solid var(--ws-border)" }}>
                     <CreatorAvatar src={selectedCreator.avatar} username={selectedCreator.username} displayName={selectedCreator.displayName} size={40} alt={selectedCreator.displayName} />
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 14, fontWeight: 600 }}>{selectedCreator.displayName}</div>
-                      <div style={{ fontSize: 12, color: "#0047FF" }}>@{selectedCreator.username}</div>
+                      <div style={{ fontSize: 12, color: "var(--ws-accent)" }}>@{selectedCreator.username}</div>
                     </div>
-                    <span style={{ fontSize: 10, fontWeight: 500, background: "#F0F0F0", padding: "4px 10px", borderRadius: 999, textTransform: "capitalize" }}>
+                    <span style={{ fontSize: 10, fontWeight: 500, background: "var(--ws-hover)", padding: "4px 10px", borderRadius: 999, textTransform: "capitalize" }}>
                       {selectedCreator.platform}
                     </span>
                   </div>
@@ -998,10 +1058,10 @@ function OutreachAIGeneratePanel({
               </div>
 
               <div style={{ marginBottom: 24 }}>
-                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#9A9A9A", marginBottom: 8, letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--ws-text-dim)", marginBottom: 8, letterSpacing: "0.04em", textTransform: "uppercase" }}>
                   {lang === "fr" ? "ÉTAPE 2 — VOTRE MARQUE" : "STEP 2 — YOUR BRAND"}
                 </label>
-                <div style={{ fontSize: 14, fontWeight: 500, color: "#1A1A1A", marginBottom: 8 }}>{lang === "fr" ? "Que vendez-vous ?" : "What are you selling?"}</div>
+                <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ws-text)", marginBottom: 8 }}>{lang === "fr" ? "Que vendez-vous ?" : "What are you selling?"}</div>
                 <input
                   type="text"
                   value={brand}
@@ -1012,12 +1072,12 @@ function OutreachAIGeneratePanel({
               </div>
 
               <div style={{ marginBottom: 24 }}>
-                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#9A9A9A", marginBottom: 12, letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--ws-text-dim)", marginBottom: 12, letterSpacing: "0.04em", textTransform: "uppercase" }}>
                   {lang === "fr" ? "ÉTAPE 3 — TON ET PLATEFORME" : "STEP 3 — TONE AND PLATFORM"}
                 </label>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
                   <div>
-                    <div style={{ fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 8 }}>{lang === "fr" ? "Ton" : "Tone"}</div>
+                    <div style={{ fontSize: 12, fontWeight: 500, color: "var(--ws-text-dim)", marginBottom: 8 }}>{lang === "fr" ? "Ton" : "Tone"}</div>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                       {tones.map((t) => (
                         <button
@@ -1026,9 +1086,9 @@ function OutreachAIGeneratePanel({
                           onClick={() => setTone(t)}
                           style={{
                             ...filterPillBtn,
-                            background: tone === t ? "#1A1A1A" : "#FFFFFF",
-                            color: tone === t ? "#FFFFFF" : "#1A1A1A",
-                            borderColor: tone === t ? "#1A1A1A" : "#E5E5E5",
+                            background: tone === t ? "var(--ws-btn)" : "var(--ws-surface)",
+                            color: tone === t ? "var(--ws-btn-text)" : "var(--ws-text)",
+                            borderColor: tone === t ? "var(--ws-text)" : "var(--ws-border)",
                           }}
                         >
                           {displayTone(t, lang)}
@@ -1037,7 +1097,7 @@ function OutreachAIGeneratePanel({
                     </div>
                   </div>
                   <div>
-                    <div style={{ fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 8 }}>{lang === "fr" ? "Plateforme" : "Platform"}</div>
+                    <div style={{ fontSize: 12, fontWeight: 500, color: "var(--ws-text-dim)", marginBottom: 8 }}>{lang === "fr" ? "Plateforme" : "Platform"}</div>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                       {platforms.map((p) => {
                         const isActive = platform === p;
@@ -1076,7 +1136,7 @@ function OutreachAIGeneratePanel({
                   {platform === "Email" && (
                     <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 12 }}>
                       <div>
-                        <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6 }}>
+                        <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "var(--ws-text-dim)", marginBottom: 6 }}>
                           {lang === "fr" ? "E-mail de la marque" : "Brand email"}
                         </label>
                         <input
@@ -1089,7 +1149,7 @@ function OutreachAIGeneratePanel({
                         />
                       </div>
                       <div>
-                        <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6 }}>
+                        <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "var(--ws-text-dim)", marginBottom: 6 }}>
                           {lang === "fr" ? "E-mail du créateur" : "Creator email"}
                         </label>
                         <input
@@ -1102,7 +1162,7 @@ function OutreachAIGeneratePanel({
                         />
                       </div>
                       <div>
-                        <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6 }}>
+                        <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "var(--ws-text-dim)", marginBottom: 6 }}>
                           {lang === "fr" ? "Objet" : "Subject"}
                         </label>
                         <input
@@ -1121,10 +1181,10 @@ function OutreachAIGeneratePanel({
                     rows={10}
                     style={{ ...inputStyle, resize: "vertical", lineHeight: 1.55, marginBottom: 8 }}
                   />
-                  <div style={{ fontSize: 12, color: "#9A9A9A", marginBottom: 16 }}>
+                  <div style={{ fontSize: 12, color: "var(--ws-text-dim)", marginBottom: 16 }}>
                     {lang === "fr" ? `${message.length} caractère${message.length > 1 ? "s" : ""}` : <>{message.length} characters</>}
                   </div>
-                  <p style={{ fontSize: 13, color: "#1A1A1A", margin: "0 0 12px", lineHeight: 1.5, letterSpacing: "-0.01em" }}>
+                  <p style={{ fontSize: 13, color: "var(--ws-text)", margin: "0 0 12px", lineHeight: 1.5, letterSpacing: "-0.01em" }}>
                     {platform === "Email"
                       ? lang === "fr"
                         ? "L'envoi ouvre votre messagerie (Gmail, Outlook ou Mail) — assurez-vous d'être connecté avec l'e-mail de la marque ci-dessus."
@@ -1165,7 +1225,7 @@ function OutreachAIGeneratePanel({
                   </div>
 
                   {showSendFlow && (
-                    <div style={{ padding: 16, background: "#FAFAFA", borderRadius: 12, border: "1px solid #EFEFEF" }}>
+                    <div style={{ padding: 16, background: "var(--ws-surface-2)", borderRadius: 12, border: "1px solid var(--ws-border)" }}>
                       {platform === "TikTok DM" && (
                         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                           <a
@@ -1259,19 +1319,19 @@ function MessageViewModal({ lang, message, creator, onClose }: { lang: "en" | "f
       onClick={onClose}
     >
       <div
-        style={{ background: "#FFFFFF", borderRadius: 16, padding: 28, maxWidth: 520, width: "100%", position: "relative", boxShadow: "0 24px 48px rgba(0,0,0,0.15)" }}
+        style={{ background: "var(--ws-surface)", borderRadius: 16, padding: 28, maxWidth: 520, width: "100%", position: "relative", boxShadow: "0 24px 48px rgba(0,0,0,0.15)" }}
         onClick={(e) => e.stopPropagation()}
       >
         <button
           type="button"
           onClick={onClose}
           aria-label={lang === "fr" ? "Fermer" : "Close"}
-          style={{ position: "absolute", top: 16, right: 16, background: "#FAFAFA", border: "1px solid #EFEFEF", borderRadius: 8, width: 32, height: 32, cursor: "pointer", fontFamily: "inherit" }}
+          style={{ position: "absolute", top: 16, right: 16, background: "var(--ws-surface-2)", border: "1px solid var(--ws-border)", borderRadius: 8, width: 32, height: 32, cursor: "pointer", fontFamily: "inherit" }}
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="#7A7A7A" strokeWidth="1.8" strokeLinecap="round" /></svg>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="var(--ws-text-muted)" strokeWidth="1.8" strokeLinecap="round" /></svg>
         </button>
         <h3 style={{ fontSize: 18, fontWeight: 600, margin: "0 0 6px", paddingRight: 32 }}>{lang === "fr" ? `Prospection auprès de ${creator}` : `Outreach to ${creator}`}</h3>
-        <p style={{ fontSize: 13, color: "#7A7A7A", margin: "0 0 16px", whiteSpace: "pre-wrap", lineHeight: 1.55 }}>{message}</p>
+        <p style={{ fontSize: 13, color: "var(--ws-text-muted)", margin: "0 0 16px", whiteSpace: "pre-wrap", lineHeight: 1.55 }}>{message}</p>
         <button type="button" style={btnSecondary} onClick={() => void navigator.clipboard.writeText(message)}>
           {lang === "fr" ? "Copier le message" : "Copy outreach"}
         </button>
@@ -1657,6 +1717,9 @@ export function OutreachHistorySection({
 
   return (
     <>
+      {AUTO_OUTREACH_ENABLED ? (
+        <AutoOutreachEntry plan={plan} onUpgrade={() => setUpgradeFeature("ai-outreach")} />
+      ) : null}
       <div className="ou-history">
         <div className="ou-history__toolbar">
           <h3 className="ou-history__title">{lang === "fr" ? "Historique" : "History"}</h3>
@@ -1696,8 +1759,8 @@ export function OutreachHistorySection({
                   right: 0,
                   left: 0,
                   marginTop: 4,
-                  background: "#FFFFFF",
-                  border: "1px solid #EFEFEF",
+                  background: "var(--ws-surface)",
+                  border: "1px solid var(--ws-border)",
                   borderRadius: 10,
                   boxShadow: "0 8px 24px rgba(0,0,0,0.1)",
                   zIndex: 20,
@@ -1706,7 +1769,7 @@ export function OutreachHistorySection({
                 }}
               >
                 {historyCreatorSuggestions.length === 0 ? (
-                  <div style={{ padding: "12px 14px", fontSize: 13, color: "#7A7A7A" }}>
+                  <div style={{ padding: "12px 14px", fontSize: 13, color: "var(--ws-text-muted)" }}>
                     {lang === "fr" ? "Aucun créateur trouvé." : "No creators found."}
                   </div>
                 ) : (
@@ -1726,8 +1789,8 @@ export function OutreachHistorySection({
                         gap: 10,
                         padding: "10px 12px",
                         border: "none",
-                        borderBottom: "1px solid #F5F5F5",
-                        background: "#FFFFFF",
+                        borderBottom: "1px solid var(--ws-border)",
+                        background: "var(--ws-surface)",
                         cursor: "pointer",
                         fontFamily: "inherit",
                         textAlign: "left",
@@ -1735,8 +1798,8 @@ export function OutreachHistorySection({
                     >
                       <CreatorAvatar src={c.avatar} username={c.username} displayName={c.displayName} size={28} alt={c.displayName} />
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 13, fontWeight: 500, color: "#1A1A1A" }}>{c.displayName}</div>
-                        <div style={{ fontSize: 12, color: "#0047FF" }}>@{c.username}</div>
+                        <div style={{ fontSize: 13, fontWeight: 500, color: "var(--ws-text)" }}>{c.displayName}</div>
+                        <div style={{ fontSize: 12, color: "var(--ws-accent)" }}>@{c.username}</div>
                       </div>
                     </button>
                   ))
@@ -1779,16 +1842,16 @@ export function OutreachHistorySection({
                     <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
                       <CreatorAvatar src={item.avatar} username={item.handle} displayName={item.creator} size={40} alt={item.creator} />
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontWeight: 600, fontSize: 14, color: "#1A1A1A" }}>{item.creator}</div>
-                        <div style={{ fontSize: 12, color: "#0047FF" }}>@{item.handle}</div>
-                        <div style={{ fontSize: 11, color: "#9A9A9A", textTransform: "capitalize" }}>
+                        <div style={{ fontWeight: 600, fontSize: 14, color: "var(--ws-text)" }}>{item.creator}</div>
+                        <div style={{ fontSize: 12, color: "var(--ws-accent)" }}>@{item.handle}</div>
+                        <div style={{ fontSize: 11, color: "var(--ws-text-dim)", textTransform: "capitalize" }}>
                           {item.platform} · {item.sentDate ? new Date(item.sentDate + "T12:00:00").toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US") : "—"}
                         </div>
                       </div>
                       <div style={{ flexShrink: 0 }}>{outreachStatusBadge(item.status, lang)}</div>
                     </div>
                     {item.message && (
-                      <div style={{ fontSize: 12, color: "#5A5A5A", background: "#F8F8F8", borderRadius: 8, padding: "8px 12px", marginBottom: 10, lineHeight: 1.4 }}>
+                      <div style={{ fontSize: 12, color: "var(--ws-text-muted)", background: "#F8F8F8", borderRadius: 8, padding: "8px 12px", marginBottom: 10, lineHeight: 1.4 }}>
                         {item.message.slice(0, 80)}
                         {item.message.length > 80 ? "..." : ""}
                       </div>
@@ -1823,7 +1886,7 @@ export function OutreachHistorySection({
                   padding: "10px 4px 12px",
                   fontSize: 11,
                   fontWeight: 600,
-                  color: "var(--ws-text-muted, #9A9A9A)",
+                  color: "var(--ws-text-muted, var(--ws-text-dim))",
                   letterSpacing: "0.04em",
                   textTransform: "uppercase",
                 }}
@@ -1850,22 +1913,22 @@ export function OutreachHistorySection({
                       gap: 10,
                       padding: "14px 16px",
                       alignItems: "center",
-                      borderTop: i === 0 ? "none" : "1px solid #F5F5F5",
+                      borderTop: i === 0 ? "none" : "1px solid var(--ws-border)",
                     }}
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
                       <CreatorAvatar src={row.avatar} username={row.handle} displayName={row.creator} size={32} alt={row.creator} />
                       <div style={{ minWidth: 0 }}>
                         <div style={{ fontSize: 13, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{row.creator}</div>
-                        <div style={{ fontSize: 12, color: "#0047FF" }}>@{row.handle}</div>
+                        <div style={{ fontSize: 12, color: "var(--ws-accent)" }}>@{row.handle}</div>
                       </div>
                     </div>
                     <div style={{ fontSize: 13, textTransform: "capitalize" }}>{row.platform}</div>
-                    <div style={{ fontSize: 12, color: "#7A7A7A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <div style={{ fontSize: 12, color: "var(--ws-text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {row.message.slice(0, 60)}
                       {row.message.length > 60 ? "…" : ""}
                     </div>
-                    <div style={{ fontSize: 12, color: "#7A7A7A" }}>{formatSentDate(row.sentDate, lang)}</div>
+                    <div style={{ fontSize: 12, color: "var(--ws-text-muted)" }}>{formatSentDate(row.sentDate, lang)}</div>
                     <div>{outreachStatusBadge(row.status, lang)}</div>
                     <div style={{ fontSize: 11, color: "#EA580C" }}>
                       {row.followUpDate ? `${lang === "fr" ? "Relance :" : "Follow up:"} ${formatFollowUpDate(row.followUpDate, lang)}` : row.status === "replied" || row.status === "converted" ? "—" : "—"}
@@ -1900,9 +1963,9 @@ export function OutreachHistorySection({
         const showMarkReplied = manageEntry.status === "sent" || manageEntry.status === "opened" || manageEntry.status === "no_response";
         return (
           <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => setManageEntry(null)}>
-            <div style={{ background: "#fff", borderRadius: 16, padding: 24, maxWidth: 420, width: "100%", position: "relative" }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ background: "var(--ws-surface)", borderRadius: 16, padding: 24, maxWidth: 420, width: "100%", position: "relative" }} onClick={(e) => e.stopPropagation()}>
               <div style={{ fontWeight: 600, fontSize: 16, marginBottom: 4 }}>{lang === "fr" ? "Gérer la prospection" : "Manage the outreach"}</div>
-              <div style={{ fontSize: 13, color: "#7A7A7A", marginBottom: 20 }}>{manageEntry.creator} · @{manageEntry.handle}</div>
+              <div style={{ fontSize: 13, color: "var(--ws-text-muted)", marginBottom: 20 }}>{manageEntry.creator} · @{manageEntry.handle}</div>
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 <button
                   type="button"
@@ -1938,14 +2001,14 @@ export function OutreachHistorySection({
 
       {viewingMessage && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => setViewingMessage(null)}>
-          <div style={{ background: "#fff", borderRadius: 16, padding: 24, maxWidth: 500, width: "100%", position: "relative" }} onClick={(e) => e.stopPropagation()}>
+          <div style={{ background: "var(--ws-surface)", borderRadius: 16, padding: 24, maxWidth: 500, width: "100%", position: "relative" }} onClick={(e) => e.stopPropagation()}>
             <div style={{ fontWeight: 600, fontSize: 16, marginBottom: 16 }}>{lang === "fr" ? "Message envoyé" : "Outreach sent"}</div>
-            <p style={{ fontSize: 14, lineHeight: 1.6, color: "#1A1A1A", whiteSpace: "pre-wrap" }}>{viewingMessage}</p>
+            <p style={{ fontSize: 14, lineHeight: 1.6, color: "var(--ws-text)", whiteSpace: "pre-wrap" }}>{viewingMessage}</p>
             <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-              <button type="button" onClick={() => { navigator.clipboard.writeText(viewingMessage); }} style={{ flex: 1, padding: "10px", background: "#F5F5F5", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>
+              <button type="button" onClick={() => { navigator.clipboard.writeText(viewingMessage); }} style={{ flex: 1, padding: "10px", background: "var(--ws-hover)", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>
                 {lang === "fr" ? "Copier" : "Copy"}
               </button>
-              <button type="button" onClick={() => setViewingMessage(null)} style={{ flex: 1, padding: "10px", background: "#1A1A1A", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>
+              <button type="button" onClick={() => setViewingMessage(null)} style={{ flex: 1, padding: "10px", background: "var(--ws-btn)", color: "var(--ws-btn-text)", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>
                 {lang === "fr" ? "Fermer" : "Close"}
               </button>
             </div>

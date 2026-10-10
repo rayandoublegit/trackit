@@ -1,5 +1,5 @@
 /* ── Creator profile page ───────── */
-.cp { display: flex; flex-direction: column; gap: 16px; padding: 18px 28px 48px; animation: cp-in .35s cubic-bezier(.2, .8, .2, 1) both; }
+.cp { display: flex; flex-direction: column; gap: 16px; padding: 18px 28px 48px; animation: cp-in .35s cubic-bezier(.2, .8, .2, 1) backwards; }
 .cp-top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding-bottom: 14px; border-bottom: 1px solid var(--ws-border); }
 .cp-back { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 36px; height: 36px; padding: 0 8px; border: 1px solid var(--ws-border); border-radius: 10px; background: var(--ws-surface); color: var(--ws-text); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
 .cp-back:hover { border-color: var(--ws-border-strong); }
@@ -23,7 +23,7 @@
 .cp-bio { margin: 0; max-width: 760px; font-size: 13.5px; line-height: 1.5; color: var(--ws-text-muted); white-space: pre-line; }
 
 .cp-kpis { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
-.cp-kpi { display: flex; flex-direction: column; gap: 8px; padding: 16px 18px; border-radius: 16px; border: 1px solid var(--ws-border); background: var(--ws-surface); animation: cp-in .45s cubic-bezier(.2, .8, .2, 1) both; animation-delay: calc(var(--i) * 60ms); }
+.cp-kpi { display: flex; flex-direction: column; gap: 8px; padding: 16px 18px; border-radius: 16px; border: 1px solid var(--ws-border); background: var(--ws-surface); animation: cp-in .45s cubic-bezier(.2, .8, .2, 1) backwards; animation-delay: calc(var(--i) * 60ms); }
 .cp-kpi__top { display: flex; align-items: center; justify-content: space-between; font-size: 12.5px; font-weight: 550; color: var(--ws-text-muted); }
 .cp-kpi__icon { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 9px; background: var(--ws-accent-soft); color: var(--ws-accent); }
 .cp-kpi__value { font-size: 26px; font-weight: 750; letter-spacing: -.05em; line-height: 1; color: var(--ws-text); font-variant-numeric: tabular-nums; }

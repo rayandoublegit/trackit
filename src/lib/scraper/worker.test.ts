@@ -43,6 +43,7 @@ describe("queue worker", () => {
   });
 
   it("drains refresh and discovery jobs and logs calls per provider", async () => {
+    db.put("creators_index", { username: "luna.beauty", platform: "tiktok" });
     db.put("scrape_jobs", job("creator_refresh", "tiktok", "luna.beauty"));
     db.put("scrape_jobs", job("creator_discover", "instagram", "fashion"));
     const s = await runScrapeWorker(db.asClient(), { budget: 60, concurrency: 2 });
@@ -50,9 +51,11 @@ describe("queue worker", () => {
     expect(s.callsByProvider).toEqual({ "scrapecreators-instagram": 1, "scrapecreators-tiktok": 2 });
     const run = db.table("scrape_runs")[0];
     expect(run).toMatchObject({ api_calls: 3, jobs_done: 2, creators_new: 2 });
-    expect(run.notes).toMatchObject({ refreshJobs: 1, discoverJobs: 1, discovered: 2, credits: 3 });
-    // The discovered creators' first refreshes are waiting for the next pass.
-    expect(db.table("scrape_jobs").filter((j) => j.status === "queued").map((j) => j.target).sort()).toEqual(["ig_mia.style", "ig_new.ig"]);
+    // Instagram searches are counted apart from the shared search cap.
+    expect(run.notes).toMatchObject({ refreshJobs: 1, discoverJobs: 0, discoverJobsInstagram: 1, discovered: 2, credits: 3, leadsQueued: 1 });
+    // The discovered creators' first refreshes are waiting for the next pass, and the
+    // hit without a follower count is queued as a lead (looked at before it is added).
+    expect(db.table("scrape_jobs").filter((j) => j.status === "queued").map((j) => j.target).sort()).toEqual(["ig_mia.style", "ig_new.ig", "ig_no.count"]);
   });
 
   it("stops at the weekly cap without spending a call", async () => {
@@ -101,8 +104,9 @@ describe("queue worker", () => {
   });
 
   it("leaves jobs of a platform without provider in the queue at no cost", async () => {
+    // YouTube only has ScrapeCreators (TikTok and Instagram still run on RapidAPI).
     vi.stubEnv("SCRAPECREATORS_API_KEY", "");
-    db.put("scrape_jobs", job("creator_refresh", "instagram", "ig_mia"));
+    db.put("scrape_jobs", job("creator_refresh", "youtube", "yt_runclub"));
     const s = await runScrapeWorker(db.asClient(), { budget: 60, concurrency: 1 });
     expect(s).toMatchObject({ idle: true, reason: "queue empty" });
     expect(fetch.calls.filter(isApiCall)).toHaveLength(0);

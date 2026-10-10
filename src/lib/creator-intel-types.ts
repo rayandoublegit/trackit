@@ -14,6 +14,8 @@ export type LibraryVideo = {
   niche: string;
   countryCode: string | null;
   cover: string;
+  /** Tried only when `cover` fails to load (a route that refetches the cover). */
+  coverFallback?: string;
   shareUrl: string;
   caption: string;
   hashtags: string[];
@@ -53,4 +55,6 @@ export type VideoLibraryResult = {
   source: "tracked" | "snapshot";
   /** No tracked video yet, and a filter needs data only tracked videos have (format, length, product). */
   needsTracking?: boolean;
+  /** Free plan: more videos match than the plan shows (upgrade to see them). */
+  teaserLocked?: boolean;
 };

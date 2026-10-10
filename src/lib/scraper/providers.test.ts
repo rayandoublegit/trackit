@@ -112,6 +112,8 @@ describe("Instagram (ScrapeCreators)", () => {
       videoCount: 90,
       verified: false,
       category: null,
+      email: null,
+      isPrivate: false,
     });
     expect(parseInstagramProfile({ success: true, data: {} }, "ghost")).toBeNull();
   });
@@ -210,13 +212,19 @@ describe("provider choice and automatic fallback", () => {
     expect(providerOrder("tiktok").map((s) => s.name)).toEqual(["scrapecreators-tiktok"]);
   });
 
-  it("enables Instagram and YouTube with the ScrapeCreators key only", () => {
+  it("enables YouTube with the ScrapeCreators key only, Instagram with either key", () => {
     expect(enabledPlatforms()).toEqual(["tiktok", "instagram", "youtube"]);
     vi.stubEnv("SCRAPE_PLATFORMS", "tiktok");
     expect(enabledPlatforms()).toEqual(["tiktok"]);
     vi.stubEnv("SCRAPE_PLATFORMS", "");
     vi.stubEnv("SCRAPECREATORS_API_KEY", "");
+    expect(sourceFor("youtube")).toBeNull();
+    // Instagram falls back to the RapidAPI key when there is no Instagram-specific one.
+    expect(providerOrder("instagram").map((s) => s.name)).toEqual(["rapidapi-instagram"]);
+    vi.stubEnv("RAPIDAPI_KEY", "");
     expect(sourceFor("instagram")).toBeNull();
+    vi.stubEnv("RAPIDAPI_INSTAGRAM_KEY", "test-ig-key");
+    expect(sourceFor("instagram")?.name).toBe("rapidapi-instagram");
   });
 
   it("falls back to RapidAPI when ScrapeCreators is out of credits, then skips it", async () => {

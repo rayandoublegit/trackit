@@ -39,6 +39,10 @@ export interface DiscoveryCreatorResult {
   platform: string;
   bio: string;
   email: string | null;
+  /** Set by the API when the plan hides emails: the creator has one (email is then null). */
+  hasEmail?: boolean;
+  /** The plan hides creator emails (Free): show the locked chip. */
+  emailLocked?: boolean;
   niche: string;
   primaryNiche: string;
   niches?: string[];
