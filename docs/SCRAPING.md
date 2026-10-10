@@ -45,16 +45,23 @@ every video) without calling a scraping API when someone opens the app.
   `seed-niches` cron are no longer scheduled (the routes still exist for manual use;
   `seed-niches` and `enrich-creators` now write lowercase platforms).
 
-### Faster TikTok growth (2026-10-09)
+### Burst growth (2026-10-09)
 
-Defaults raised to grow TikTok faster: `SCRAPE_WEEKLY_MAX_NEW_CREATORS` 30,000
-(was 12,000), `SCRAPE_WEEKLY_MAX_DISCOVERY_KEYWORDS` 3,000 (was 1,200; searches and
-Creator Marketplace pages), `SCRAPE_WEEKLY_MAX_CREATORS` 100,000 (was 65,000),
-worker `budget=240` and `SCRAPE_CONCURRENCY` 8. At most ~34,500 jobs a day.
-Cost at full speed: a new TikTok creator is ~2 calls plus 1 per 20 from
-Marketplace pages, so 30,000 new creators a week is about 63,000 extra calls a
-week on ScrapeCreators. Lower the env caps if credits run short; the worker
-stops a platform cleanly when its provider is out of credits.
+Defaults raised for a burst toward 100,000 creators: `SCRAPE_WEEKLY_MAX_NEW_CREATORS`
+100,000 (was 12,000), `SCRAPE_WEEKLY_MAX_DISCOVERY_KEYWORDS` 8,000 (was 1,200;
+searches and Creator Marketplace pages), `SCRAPE_WEEKLY_MAX_CREATORS` 150,000
+(was 65,000), worker `budget=240` and `SCRAPE_CONCURRENCY` 8 (~34,500 jobs a day),
+Instagram seed `searches=4000` a week.
+
+- Creator Marketplace walks run one page per walk per pass (216 walks): listing
+  rows appear within about a day; every new creator then needs its first refresh
+  (2 calls), so full data for 100,000 new TikTok creators takes 3-4 days and
+  about 200,000 ScrapeCreators credits.
+- The Instagram call caps now count RapidAPI Instagram calls only and apply only
+  when RapidAPI is the first Instagram provider: ScrapeCreators Instagram is
+  limited by its own credits.
+- Lower the env caps when credits run short; a provider out of credits stops
+  its platform cleanly.
 
 ## When is a creator refreshed
 

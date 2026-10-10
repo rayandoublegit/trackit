@@ -42,7 +42,7 @@
       "schedule": "5 0 * * 1"
     },
     {
-      "path": "/api/cron/scrape/instagram-seed?searches=700",
+      "path": "/api/cron/scrape/instagram-seed?searches=4000",
       "schedule": "10 0 * * 1"
     },
     {

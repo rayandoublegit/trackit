@@ -14,7 +14,7 @@ import {
 import { isMarketTarget } from "./marketplace";
 import { normalizePlatform } from "./identity";
 import { trackedIntervalDays } from "./schedule";
-import { AllProvidersFailed, enabledPlatforms, sourceFor } from "./sources";
+import { AllProvidersFailed, enabledPlatforms, providerOrder, sourceFor } from "./sources";
 import { CallMeter, type CreatorSource, type ScrapePlatform } from "./types";
 
 // The queue worker. It runs often (every 10 minutes) and only spends API
@@ -193,6 +193,7 @@ export async function runScrapeWorker(admin: SupabaseClient, opts: WorkerOptions
   const nextWeek = new Date(weekStart().getTime() + 7 * 86_400_000).toISOString();
   let sharedSearchesLeft = left.discoveryKeywords;
   let igReserved = 0;
+  const igCapped = providerOrder("instagram")[0]?.name === "rapidapi-instagram";
   // Platforms whose every provider is out of credits (or refuses the key): their jobs go back untouched.
   const stopped = new Set<ScrapePlatform>();
 
@@ -226,7 +227,8 @@ export async function runScrapeWorker(admin: SupabaseClient, opts: WorkerOptions
       sharedSearchesLeft -= 1;
     }
     // Instagram: reserve the calls this job may spend, or wait for the next window.
-    const igNeed = platform !== "instagram" ? 0 : discover ? 1 : source.callsPerRefresh + (similarCalls ? 1 : 0);
+    // Only when RapidAPI serves Instagram first: ScrapeCreators is outside the RapidAPI plan.
+    const igNeed = platform !== "instagram" || !igCapped ? 0 : discover ? 1 : source.callsPerRefresh + (similarCalls ? 1 : 0);
     if (igNeed && ig) {
       if (igReserved + igNeed > ig.left) {
         handBackAt.push({ job, at: ig.retryAt });

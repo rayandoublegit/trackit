@@ -6,9 +6,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 // added), so the caps hold across every invocation of the week.
 //
 // Defaults are sized to grow the base to 100,000+ creators (docs/SCRAPING.md):
-//   SCRAPE_WEEKLY_MAX_CREATORS            creator refreshes per week (default 100,000)
-//   SCRAPE_WEEKLY_MAX_DISCOVERY_KEYWORDS  searches + Creator Marketplace pages per week (default 3,000)
-//   SCRAPE_WEEKLY_MAX_NEW_CREATORS        new creators discovery may add per week (default 30,000)
+//   SCRAPE_WEEKLY_MAX_CREATORS            creator refreshes per week (default 150,000)
+//   SCRAPE_WEEKLY_MAX_DISCOVERY_KEYWORDS  searches + Creator Marketplace pages per week (default 8,000)
+//   SCRAPE_WEEKLY_MAX_NEW_CREATORS        new creators discovery may add per week (default 100,000)
 
 const DAY = 86_400_000;
 const WEEK = 7 * DAY;
@@ -25,9 +25,9 @@ export type WeeklyCaps = { refreshes: number; discoveryKeywords: number; newCrea
 
 export function weeklyCaps(): WeeklyCaps {
   return {
-    refreshes: envInt("SCRAPE_WEEKLY_MAX_CREATORS", 100_000),
-    discoveryKeywords: envInt("SCRAPE_WEEKLY_MAX_DISCOVERY_KEYWORDS", 3_000),
-    newCreators: envInt("SCRAPE_WEEKLY_MAX_NEW_CREATORS", 30_000),
+    refreshes: envInt("SCRAPE_WEEKLY_MAX_CREATORS", 150_000),
+    discoveryKeywords: envInt("SCRAPE_WEEKLY_MAX_DISCOVERY_KEYWORDS", 8_000),
+    newCreators: envInt("SCRAPE_WEEKLY_MAX_NEW_CREATORS", 100_000),
   };
 }
 
@@ -94,8 +94,10 @@ export async function weeklyUsage(admin: SupabaseClient, nowMs = Date.now()): Pr
 //   SCRAPE_INSTAGRAM_MAX_CALLS_PER_WEEK   calls per week (Monday 00:00 UTC), default 11,000
 //   SCRAPE_INSTAGRAM_MAX_CALLS_PER_30D    calls over the last 30 days (rolling, so no
 //                                         billing period can go over), default 45,000
-// They count every Instagram provider's calls (notes.callsByProvider keys
-// ending in "-instagram"). Raise both after upgrading the plan.
+// They count the RapidAPI Instagram calls only (notes.callsByProvider key
+// "rapidapi-instagram"): ScrapeCreators credits are not part of that plan, so
+// Instagram served by ScrapeCreators is not held back. Raise both after
+// upgrading the plan.
 
 export type InstagramCaps = { perWeek: number; per30d: number };
 
@@ -106,7 +108,8 @@ export function instagramCaps(): InstagramCaps {
   };
 }
 
-export const isInstagramProvider = (name: string) => /(^|[-_])instagram$/.test(name);
+/** The provider whose requests the Instagram caps protect (the RapidAPI plan). */
+export const isInstagramProvider = (name: string) => name === "rapidapi-instagram";
 
 export function instagramCalls(callsByProvider: Record<string, number>): number {
   return Object.entries(callsByProvider).reduce((sum, [k, v]) => sum + (isInstagramProvider(k) ? v : 0), 0);

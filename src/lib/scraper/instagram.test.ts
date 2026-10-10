@@ -298,7 +298,7 @@ describe("Instagram call caps", () => {
     vi.stubEnv("SCRAPE_INSTAGRAM_MAX_CALLS_PER_30D", "1100");
     const a = await instagramAllowance(db.asClient(), now);
     expect(a).toMatchObject({ usedWeek: 100, used30d: 140, left: 900 });
-    expect(instagramCalls({ "rapidapi-instagram": 2, "scrapecreators-instagram": 3, "rapidapi-tiktok": 9 })).toBe(5);
+    expect(instagramCalls({ "rapidapi-instagram": 2, "scrapecreators-instagram": 3, "rapidapi-tiktok": 9 })).toBe(2);
   });
 
   it("holds Instagram jobs back when the plan's calls are used up, without a call", async () => {
