@@ -5,10 +5,11 @@ import { weeklyDiscoveryPlan } from "@/lib/scraper/discovery-plan";
 import { normalizePlatform } from "@/lib/scraper/identity";
 import { enabledPlatforms } from "@/lib/scraper/sources";
 import { marketSeeds, marketTarget } from "@/lib/scraper/marketplace";
+import { queueJobs } from "@/lib/scraper/queue-insert";
 import type { ScrapePlatform } from "@/lib/scraper/types";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 /**
  * /api/cron/scrape/weekly-discovery — Mondays. Queues this week's keyword
@@ -56,24 +57,18 @@ export async function GET(request: Request) {
   // walk queues its own next pages while they bring new creators.
   let marketQueued = 0;
   if (platforms.includes("tiktok") && process.env.SCRAPECREATORS_API_KEY && params.get("market") !== "0") {
-    for (const seed of marketSeeds()) {
-      if (marketQueued >= max) break;
-      const { error } = await admin
-        .from("scrape_jobs")
-        .insert({ kind: "creator_discover", platform: "tiktok", target: marketTarget(seed), priority: seed.country === "FR" ? 1 : 2 });
-      if (!error) marketQueued += 1;
-    }
+    const seeds = marketSeeds().slice(0, Math.max(0, max));
+    marketQueued = await queueJobs(
+      admin,
+      seeds.map((seed) => ({ kind: "creator_discover", platform: "tiktok", target: marketTarget(seed), priority: seed.country === "FR" ? 1 : 2 })),
+    );
     max -= marketQueued;
   }
   const extra = (params.get("discover") || "").split(",").map((k) => k.trim()).filter(Boolean).slice(0, 50);
   const plan = weeklyDiscoveryPlan({ platforms, maxKeywords: max, weekIndex: weekIndex(), extra });
 
-  let queued = 0;
-  for (const item of plan) {
-    // One live job per keyword and platform: a duplicate insert is refused, which is fine.
-    const { error } = await admin.from("scrape_jobs").insert({ kind: "creator_discover", platform: item.platform, target: item.keyword, priority: 2 });
-    if (!error) queued += 1;
-  }
+  // One live job per keyword and platform; inserted in batches (thousands of keywords once the caps are lifted).
+  const queued = await queueJobs(admin, plan.map((item) => ({ kind: "creator_discover", platform: item.platform, target: item.keyword, priority: 2 })));
   await admin.from("scrape_runs").insert({
     trigger: "weekly-discovery",
     finished_at: new Date().toISOString(),
