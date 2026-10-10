@@ -1,4 +1,8 @@
 export const GIFT_STATUSES = [
+  // A creator applied through the campaign's public link; the brand has not reviewed it yet.
+  "applied",
+  // The brand declined the application. Final.
+  "rejected",
   "invited",
   "accepted",
   "declined",
@@ -58,6 +62,12 @@ export type GiftMission = {
 export type GiftAction =
   | { type: "accept" }
   | { type: "decline" }
+  /** Brand: an application (status applied) becomes an offer (invited); the usual flow follows. */
+  | { type: "approve_application" }
+  /** Brand: the application is declined (rejected, final). */
+  | { type: "decline_application" }
+  /** Creator: takes back an application before the brand reviews it (declined, final). */
+  | { type: "withdraw" }
   | { type: "sign"; name: string; consent: boolean; address: ShippingAddress }
   | { type: "ship"; carrier: string; trackingNumber: string }
   | { type: "deliver" }
@@ -274,6 +284,18 @@ export function applyGiftAction(mission: GiftMission, action: GiftAction, now: s
       return next;
     case "decline":
       if (next.status !== "invited") throw new GiftRuleError("This mission can no longer be declined.");
+      next.status = "declined";
+      return next;
+    case "approve_application":
+      if (next.status !== "applied") throw new GiftRuleError("This application was already reviewed.");
+      next.status = "invited";
+      return next;
+    case "decline_application":
+      if (next.status !== "applied") throw new GiftRuleError("This application was already reviewed.");
+      next.status = "rejected";
+      return next;
+    case "withdraw":
+      if (next.status !== "applied") throw new GiftRuleError("This application can no longer be withdrawn.");
       next.status = "declined";
       return next;
     case "sign": {

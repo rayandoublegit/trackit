@@ -3,7 +3,7 @@ import type { Lang } from "@/lib/useLang";
 // Every word of the creator app, in both languages. Creators are addressed
 // with "tu" in French, like most creator platforms.
 
-export type MissionStage = "invited" | "accepted" | "signed" | "shipped" | "delivered" | "submitted" | "changes" | "approved" | "declined";
+export type MissionStage = "applied" | "rejected" | "invited" | "accepted" | "signed" | "shipped" | "delivered" | "submitted" | "changes" | "approved" | "declined";
 export type SlotStatus = "empty" | "pending" | "changes_requested" | "approved";
 
 const EN = {
@@ -37,6 +37,8 @@ const EN = {
   step: (i: number, n: number) => `Step ${i}/${n}`,
   contentsProgress: (done: number, total: number) => `${done}/${total} ${total === 1 ? "content" : "contents"} sent`,
   stages: {
+    applied: "Application sent",
+    rejected: "Not selected this time",
     invited: "Invitation received",
     accepted: "Contract to sign",
     signed: "The brand is preparing your parcel",
@@ -56,6 +58,8 @@ const EN = {
     waiting: "See the mission",
   },
   waitingNote: {
+    applied: "Nothing to do: the brand reviews your application. The answer shows up here.",
+    rejected: "The brand didn’t pick your profile for this campaign. Other brands will.",
     signed: "Nothing to do: the brand ships soon.",
     submitted: "Nothing to do: the brand is reviewing your content.",
     approved: "Well done. This mission is complete.",
@@ -71,6 +75,9 @@ const EN = {
   accept: "Accept the mission",
   decline: "Decline",
   declineConfirm: "Decline this mission? The brand will be told.",
+  acceptedApplication: "Application accepted: accept the mission to sign",
+  withdraw: "Withdraw my application",
+  withdrawConfirm: "Withdraw your application? The brand will no longer see it.",
   fullName: "First and last name",
   street: "Street and number",
   postalCode: "Postal code",
@@ -154,6 +161,8 @@ const FR: Copy = {
   step: (i, n) => `Étape ${i}/${n}`,
   contentsProgress: (done, total) => `${done}/${total} ${total > 1 ? "contenus envoyés" : "contenu envoyé"}`,
   stages: {
+    applied: "Candidature envoyée",
+    rejected: "Candidature non retenue",
     invited: "Invitation reçue",
     accepted: "Contrat à signer",
     signed: "La marque prépare ton colis",
@@ -173,6 +182,8 @@ const FR: Copy = {
     waiting: "Voir la mission",
   },
   waitingNote: {
+    applied: "Rien à faire : la marque regarde ta candidature. La réponse arrive ici.",
+    rejected: "La marque n’a pas retenu ton profil pour cette campagne. D’autres marques le feront.",
     signed: "Rien à faire : la marque expédie bientôt.",
     submitted: "Rien à faire : la marque regarde ton contenu.",
     approved: "Bravo, cette mission est terminée.",
@@ -188,6 +199,9 @@ const FR: Copy = {
   accept: "Accepter la mission",
   decline: "Refuser",
   declineConfirm: "Refuser cette mission ? La marque sera prévenue.",
+  acceptedApplication: "Candidature acceptée : accepte la mission pour signer",
+  withdraw: "Retirer ma candidature",
+  withdrawConfirm: "Retirer ta candidature ? La marque ne la verra plus.",
   fullName: "Prénom et nom",
   street: "Numéro et rue",
   postalCode: "Code postal",

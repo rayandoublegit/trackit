@@ -204,11 +204,16 @@ check("approved with approvedAt set (start of ad rights)", mission.status === "a
 check("single-video mission: row at position 1, kind video, mission approved_at stored", video.position === 1 && video.kind === "video" && Boolean(mission.approved_at));
 await rejects("an approved mission cannot be approved again", { type: "approve" });
 
-// ── Declined path
+// ── Declined path (its own campaign: one mission per creator per campaign)
+const declineCampaign = await one(
+  `insert into public.gift_campaigns (user_id, workspace_id, name, product, brief, deadline)
+   values ($1,$1,'Refus','Sérum','Brief','2026-10-30') returning id`,
+  [brand],
+);
 const m2 = await one(
   `insert into public.gift_missions (campaign_id, user_id, workspace_id, creator_handle, creator_platform, creator_user_id, contract_text)
    values ($1,$2,$2,'lea.other','instagram',$3,$4) returning *`,
-  [campaign.id, brand, creator, contract],
+  [declineCampaign.id, brand, creator, contract],
 );
 const saved = mission;
 mission = m2;
@@ -333,7 +338,8 @@ check("admin_audit_log exists and is closed to browsers", /permission denied/i.t
 const MANUAL = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "supabase", "manual", "2026-09-29_enable_gifting_audit_sessions.sql");
 const prodLike = await freshDb();
 // The multi-content migration comes after: it needs the gift tables from the manual script.
-const missingInProd = ["user_sessions", "_gifting.sql", "gifting_private_media", "admin_audit_log", MULTI_CONTENT];
+// 000051 (share links) also needs the gift tables; gifting-share-links.mts covers it on live data.
+const missingInProd = ["user_sessions", "_gifting.sql", "gifting_private_media", "admin_audit_log", MULTI_CONTENT, "gifting_share_links"];
 const prodFailures = await migrate(prodLike, (f) => missingInProd.some((m) => f.includes(m)));
 let scriptError = "";
 try {

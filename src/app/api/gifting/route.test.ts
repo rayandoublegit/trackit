@@ -380,3 +380,112 @@ describe("several contents per mission", () => {
     expect(bad.status).toBe(400);
   });
 });
+
+describe("gift campaigns with a share link and applications", () => {
+  const spaceId = "55555555-5555-4555-8555-555555555555";
+  const creatorId = "66666666-6666-4666-8666-666666666666";
+  const application = {
+    ...unclaimedMission,
+    id: "77777777-7777-4777-8777-777777777777",
+    user_id: actorId,
+    workspace_id: spaceId,
+    creator_user_id: creatorId,
+    status: "applied",
+    revision: 4,
+    source: "link",
+  };
+  const post = (body: Record<string, unknown>) =>
+    POST(new NextRequest("http://localhost/api/gifting", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }));
+
+  beforeEach(() => {
+    commit.mockClear();
+    tables.gift_missions = [application];
+    tables.gift_videos = [];
+    tables.creator_links = [];
+    tables.gift_campaigns = [{ id: unclaimedMission.campaign_id, user_id: actorId, workspace_id: spaceId, name: "Routine", video_count: 1 }];
+  });
+
+  it("creates the campaign at once, open, with an unguessable share token and no creator handle", async () => {
+    tables.profiles = [{ id: actorId, account_type: "brand", plan: "free" }];
+    vi.mocked(requireBrandSpace).mockResolvedValue({ ownerId: actorId, spaceId });
+    const response = await post({
+      op: "create_campaign",
+      name: "Routine",
+      product: "Sérum",
+      brief: "Montre la texture.",
+      deadline: "2999-01-01",
+      spots: 8,
+      autoApprove: true,
+      allowAds: false,
+    });
+    expect(response.status).toBe(200);
+    const { campaign } = await response.json();
+    expect(campaign).toMatchObject({ status: "active", share_enabled: true, spots: 8, auto_approve: true, user_id: actorId, workspace_id: spaceId });
+    expect(campaign.share_token).toMatch(/^[A-Za-z0-9_-]{32}$/);
+  });
+
+  it("refuses an invalid campaign with a clear rule error", async () => {
+    tables.profiles = [{ id: actorId, account_type: "brand", plan: "pro" }];
+    vi.mocked(requireBrandSpace).mockResolvedValue({ ownerId: actorId, spaceId });
+    const response = await post({ op: "create_campaign", name: "R", product: "P", brief: "B", deadline: "2020-01-01", allowAds: false });
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toBe("Deadline is in the past.");
+  });
+
+  it("lets only the brand that owns the campaign regenerate or pause its link", async () => {
+    tables.profiles = [{ id: actorId, account_type: "brand", plan: "pro" }];
+    vi.mocked(requireBrandSpace).mockResolvedValue({ ownerId: actorId, spaceId: "99999999-9999-4999-8999-999999999999" });
+    const other = await post({ op: "share_link", campaignId: unclaimedMission.campaign_id, action: "regenerate" });
+    expect(other.status).toBe(404);
+    vi.mocked(requireBrandSpace).mockResolvedValue({ ownerId: actorId, spaceId });
+    const ok = await post({ op: "share_link", campaignId: unclaimedMission.campaign_id, action: "disable" });
+    expect(ok.status).toBe(200);
+    const bad = await post({ op: "share_link", campaignId: unclaimedMission.campaign_id, action: "explode" });
+    expect(bad.status).toBe(400);
+  });
+
+  it("does not let the applicant (or any creator) approve an application", async () => {
+    tables.profiles = [{ id: actorId, account_type: "creator" }];
+    vi.mocked(requireBrandSpace).mockResolvedValue({ error: new Response(null, { status: 403 }) } as never);
+    const response = await post({ op: "act", missionId: application.id, action: { type: "approve_application" } });
+    expect(response.status).toBe(403);
+    expect(commit).not.toHaveBeenCalled();
+  });
+
+  it("brand approval goes through the locked review function with the revision, then activates the creator link", async () => {
+    tables.profiles = [{ id: actorId, account_type: "brand" }];
+    vi.mocked(requireBrandSpace).mockResolvedValue({ ownerId: actorId, spaceId });
+    commit.mockResolvedValueOnce({ data: "ok" as never, error: null });
+    const response = await post({ op: "act", missionId: application.id, action: { type: "approve_application" } });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true, status: "invited" });
+    expect(commit).toHaveBeenCalledWith("gift_review_application", { p_mission_id: application.id, p_expected_revision: 4, p_status: "invited" });
+  });
+
+  it("maps a full campaign and a stale review to 409, and refuses reviewing a non-application", async () => {
+    tables.profiles = [{ id: actorId, account_type: "brand" }];
+    vi.mocked(requireBrandSpace).mockResolvedValue({ ownerId: actorId, spaceId });
+    commit.mockResolvedValueOnce({ data: "full" as never, error: null });
+    const full = await post({ op: "act", missionId: application.id, action: { type: "approve_application" } });
+    expect(full.status).toBe(409);
+    expect((await full.json()).error).toBe("Every spot of this campaign is taken.");
+    commit.mockResolvedValueOnce({ data: "stale" as never, error: null });
+    expect((await post({ op: "act", missionId: application.id, action: { type: "decline_application" } })).status).toBe(409);
+    tables.gift_missions = [{ ...application, status: "invited" }];
+    commit.mockClear();
+    const notApplied = await post({ op: "act", missionId: application.id, action: { type: "approve_application" } });
+    expect(notApplied.status).toBe(400);
+    expect(commit).not.toHaveBeenCalled();
+  });
+
+  it("lets the applicant withdraw, but not someone else", async () => {
+    tables.profiles = [{ id: actorId, account_type: "creator" }];
+    vi.mocked(requireBrandSpace).mockResolvedValue({ error: new Response(null, { status: 403 }) } as never);
+    tables.gift_missions = [{ ...application, creator_user_id: actorId }];
+    const own = await post({ op: "act", missionId: application.id, action: { type: "withdraw" } });
+    expect(own.status).toBe(200);
+    expect(commit).toHaveBeenCalledWith("gift_commit_mission_action", expect.objectContaining({ p_mission: expect.objectContaining({ status: "declined" }) }));
+    tables.gift_missions = [application];
+    expect((await post({ op: "act", missionId: application.id, action: { type: "withdraw" } })).status).toBe(403);
+  });
+});

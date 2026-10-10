@@ -18,6 +18,9 @@ import {
   type ShippingAddress,
 } from "@/lib/gifting";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { generateGiftShareToken, parseGiftCampaignInput, todayIso } from "@/lib/gift-share";
+import { brandPublicIdentity, giftProductImagePrefix } from "@/lib/gift-share-server";
+import { activateGiftCreatorLink } from "@/lib/gift-apply-server";
 
 export const dynamic = "force-dynamic";
 
@@ -105,8 +108,12 @@ async function brandNames(admin: NonNullable<ReturnType<typeof getSupabaseAdmin>
   return names;
 }
 
-const BRAND_ACTIONS = new Set(["ship", "deliver", "approve", "request_changes"]);
-const CREATOR_ACTIONS = new Set(["accept", "decline", "sign", "deliver", "submit"]);
+const BRAND_ACTIONS = new Set(["ship", "deliver", "approve", "request_changes", "approve_application", "decline_application"]);
+const CREATOR_ACTIONS = new Set(["accept", "decline", "sign", "deliver", "submit", "withdraw"]);
+const REVIEW_ACTIONS = new Set(["approve_application", "decline_application"]);
+
+/** Campaign fields a creator sees on a mission: never the owner's workspace, token or settings. */
+const CREATOR_CAMPAIGN_FIELDS = ["id", "user_id", "name", "product", "deadline", "video_count", "brief", "offer", "product_images"] as const;
 
 type ContentLookup = { status?: string | null; storage_path?: string | null; kind?: string | null };
 
@@ -152,23 +159,15 @@ export async function GET(request: NextRequest) {
         ? admin.from("gift_videos").select("*").in("mission_id", ids)
         : Promise.resolve({ data: [], error: null }),
       campaignIds.length
-        ? admin
-            .from("gift_campaigns")
-            .select("id, user_id, name, product, deadline, video_count, brief")
-            .in("id", campaignIds)
+        ? admin.from("gift_campaigns").select("*").in("id", campaignIds)
         : Promise.resolve({ data: [], error: null }),
     ]);
     if (videos.error) return NextResponse.json({ error: videos.error.message }, { status: 500 });
     if (campaigns.error) return NextResponse.json({ error: campaigns.error.message }, { status: 500 });
-    const campaignRows = (campaigns.data ?? []) as {
-      id: string;
-      user_id: string;
-      name: string;
-      product: string;
-      deadline: string;
-      video_count: number;
-      brief: string;
-    }[];
+    const campaignRows = ((campaigns.data ?? []) as Record<string, unknown>[]).map((row) => {
+      const picked = Object.fromEntries(CREATOR_CAMPAIGN_FIELDS.map((key) => [key, row[key] ?? null]));
+      return picked as { id: string; user_id: string; name: string; product: string; deadline: string; video_count: number; brief: string; offer: string | null; product_images: string[] | null };
+    });
     const names = await brandNames(admin, [...new Set(campaignRows.map((c) => c.user_id))]);
     return NextResponse.json({
       role: "creator",
@@ -207,8 +206,10 @@ export async function GET(request: NextRequest) {
   ]);
   if (items.error) return NextResponse.json({ error: items.error.message }, { status: 500 });
   if (videos.error) return NextResponse.json({ error: videos.error.message }, { status: 500 });
+  const brand = await brandPublicIdentity(admin, { user_id: ownerId, workspace_id: spaceId }).catch(() => ({ name: null }));
   return NextResponse.json({
     role: "brand",
+    brandName: brand.name ?? "",
     wishlists: wishlists.data ?? [],
     items: items.data ?? [],
     campaigns: campaigns.data ?? [],
@@ -288,29 +289,66 @@ export async function POST(request: NextRequest) {
     }
 
     if (op === "create_campaign") {
-      const name = String(body.name ?? "").trim();
-      const product = String(body.product ?? "").trim();
-      const brief = String(body.brief ?? "").trim();
-      const deadline = String(body.deadline ?? "").trim();
-      if (!name || !product || !brief || !deadline) {
-        return NextResponse.json({ error: "Name, product, brief and deadline are required." }, { status: 400 });
-      }
-      const rights = parseGiftCampaignRights(body);
+      // Created open, with its share link: no creator needed to start.
+      const input = parseGiftCampaignInput(body, { today: todayIso(), imagePrefix: giftProductImagePrefix(ownerId) });
       const { data, error } = await admin
         .from("gift_campaigns")
         .insert({
           user_id: ownerId,
           workspace_id: spaceId,
-          name,
-          product,
-          brief,
-          deadline,
-          video_count: giftExpectedCount(body.videoCount ?? body.contentCount),
-          fixed_fee_cents: Math.max(0, Math.round(Number(body.fixedFeeCents) || 0)),
-          allow_ads: rights.allowAds,
-          rights_days: rights.rightsDays,
-          territories: rights.territories,
+          status: "active",
+          name: input.name,
+          product: input.product,
+          brief: input.brief,
+          deadline: input.deadline,
+          video_count: input.videoCount,
+          fixed_fee_cents: input.fixedFeeCents,
+          allow_ads: input.allowAds,
+          rights_days: input.rightsDays,
+          territories: input.territories,
+          share_token: generateGiftShareToken(),
+          share_enabled: true,
+          spots: input.spots,
+          auto_approve: input.autoApprove,
+          offer: input.offer,
+          product_value_cents: input.productValueCents,
+          product_images: input.productImages,
+          min_followers: input.minFollowers,
+          platforms: input.platforms,
+          countries: input.countries,
         })
+        .select()
+        .single();
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ campaign: data });
+    }
+
+    if (op === "share_link" || op === "campaign_status") {
+      const { data: campaign } = await admin
+        .from("gift_campaigns")
+        .select("id")
+        .eq("id", String(body.campaignId ?? ""))
+        .eq("user_id", ownerId)
+        .eq("workspace_id", spaceId)
+        .maybeSingle();
+      if (!campaign) return NextResponse.json({ error: "Campaign not found." }, { status: 404 });
+      let patch: Record<string, unknown>;
+      if (op === "campaign_status") {
+        const status = String(body.status ?? "");
+        if (status !== "active" && status !== "completed") return NextResponse.json({ error: "Unknown operation." }, { status: 400 });
+        patch = { status };
+      } else {
+        const action = String(body.action ?? "");
+        if (action === "regenerate") patch = { share_token: generateGiftShareToken(), share_enabled: true };
+        else if (action === "disable") patch = { share_enabled: false };
+        else if (action === "enable") patch = { share_enabled: true };
+        else return NextResponse.json({ error: "Unknown operation." }, { status: 400 });
+      }
+      const { data, error } = await admin
+        .from("gift_campaigns")
+        .update({ ...patch, updated_at: new Date().toISOString() })
+        .eq("id", campaign.id)
+        .eq("user_id", ownerId)
         .select()
         .single();
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -434,6 +472,10 @@ async function actOnMission(
     return NextResponse.json({ error: "Invited creator only." }, { status: 403 });
   }
 
+  if (REVIEW_ACTIONS.has(raw.type)) {
+    return reviewApplication(admin, mission, raw.type as "approve_application" | "decline_application");
+  }
+
   const [contentsResult, campaignResult] = await Promise.all([
     admin.from("gift_videos").select("*").eq("mission_id", mission.id),
     admin.from("gift_campaigns").select("video_count").eq("id", mission.campaign_id).maybeSingle(),
@@ -528,6 +570,38 @@ async function actOnMission(
     ...(isContentAction ? { position } : {}),
     progress: giftContentProgress(next.contents, next.expectedCount),
   });
+}
+
+/**
+ * Brand approves or declines an application from the share link. The state
+ * machine decides the next status; the SQL function re-checks it under the
+ * campaign lock (revision and spots) so two approvals can't overfill it.
+ */
+async function reviewApplication(
+  admin: NonNullable<ReturnType<typeof getSupabaseAdmin>>,
+  mission: MissionRow,
+  type: "approve_application" | "decline_application",
+) {
+  let next: GiftMission;
+  try {
+    next = applyGiftAction(toMission(mission, [], 1), { type }, new Date().toISOString());
+  } catch (error) {
+    if (error instanceof GiftRuleError) return NextResponse.json({ error: error.message }, { status: 400 });
+    throw error;
+  }
+  const result = await admin.rpc("gift_review_application", {
+    p_mission_id: mission.id,
+    p_expected_revision: mission.revision,
+    p_status: next.status,
+  });
+  if (result.error) return NextResponse.json({ error: result.error.message }, { status: 500 });
+  if (result.data === "full") return NextResponse.json({ error: "Every spot of this campaign is taken." }, { status: 409 });
+  if (result.data === "not_applied") return NextResponse.json({ error: "This application was already reviewed." }, { status: 409 });
+  if (result.data !== "ok") return NextResponse.json({ error: "Mission changed. Refresh and try again." }, { status: 409 });
+  if (next.status === "invited" && mission.creator_user_id) {
+    await activateGiftCreatorLink(admin, mission.user_id, mission.creator_user_id);
+  }
+  return NextResponse.json({ ok: true, status: next.status });
 }
 
 async function brandOwns(request: NextRequest, ownerId: string, spaceId: string | null) {

@@ -11,10 +11,12 @@ import {
 } from "./gifting-board";
 
 describe("gifting board", () => {
-  it("places every status except declined in exactly one column", () => {
+  it("places every status except declined and applications in exactly one column", () => {
+    // Applications (applied, rejected) are reviewed on their campaign, not on the mission board.
+    const offBoard = new Set(["declined", "applied", "rejected"]);
     for (const status of GIFT_STATUSES) {
       const columns = GIFT_BOARD_COLUMNS.filter((c) => c.statuses.includes(status));
-      expect(columns.length).toBe(status === "declined" ? 0 : 1);
+      expect(columns.length).toBe(offBoard.has(status) ? 0 : 1);
     }
     expect(giftColumnFor("accepted")).toBe("invited");
     expect(giftColumnFor("declined")).toBeNull();
@@ -39,7 +41,7 @@ describe("gifting board", () => {
       { status: "approved" },
       { status: "declined" },
     ]);
-    expect(stats).toEqual({ active: 4, shipping: 2, toReview: 1, approved: 1, declined: 1 });
+    expect(stats).toEqual({ active: 4, shipping: 2, toReview: 1, approved: 1, declined: 1, applicants: 0 });
   });
 
   it("turns server errors into plain sentences and keeps unknown ones", () => {

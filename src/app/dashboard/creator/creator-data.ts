@@ -63,6 +63,8 @@ export type Mission = {
   signed_name: string | null;
   carrier: string | null;
   tracking_number: string | null;
+  /** "link" when the creator applied through the campaign's share link. */
+  source?: string | null;
 };
 export type Content = { mission_id: string; position?: number; kind?: string; name: string; status: string; feedback: string };
 export type Gifting = { campaigns: Campaign[]; missions: Mission[]; videos: Content[] };
@@ -101,14 +103,14 @@ function slotsOf(mission: Mission, expected: number, contents: Content[]): Slot[
 
 function stageOf(mission: Mission, slots: Slot[]): MissionStage {
   if (slots.some((s) => s.status === "changes_requested")) return "changes";
-  const known: MissionStage[] = ["invited", "accepted", "signed", "shipped", "delivered", "submitted", "approved", "declined"];
+  const known: MissionStage[] = ["applied", "rejected", "invited", "accepted", "signed", "shipped", "delivered", "submitted", "approved", "declined"];
   return known.includes(mission.status as MissionStage) ? (mission.status as MissionStage) : "signed";
 }
 
 // Creator has something to do first, then waiting on the brand, then done.
-export const PRIORITY: Record<MissionStage, number> = { invited: 0, accepted: 0, shipped: 0, delivered: 0, changes: 0, signed: 1, submitted: 1, approved: 2, declined: 3 };
+export const PRIORITY: Record<MissionStage, number> = { invited: 0, accepted: 0, shipped: 0, delivered: 0, changes: 0, applied: 1, signed: 1, submitted: 1, approved: 2, rejected: 3, declined: 3 };
 export const NEEDS_ME = new Set<MissionStage>(["invited", "accepted", "shipped", "delivered", "changes"]);
-export const STEP_OF: Record<MissionStage, number> = { invited: 1, accepted: 2, signed: 3, shipped: 3, delivered: 4, changes: 4, submitted: 4, approved: 5, declined: 0 };
+export const STEP_OF: Record<MissionStage, number> = { applied: 1, rejected: 0, invited: 1, accepted: 2, signed: 3, shipped: 3, delivered: 4, changes: 4, submitted: 4, approved: 5, declined: 0 };
 
 export function useCreatorData(userId: string | undefined, lang: Lang) {
   const [brands, setBrands] = useState<Brand[] | null>(null);

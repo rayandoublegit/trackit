@@ -4,7 +4,8 @@ export type BrandNotificationType =
   | "creator_joined"
   | "script_done"
   | "content_uploaded"
-  | "creator_message";
+  | "creator_message"
+  | "gift_application";
 
 export type BrandNotificationRow = {
   id: string;

@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from "react";
 import {
   contractGrantsAdUse,
   GIFT_CONTENT_ACCEPT,
-  GIFT_MAX_CONTENTS,
   giftContentProgress,
   giftContentType,
   giftExpectedCount,
@@ -24,6 +23,10 @@ import {
 import { useLang } from "@/lib/useLang";
 import { takeCreatorForGift } from "@/lib/creator-handoff";
 import { CreatorAvatar } from "./CreatorAvatar";
+import { GiftCampaignCreate } from "./GiftCampaignCreate";
+import { GiftCampaignDetail, giftCampaignStateLabel } from "./GiftCampaignDetail";
+import type { GiftCampaignUi, GiftMissionUi } from "./gifting-types";
+import { giftTakesSpot } from "@/lib/gift-share";
 import { CountUp } from "./sample-motion";
 import "./sample-preview.css";
 import "./gifting-view.css";
@@ -31,30 +34,8 @@ import "./gifting-view.css";
 type Lang = "en" | "fr";
 type Wishlist = { id: string; name: string; description: string };
 type WishlistItem = { id: string; wishlist_id: string; handle: string; platform: string };
-type Campaign = {
-  id: string;
-  name: string;
-  product: string;
-  brief: string;
-  deadline: string;
-  video_count?: number;
-  allow_ads: boolean;
-  rights_days: number;
-  territories: string;
-};
-type Mission = {
-  id: string;
-  campaign_id: string;
-  creator_handle: string;
-  creator_platform: string;
-  status: string;
-  contract_text: string;
-  signed_name: string | null;
-  signed_at: string | null;
-  carrier: string | null;
-  tracking_number: string | null;
-  address: { name: string; line: string; postalCode: string; city: string; country: string } | null;
-};
+type Campaign = GiftCampaignUi;
+type Mission = GiftMissionUi;
 /** One content of a mission (gift_videos row): a video or a photo at slot `position`. */
 type Content = {
   mission_id: string;
@@ -113,14 +94,9 @@ export function GiftingView({
   const [listName, setListName] = useState("");
   const [handles, setHandles] = useState<Record<string, string>>({});
   const [inviteHandles, setInviteHandles] = useState<Record<string, string>>({});
-  const [campaignName, setCampaignName] = useState("");
-  const [product, setProduct] = useState("");
-  const [brief, setBrief] = useState("");
-  const [deadline, setDeadline] = useState("");
-  const [contentCount, setContentCount] = useState("1");
-  const [allowAds, setAllowAds] = useState(true);
-  const [rightsDays, setRightsDays] = useState("90");
-  const [territories, setTerritories] = useState("France");
+  const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
+  const [justCreatedId, setJustCreatedId] = useState<string | null>(null);
+  const [brandName, setBrandName] = useState("");
   const [publishPaywall, setPublishPaywall] = useState(false);
   const [creating, setCreating] = useState(startCreating && !isCreator);
   const paid = plan !== "free";
@@ -159,6 +135,7 @@ export function GiftingView({
       setCampaigns(body.campaigns ?? []);
       setMissions(body.missions ?? []);
       setVideos(body.videos ?? []);
+      if (typeof body.brandName === "string") setBrandName(body.brandName);
     } catch {
       setLoadError(fr ? "Connexion impossible. Réessayez." : "Connection failed. Please try again.");
     } finally {
@@ -170,7 +147,7 @@ export function GiftingView({
     void load();
   }, [load]);
 
-  async function send(payload: Record<string, unknown>): Promise<{ code?: string; ok: boolean; path?: string; token?: string; url?: string }> {
+  async function send(payload: Record<string, unknown>): Promise<{ code?: string; ok: boolean; path?: string; token?: string; url?: string; campaign?: { id: string } }> {
     setBusy(true);
     setError("");
     try {
@@ -252,6 +229,9 @@ export function GiftingView({
   );
   const setupMissing = Boolean(loadError) && isGiftSetupError(loadError);
   const campaignTitle = (id: string) => campaigns.find((c) => c.id === id)?.name ?? "";
+  const selectedCampaign = campaigns.find((c) => c.id === selectedCampaignId) ?? null;
+  // Missions on the board: applications are reviewed on their campaign, not here.
+  const boardMissions = missions.filter((m) => m.status !== "applied" && m.status !== "rejected");
 
   return (
     <div className={`gv-page${isMobile ? " is-mobile" : ""}${embedded ? " is-embedded" : ""}`}>
@@ -282,6 +262,7 @@ export function GiftingView({
 
       <div className="gv-stats">
         {[
+          ...(isCreator ? [] : [{ label: fr ? "Candidatures à traiter" : "Applications to review", value: stats.applicants, hot: stats.applicants > 0 }]),
           { label: fr ? "En cours" : "In progress", value: stats.active, hot: false },
           { label: fr ? "Colis en route" : "Parcels on the way", value: stats.shipping, hot: false },
           { label: fr ? "Contenus à valider" : "Contents to review", value: stats.toReview, hot: stats.toReview > 0 },
@@ -301,11 +282,11 @@ export function GiftingView({
             <p>
               {campaigns.length === 0
                 ? fr
-                  ? "Créez d’abord la campagne cadeau (produit, brief, droits), puis envoyez-lui la mission."
-                  : "Create the gift campaign first (product, brief, rights), then send them the mission."
+                  ? "Créez la campagne cadeau, puis envoyez-lui son lien (ou la mission directement s’il est déjà relié à votre marque)."
+                  : "Create the gift campaign, then send them its link (or the mission directly if they are already connected to your brand)."
                 : fr
-                  ? "Le pseudo est prêt dans chaque campagne ci-dessous : cliquez sur « Envoyer la mission » dans la bonne."
-                  : "The handle is filled in on each campaign below: click “Send mission” on the right one."}
+                  ? "Ouvrez une campagne ci-dessous : envoyez-lui le lien, ou la mission directement s’il est déjà relié à votre marque (pseudo prérempli)."
+                  : "Open a campaign below: send them the link, or the mission directly if they are already connected to your brand (handle filled in)."}
             </p>
           </div>
           <button type="button" className="gv-alert__close" aria-label={fr ? "Fermer" : "Dismiss"} onClick={() => setPendingHandle(null)}>
@@ -349,121 +330,50 @@ export function GiftingView({
       ) : null}
 
       {!isCreator && creating && !loadError ? (
-        <section className="gv-card gift-create">
-          <header className="gift-create__head">
-            <h2>{fr ? "Campagne cadeau" : "Gift campaign"}</h2>
-            <p>
-              {fr
-                ? "Le produit, le brief, et si le contrat autorise l’usage publicitaire. Le créateur voit tout avant d’accepter."
-                : "The product, the brief, and whether the contract grants advertising use. The creator sees all of it before accepting."}
-            </p>
-          </header>
-          <form
-            className="gift-create__form"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void send({
-                op: "create_campaign",
-                name: campaignName,
-                product,
-                brief,
-                deadline,
-                videoCount: giftExpectedCount(contentCount),
-                allowAds,
-                rightsDays: allowAds ? Number(rightsDays) : 0,
-                territories: allowAds ? territories : "",
-                lang,
-              }).then((result) => {
-                if (result.ok) {
-                  setCampaignName("");
-                  setProduct("");
-                  setBrief("");
-                  setContentCount("1");
-                  setCreating(false);
-                }
-              });
-            }}
-          >
-            <div className="gv-row2">
-              <label>
-                {fr ? "Nom" : "Name"}
-                <input className="gv-field" aria-label={fr ? "Nom de la campagne" : "Campaign name"} required value={campaignName} onChange={(event) => setCampaignName(event.target.value)} placeholder={fr ? "Routine du matin" : "Morning routine"} />
-              </label>
-              <label>
-                {fr ? "Produit" : "Product"}
-                <input className="gv-field" aria-label={fr ? "Produit" : "Product"} required value={product} onChange={(event) => setProduct(event.target.value)} placeholder={fr ? "Sérum" : "Serum"} />
-              </label>
-            </div>
-            <label>
-              Brief
-              <textarea className="gv-field" aria-label="Brief" required value={brief} onChange={(event) => setBrief(event.target.value)} placeholder={fr ? "Ce que le créateur doit montrer." : "What the creator should show."} style={{ minHeight: 96 }} />
-            </label>
-            <div className="gv-row2">
-              <label>
-                {fr ? "Échéance" : "Deadline"}
-                <input className="gv-field" aria-label={fr ? "Échéance" : "Deadline"} type="date" required value={deadline} onChange={(event) => setDeadline(event.target.value)} />
-              </label>
-              <label>
-                {fr ? "Contenus attendus" : "Contents expected"}
-                <input
-                  className="gv-field"
-                  aria-label={fr ? "Nombre de contenus attendus" : "Number of contents expected"}
-                  type="number"
-                  min="1"
-                  max={GIFT_MAX_CONTENTS}
-                  step="1"
-                  required
-                  value={contentCount}
-                  onChange={(event) => setContentCount(event.target.value)}
-                />
-                <small className="gv-muted">
-                  {fr
-                    ? "Vidéos ou photos, de 1 à 20. Ce nombre est écrit dans le contrat."
-                    : "Videos or photos, 1 to 20. This number is written into the contract."}
-                </small>
-              </label>
-            </div>
-            <div className="gift-ads">
-              <p>{fr ? "Usage publicitaire" : "Advertising use"}</p>
-              <div>
-                <button type="button" className={allowAds ? "is-on" : ""} onClick={() => setAllowAds(true)}>
-                  {fr ? "Autorisé" : "Granted"}
-                </button>
-                <button type="button" className={!allowAds ? "is-on" : ""} onClick={() => setAllowAds(false)}>
-                  {fr ? "Non autorisé" : "Not granted"}
-                </button>
-              </div>
-            </div>
-            {allowAds && (
-              <div className="gv-row2">
-                <label>
-                  {fr ? "Durée des droits (jours)" : "Rights duration (days)"}
-                  <input className="gv-field" aria-label={fr ? "Durée des droits" : "Rights duration"} type="number" min="1" step="1" required value={rightsDays} onChange={(event) => setRightsDays(event.target.value)} />
-                </label>
-                <label>
-                  {fr ? "Territoires autorisés" : "Licensed territories"}
-                  <input className="gv-field" aria-label={fr ? "Territoires autorisés" : "Licensed territories"} required value={territories} onChange={(event) => setTerritories(event.target.value)} />
-                </label>
-              </div>
-            )}
-            <div>
-              <button className="es-primary" disabled={busy}>
-                {busy ? (fr ? "Création…" : "Creating…") : fr ? "Créer la campagne" : "Create campaign"}
-              </button>
-            </div>
-          </form>
-        </section>
+        <GiftCampaignCreate
+          lang={lang}
+          busy={busy}
+          onError={setError}
+          onCreate={async (payload) => {
+            const result = await send(payload);
+            if (result.ok && result.campaign?.id) {
+              setCreating(false);
+              setSelectedCampaignId(result.campaign.id);
+              setJustCreatedId(result.campaign.id);
+              if (pendingHandle) setInviteHandles((prev) => ({ ...prev, [result.campaign!.id]: pendingHandle }));
+              window.requestAnimationFrame(() => document.getElementById("gift-campaign-detail")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+            }
+            return result;
+          }}
+        />
       ) : null}
 
       {!isCreator && campaigns.length > 0 ? (
         <section className="gv-campaigns">
           {campaigns.map((campaign, i) => {
-            const count = missions.filter((m) => m.campaign_id === campaign.id).length;
-            const value = inviteHandles[campaign.id] ?? "";
+            const own = missions.filter((m) => m.campaign_id === campaign.id);
+            const taken = own.filter((m) => giftTakesSpot(m.status)).length;
+            const applicants = own.filter((m) => m.status === "applied").length;
+            const state = giftCampaignStateLabel(campaign, taken, lang);
+            const selected = selectedCampaignId === campaign.id;
             return (
-              <article key={campaign.id} className="gv-campaign" style={{ animationDelay: `${i * 60}ms` }}>
+              <button
+                key={campaign.id}
+                type="button"
+                className={`gv-campaign gv-campaign--btn${selected ? " is-selected" : ""}`}
+                style={{ animationDelay: `${i * 60}ms` }}
+                aria-expanded={selected}
+                onClick={() => {
+                  setSelectedCampaignId(selected ? null : campaign.id);
+                  if (!selected) window.requestAnimationFrame(() => document.getElementById("gift-campaign-detail")?.scrollIntoView({ behavior: "smooth", block: "nearest" }));
+                }}
+              >
                 <div className="gv-campaign__top">
-                  <div>
+                  {campaign.product_images?.[0] ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- uploaded product photo
+                    <img className="gv-campaign__thumb" src={campaign.product_images[0]} alt="" />
+                  ) : null}
+                  <div style={{ flex: 1, minWidth: 0 }}>
                     <strong>{campaign.name}</strong>
                     <p>
                       {campaign.product}
@@ -471,57 +381,66 @@ export function GiftingView({
                       {` · ${contentsExpectedLabel(giftExpectedCount(campaign.video_count), lang)}`}
                     </p>
                   </div>
+                  <span className={`gcd-state is-${state.tone}`}>{state.label}</span>
+                </div>
+                <div className="gv-campaign__meta">
+                  {campaign.spots != null ? (
+                    <span className="gv-campaign__spots">
+                      <span className="gv-campaign__bar" aria-hidden>
+                        <i style={{ width: `${Math.min(100, Math.round((taken / Math.max(1, campaign.spots)) * 100))}%` }} />
+                      </span>
+                      {fr ? `${taken}/${campaign.spots} places` : `${taken}/${campaign.spots} spots`}
+                    </span>
+                  ) : (
+                    <span className="gv-muted">
+                      {own.length} mission{(fr ? own.length <= 1 : own.length === 1) ? "" : "s"}
+                    </span>
+                  )}
+                  {applicants > 0 ? (
+                    <em className="gv-chip gv-count is-hot">
+                      {applicants} {fr ? (applicants > 1 ? "candidatures" : "candidature") : applicants === 1 ? "application" : "applications"}
+                    </em>
+                  ) : null}
                   <span className={`gv-rights${campaign.allow_ads ? " is-yes" : ""}`}>
-                    {campaign.allow_ads
-                      ? `${fr ? "Pub" : "Ads"} · ${campaign.rights_days} ${fr ? "j" : "d"} · ${campaign.territories}`
-                      : fr ? "Pas d’usage publicitaire" : "No ad use"}
+                    {campaign.allow_ads ? `${fr ? "Pub" : "Ads"} · ${campaign.rights_days} ${fr ? "j" : "d"}` : fr ? "Pas de pub" : "No ads"}
                   </span>
                 </div>
-                <div className="gv-campaign__bottom">
-                  <span className="gv-muted">
-                    {count} mission{(fr ? count <= 1 : count === 1) ? "" : "s"}
-                  </span>
-                  <form
-                    className="gv-inline"
-                    onSubmit={(event) => {
-                      event.preventDefault();
-                      if (!paid) {
-                        setPublishPaywall(true);
-                        return;
-                      }
-                      void send({
-                        op: "invite",
-                        campaignId: campaign.id,
-                        handle: value,
-                        platform: "tiktok",
-                        lang,
-                      }).then((result) => {
-                        if (result.code === "paywall") setPublishPaywall(true);
-                        if (result.ok) setInviteHandles((prev) => ({ ...prev, [campaign.id]: "" }));
-                      });
-                    }}
-                  >
-                    <input
-                      className="gv-field"
-                      aria-label={fr ? "Pseudo à inviter" : "Handle to invite"}
-                      value={value}
-                      required={paid}
-                      onChange={(event) => setInviteHandles((prev) => ({ ...prev, [campaign.id]: event.target.value }))}
-                      placeholder={fr ? "@pseudo" : "@handle"}
-                    />
-                    <button className="gv-btn" disabled={busy}>
-                      {paid ? (fr ? "Envoyer la mission" : "Send mission") : fr ? "Envoyer — offre payante" : "Send — upgrade"}
-                    </button>
-                  </form>
-                </div>
-              </article>
+                <span className="gv-campaign__cta">{selected ? (fr ? "Masquer" : "Hide") : fr ? "Lien et candidatures" : "Link and applications"}</span>
+              </button>
             );
           })}
         </section>
       ) : null}
 
-      {missions.length > 0 ? (
-        <section className="gv-card">
+      {!isCreator && selectedCampaign ? (
+        <div id="gift-campaign-detail">
+          <GiftCampaignDetail
+            key={selectedCampaign.id}
+            lang={lang}
+            campaign={selectedCampaign}
+            missions={missions.filter((m) => m.campaign_id === selectedCampaign.id)}
+            brandName={brandName}
+            paid={paid}
+            busy={busy}
+            justCreated={justCreatedId === selectedCampaign.id}
+            inviteHandle={inviteHandles[selectedCampaign.id] ?? ""}
+            onInviteHandle={(value) => setInviteHandles((prev) => ({ ...prev, [selectedCampaign.id]: value }))}
+            onSend={send}
+            onUpgrade={() => setPublishPaywall(true)}
+            onOpenMission={(id) => {
+              setOpenId(id);
+              window.requestAnimationFrame(() => document.getElementById("gift-missions")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+            }}
+            onClose={() => {
+              setSelectedCampaignId(null);
+              setJustCreatedId(null);
+            }}
+          />
+        </div>
+      ) : null}
+
+      {boardMissions.length > 0 ? (
+        <section className="gv-card" id="gift-missions">
           <div className="gv-card__head">
             <h2>{fr ? "Missions et colis" : "Missions and parcels"}</h2>
             {stats.declined > 0 ? (
@@ -532,7 +451,7 @@ export function GiftingView({
           </div>
           <div className="gv-board">
             {GIFT_BOARD_COLUMNS.map((column, col) => {
-              const cards = missions.filter((m) => giftColumnFor(m.status) === column.id);
+              const cards = boardMissions.filter((m) => giftColumnFor(m.status) === column.id);
               return (
                 <section key={column.id} className="gv-board__col" style={{ animationDelay: `${col * 60}ms` }}>
                   <header>
@@ -598,11 +517,11 @@ export function GiftingView({
                 : "No mission yet. When a brand sends you one, it shows up here."
               : campaigns.length === 0
                 ? fr
-                  ? "Aucune campagne cadeau pour le moment. Créez-en une, puis envoyez la mission à un créateur : elle apparaît ici."
-                  : "No gift campaign yet. Create one, then send the mission to a creator: it shows up here."
+                  ? "Aucune campagne cadeau pour le moment. Créez-en une : vous obtenez un lien à envoyer aux créateurs."
+                  : "No gift campaign yet. Create one: you get a link to send to creators."
                 : fr
-                  ? "Aucune mission envoyée. Entrez le pseudo d’un créateur relié à votre marque sur une campagne ci-dessus."
-                  : "No mission sent yet. Enter the handle of a creator connected to your brand on a campaign above."}
+                  ? "Aucune mission en cours. Envoyez le lien d’une campagne : les candidatures acceptées apparaissent ici."
+                  : "No mission in progress. Send a campaign’s link: approved applications show up here."}
           </p>
         </section>
       ) : null}
@@ -693,8 +612,8 @@ export function GiftingView({
             <strong>{fr ? "Publier la campagne" : "Publish the campaign"}</strong>
             <p>
               {fr
-                ? "Vous pouvez préparer la campagne. L’envoi de la mission à un créateur déjà connecté à cette marque nécessite un abonnement."
-                : "You can prepare the campaign. Sending a mission to a creator already connected to this brand requires a subscription."}
+                ? "Votre campagne est créée. L’envoi de son lien aux créateurs (ou d’une mission à un créateur relié) nécessite un abonnement."
+                : "Your campaign is created. Sending its link to creators (or a mission to a connected creator) requires a subscription."}
             </p>
             <div className="gv-inline">
               <button type="button" className="gv-btn" onClick={() => setPublishPaywall(false)}>

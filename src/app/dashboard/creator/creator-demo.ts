@@ -70,11 +70,13 @@ export function demoGifting(lang: "en" | "fr"): Gifting {
     campaigns: [
       { id: "c1", brand_id: LUMIERE, brand_name: "Lumière Skin", name: fr ? "Lancement sérum Glow" : "Glow Serum launch", product: fr ? "Sérum Glow 30 ml" : "Glow Serum 30 ml", deadline: "2026-10-12", video_count: 3, brief: fr ? "Montre ta routine du matin avec le sérum. Lumière naturelle, sans filtre, cite le code dans les 5 premières secondes. 2 vidéos et 1 photo." : "Show your morning routine with the serum. Real light, no filter, mention the code in the first 5 seconds. 2 videos and 1 photo." },
       { id: "c2", brand_id: OLIVE, brand_name: "Maison Olive", name: fr ? "Coffret des fêtes" : "Holiday gift set", product: fr ? "Coffret huile d’olive et savons" : "Olive oil and soap gift set", deadline: "2026-11-20", video_count: 2, brief: fr ? "Déballe le coffret et choisis ton produit préféré." : "Unbox the set and pick your favourite." },
+      { id: "c4", brand_id: OLIVE, brand_name: "Maison Olive", name: fr ? "Savon surgras, nouvelle recette" : "Rich soap, new recipe", product: fr ? "Trio de savons surgras" : "Rich soap trio", deadline: "2026-12-05", video_count: 1, brief: fr ? "Ta routine douche, lumière naturelle." : "Your shower routine, natural light." },
       { id: "c3", brand_id: LUMIERE, brand_name: "Lumière Skin", name: fr ? "Collection SPF été" : "Summer SPF drop", product: fr ? "Brume SPF 50" : "SPF 50 body mist", deadline: "2026-08-30", video_count: 1, brief: fr ? "Sac de plage, juste avant la baignade." : "Beach bag, before a swim." },
     ],
     missions: [
       { id: "m1", campaign_id: "c1", user_id: LUMIERE, status: "delivered", contract_text: contract("Lumière Skin", fr ? "un sérum Glow 30 ml" : "one Glow Serum 30 ml", 3), signed_name: "Luna Park", carrier: "Colissimo", tracking_number: "6A21938476512" },
       { id: "m2", campaign_id: "c2", user_id: OLIVE, status: "invited", contract_text: contract("Maison Olive", fr ? "un coffret huile d’olive et savons" : "one olive oil and soap gift set", 2), signed_name: null, carrier: null, tracking_number: null },
+      { id: "m4", campaign_id: "c4", user_id: OLIVE, status: "applied", source: "link", contract_text: contract("Maison Olive", fr ? "un trio de savons surgras" : "one rich soap trio", 1), signed_name: null, carrier: null, tracking_number: null },
       { id: "m3", campaign_id: "c3", user_id: LUMIERE, status: "approved", contract_text: contract("Lumière Skin", fr ? "une brume SPF 50" : "one SPF 50 body mist", 1), signed_name: "Luna Park", carrier: "UPS", tracking_number: "1Z999AA10123456784" },
     ],
     videos: [

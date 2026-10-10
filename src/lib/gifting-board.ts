@@ -3,6 +3,8 @@ import type { GiftContentProgress, GiftStatus } from "@/lib/gifting";
 type Lang = "en" | "fr";
 
 export const GIFT_STATUS_LABELS: Record<GiftStatus, { en: string; fr: string }> = {
+  applied: { en: "Application", fr: "Candidature" },
+  rejected: { en: "Not selected", fr: "Non retenue" },
   invited: { en: "Invited", fr: "Invité" },
   accepted: { en: "Accepted", fr: "Accepté" },
   declined: { en: "Declined", fr: "Refusé" },
@@ -32,16 +34,19 @@ export function giftColumnFor(status: string): string | null {
   return GIFT_BOARD_COLUMNS.find((column) => column.statuses.includes(status as GiftStatus))?.id ?? null;
 }
 
-export type GiftStats = { active: number; shipping: number; toReview: number; approved: number; declined: number };
+export type GiftStats = { active: number; shipping: number; toReview: number; approved: number; declined: number; applicants: number };
 
 /**
  * `pendingContents` (optional) is how many contents of the mission wait for the brand:
  * a brand can review each content as it arrives, before every slot is filled.
  */
 export function giftStats(missions: { status: string; pendingContents?: number }[]): GiftStats {
-  const stats: GiftStats = { active: 0, shipping: 0, toReview: 0, approved: 0, declined: 0 };
+  const stats: GiftStats = { active: 0, shipping: 0, toReview: 0, approved: 0, declined: 0, applicants: 0 };
   for (const mission of missions) {
-    if (mission.status === "declined") stats.declined += 1;
+    // Applications wait for the brand's answer; they are not missions in progress yet.
+    if (mission.status === "applied") stats.applicants += 1;
+    else if (mission.status === "rejected") continue;
+    else if (mission.status === "declined") stats.declined += 1;
     else if (mission.status === "approved") stats.approved += 1;
     else stats.active += 1;
     if (mission.status === "shipped") stats.shipping += 1;
@@ -109,6 +114,14 @@ export function giftNextStep(status: string, isCreator: boolean, lang: Lang, pro
       : `${sent}, ${approved}. Waiting for the changed contents.`;
   }
   switch (status) {
+    case "applied":
+      return isCreator
+        ? fr ? "Candidature envoyée. La marque te répond ici." : "Application sent. The brand answers here."
+        : fr ? "Nouvelle candidature : acceptez-la ou refusez-la." : "New application: approve or decline it.";
+    case "rejected":
+      return isCreator
+        ? fr ? "La marque n’a pas retenu ta candidature cette fois." : "The brand didn’t pick your application this time."
+        : fr ? "Candidature refusée." : "Application declined.";
     case "invited":
       return isCreator
         ? fr ? "Lisez la proposition, puis acceptez ou refusez." : "Read the offer, then accept or decline."
@@ -158,6 +171,10 @@ const FIELD_LABELS_FR: Record<string, { noun: string; feminine?: boolean; plural
   "video name": { noun: "Le nom de la vidéo" },
   "content name": { noun: "Le nom du contenu" },
   feedback: { noun: "Le retour" },
+  product: { noun: "Le produit" },
+  brief: { noun: "Le brief" },
+  deadline: { noun: "L’échéance", feminine: true },
+  offer: { noun: "L’offre", feminine: true },
 };
 
 function fieldErrorFr(label: string, kind: "required" | "too long"): string | null {
@@ -234,6 +251,21 @@ const KNOWN_ERRORS: { match: RegExp; en: ErrorText; fr: ErrorText }[] = [
     fr: "Ce contenu est déjà validé.",
   },
   { match: /^unknown action\.$/i, en: "Unknown action.", fr: "Action inconnue." },
+  { match: /^this application was already reviewed\.$/i, en: "This application was already reviewed.", fr: "Cette candidature a déjà été traitée." },
+  { match: /^this application can no longer be withdrawn\.$/i, en: "This application can no longer be withdrawn.", fr: "Cette candidature ne peut plus être retirée." },
+  { match: /^every spot of this campaign is taken\.$/i, en: "Every spot of this campaign is taken.", fr: "Toutes les places de cette campagne sont prises." },
+  { match: /^deadline is in the past\.$/i, en: "The deadline is in the past.", fr: "L’échéance est déjà passée." },
+  { match: /^deadline is not a valid date\.$/i, en: "The deadline is not a valid date.", fr: "L’échéance n’est pas une date valide." },
+  { match: /^pick at least one platform\.$/i, en: "Pick at least one platform.", fr: "Choisissez au moins une plateforme." },
+  { match: /^use two-letter country codes/i, en: "Use two-letter country codes (FR, BE…).", fr: "Utilisez des codes pays à deux lettres (FR, BE…)." },
+  { match: /^too many countries\.$/i, en: "Too many countries.", fr: "Trop de pays." },
+  { match: /^too many photos\.$/i, en: "Up to 4 photos.", fr: "4 photos maximum." },
+  { match: /^invalid photo\.$/i, en: "One of the photos is invalid. Upload it again.", fr: "Une des photos est invalide. Déposez-la à nouveau." },
+  { match: /^image too large\.$/i, en: "The image is too large (8 MB max).", fr: "L’image est trop lourde (8 Mo maximum)." },
+  { match: /^use a jpeg, png or webp image\.$/i, en: "Use a JPEG, PNG or WebP image.", fr: "Utilisez une image JPEG, PNG ou WebP." },
+  { match: /^spots must be a whole number between (\d+) and (\d+)\.$/i, en: (m) => m[0], fr: (m) => `Le nombre de places doit être un entier entre ${m[1]} et ${m[2]}.` },
+  { match: /^minimum followers must be a whole number/i, en: (m) => m.input ?? "", fr: "Le minimum d’abonnés doit être un nombre entier." },
+  { match: /^product value is not a valid amount\.$/i, en: "The product value is not a valid amount.", fr: "La valeur du produit n’est pas un montant valide." },
   {
     match: /^(.+) is required\.$/i,
     en: (m) => m[0],

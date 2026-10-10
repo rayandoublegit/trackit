@@ -242,8 +242,8 @@ export function CreatorApp({
   const rpmRows: RpmBrand[] = useMemo(() => (rpm?.byBrand ?? []).filter((row) => inScope(row.brandId) && brands.some((b) => b.brandId === row.brandId && b.models.includes("rpm"))), [rpm, brands, brandId]); // eslint-disable-line react-hooks/exhaustive-deps
   const sales: Sale[] = (stats?.sales ?? []).filter((s) => !current || !s.brandId || s.brandId === current.brandId);
   const scopedMissions = missions.filter((m) => inScope(m.brandId));
-  const active = scopedMissions.filter((m) => m.stage !== "approved" && m.stage !== "declined");
-  const currentMission = scopedMissions.find((m) => m.stage !== "declined") ?? null;
+  const active = scopedMissions.filter((m) => m.stage !== "approved" && m.stage !== "declined" && m.stage !== "rejected");
+  const currentMission = scopedMissions.find((m) => m.stage !== "declined" && m.stage !== "rejected") ?? null;
   const open = missions.find((m) => m.mission.id === openId) ?? null;
   const moneyAnywhere = brands.some((b) => b.models.includes("commission") || b.models.includes("rpm"));
   const giftingAnywhere = brands.some((b) => b.models.includes("gifting")) || missions.length > 0;
@@ -258,7 +258,7 @@ export function CreatorApp({
   const act: Act = async (missionId, action) => {
     if (PREVIEW) {
       // Local preview: move the sample mission forward so every step can be tried.
-      const next: Record<string, string> = { accept: "accepted", decline: "declined", sign: "signed", deliver: "delivered" };
+      const next: Record<string, string> = { accept: "accepted", decline: "declined", withdraw: "declined", sign: "signed", deliver: "delivered" };
       data.setGifting((g) => {
         if (!g) return g;
         if (action.type === "submit") {
@@ -751,7 +751,8 @@ function MissionCard({ t, f, item, showBrand, onOpen, onAct }: { t: CreatorCopy;
   const direct = stage === "shipped";
   const label =
     stage === "invited" ? t.cta.invited : stage === "accepted" ? t.cta.accepted : stage === "shipped" ? t.cta.shipped : stage === "delivered" ? t.cta.delivered : stage === "changes" ? t.cta.changes : t.cta.waiting;
-  const note = stage === "signed" ? t.waitingNote.signed : stage === "submitted" ? t.waitingNote.submitted : stage === "approved" ? t.waitingNote.approved : null;
+  const note =
+    stage === "applied" ? t.waitingNote.applied : stage === "signed" ? t.waitingNote.signed : stage === "submitted" ? t.waitingNote.submitted : stage === "approved" ? t.waitingNote.approved : null;
   const showSlots = stage === "delivered" || stage === "changes" || stage === "submitted";
 
   return (
@@ -764,7 +765,7 @@ function MissionCard({ t, f, item, showBrand, onOpen, onAct }: { t: CreatorCopy;
       </div>
       {showBrand && item.brandName ? <span className="ca-muted">{item.brandName}</span> : null}
       <h2 className="ca-h2">{campaign?.product || campaign?.name || "—"}</h2>
-      <p className="ca-stage">{t.stages[stage]}</p>
+      <p className="ca-stage">{stage === "invited" && mission.source === "link" ? t.acceptedApplication : t.stages[stage]}</p>
       {campaign?.deadline && stage !== "approved" ? (
         <p className="ca-muted ca-inline">
           <Icon d={I.clock} size={15} /> {t.dueBy(f.date(campaign.deadline))}
@@ -814,7 +815,7 @@ function MissionSheet({ t, f, item, onClose, onAct, onUpload }: { t: CreatorCopy
     const ok = await onAct(mission.id, action);
     setBusy(false);
     if (!ok) setError(t.actionError);
-    else if (action.type === "decline") onClose();
+    else if (action.type === "decline" || action.type === "withdraw") onClose();
   };
 
   const field = (key: keyof typeof form, label: string, autoComplete: string) => (
@@ -836,9 +837,9 @@ function MissionSheet({ t, f, item, onClose, onAct, onUpload }: { t: CreatorCopy
         <h2 className="ca-h2">{campaign?.product || campaign?.name || "—"}</h2>
       </div>
 
-      {stage !== "declined" ? <Steps current={STEP_OF[stage]} labels={t.stepsLabels} /> : null}
-      <p className="ca-stage">{t.stages[stage]}</p>
-      {campaign?.deadline && stage !== "approved" && stage !== "declined" ? (
+      {stage !== "declined" && stage !== "rejected" ? <Steps current={STEP_OF[stage]} labels={t.stepsLabels} /> : null}
+      <p className="ca-stage">{stage === "invited" && mission.source === "link" ? t.acceptedApplication : t.stages[stage]}</p>
+      {campaign?.deadline && stage !== "approved" && stage !== "declined" && stage !== "rejected" ? (
         <p className="ca-muted ca-inline">
           <Icon d={I.clock} size={15} /> {t.dueBy(f.date(campaign.deadline))}
         </p>
@@ -913,6 +914,17 @@ function MissionSheet({ t, f, item, onClose, onAct, onUpload }: { t: CreatorCopy
           </button>
         </div>
       ) : null}
+
+      {stage === "applied" ? (
+        <div className="ca-actions">
+          <p className="ca-note">{t.waitingNote.applied}</p>
+          <button type="button" className="ca-btn is-text" disabled={busy} onClick={() => window.confirm(t.withdrawConfirm) && void run({ type: "withdraw" })}>
+            {t.withdraw}
+          </button>
+        </div>
+      ) : null}
+
+      {stage === "rejected" ? <p className="ca-note">{t.waitingNote.rejected}</p> : null}
 
       {stage === "signed" || stage === "submitted" || stage === "approved" ? (
         <p className="ca-note">{stage === "signed" ? t.waitingNote.signed : stage === "submitted" ? t.waitingNote.submitted : t.waitingNote.approved}</p>

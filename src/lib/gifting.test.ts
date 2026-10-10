@@ -377,3 +377,40 @@ describe("contract with several contents", () => {
     expect(contractGrantsAdUse("Brief : Authorization to use the content in ads: granted.")).toBe(false);
   });
 });
+
+describe("applications from the share link", () => {
+  const applied = () => mission({ status: "applied" });
+
+  it("approving an application opens the usual flow: accept, sign, ship", () => {
+    let current = applyGiftAction(applied(), { type: "approve_application" }, now);
+    expect(current.status).toBe("invited");
+    current = applyGiftAction(current, { type: "accept" }, now);
+    current = applyGiftAction(current, { type: "sign", name: "Léa Moreau", consent: true, address }, now);
+    expect(current.status).toBe("signed");
+  });
+
+  it("declining or withdrawing is final", () => {
+    const rejected = applyGiftAction(applied(), { type: "decline_application" }, now);
+    expect(rejected.status).toBe("rejected");
+    expect(() => applyGiftAction(rejected, { type: "approve_application" }, now)).toThrow(/already reviewed/);
+    expect(() => applyGiftAction(rejected, { type: "accept" }, now)).toThrow(GiftRuleError);
+    const withdrawn = applyGiftAction(applied(), { type: "withdraw" }, now);
+    expect(withdrawn.status).toBe("declined");
+    expect(() => applyGiftAction(withdrawn, { type: "approve_application" }, now)).toThrow(GiftRuleError);
+  });
+
+  it("an application cannot skip the brand's review, and review actions need an application", () => {
+    expect(() => applyGiftAction(applied(), { type: "accept" }, now)).toThrow(/no longer be accepted/);
+    expect(() => applyGiftAction(applied(), { type: "decline" }, now)).toThrow(/no longer be declined/);
+    expect(() => applyGiftAction(applied(), { type: "ship", carrier: "UPS", trackingNumber: "1Z" }, now)).toThrow(GiftRuleError);
+    expect(() => applyGiftAction(mission(), { type: "approve_application" }, now)).toThrow(/already reviewed/);
+    expect(() => applyGiftAction(mission({ status: "accepted" }), { type: "withdraw" }, now)).toThrow(/withdrawn/);
+  });
+
+  it("board texts know applications", () => {
+    expect(giftNextStep("applied", true, "fr")).toBe("Candidature envoyée. La marque te répond ici.");
+    expect(giftNextStep("applied", false, "en")).toBe("New application: approve or decline it.");
+    expect(giftStats([{ status: "applied" }, { status: "rejected" }, { status: "invited" }])).toMatchObject({ applicants: 1, active: 1 });
+    expect(friendlyGiftError("Every spot of this campaign is taken.", "fr")).toBe("Toutes les places de cette campagne sont prises.");
+  });
+});
