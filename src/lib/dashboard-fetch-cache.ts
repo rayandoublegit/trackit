@@ -131,10 +131,8 @@ export function prefetchDashboardData(view: string): void {
       warm("/api/saved");
       warm("/api/folders");
       break;
-    case "campaigns":
-    case "links":
-      warm("/api/campaigns");
-      break;
+    // Campaigns and links read through the browser client: /api/campaigns only
+    // answers DELETE, so warming it was a 405 on every visit.
     case "analytics": {
       const tz = new Date().getTimezoneOffset();
       warm(`/api/analytics?range=30d&tzOffset=${tz}`);
@@ -145,9 +143,6 @@ export function prefetchDashboardData(view: string): void {
       break;
     case "rpm":
       warm("/api/rpm");
-      break;
-    case "invitations":
-      warm("/api/invitations");
       break;
     case "payouts":
     case "transactions":

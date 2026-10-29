@@ -61,6 +61,13 @@ export type ScrapedVideo = {
   language?: string;
   /** Country of the account that posted it (TikTok author.region), when given. */
   region?: string;
+  /** Caption track (WEBVTT) the platform put in the payload: a free transcript (video-intel/captions.ts). */
+  subtitleUrl?: string;
+  subtitleLang?: string;
+  /** "original" / "music" / "none" when the payload says (no audio = no speech to transcribe). */
+  audioKind?: "original" | "music" | "none";
+  /** Short-lived media file URL (speech-to-text fallback of video intelligence). */
+  mediaUrl?: string;
   /**
    * Other accounts on the post (Instagram: tagged people, co-authors, @mentions
    * in the caption). Never stored as such: Instagram discovery follows them.

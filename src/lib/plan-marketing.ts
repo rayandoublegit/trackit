@@ -8,6 +8,7 @@ import {
   canPersistTemplates,
   canPublishGiftLinks,
   canSeeCreatorEmails,
+  canSeeVideoInsights,
   canUseAIOutreach,
   canUseAffiliates,
   canUseAutoFollowUp,
@@ -155,6 +156,7 @@ export type GateFeatureKey =
   | "live-lookup"
   | "mino-analysis"
   | "creator-emails"
+  | "video-insights"
   | "gifting-links"
   | "findit"
   | "team-members";
@@ -332,6 +334,14 @@ export const FEATURE_GATES: Record<GateFeatureKey, GateDefinition> = {
     {
       en: "See the contact email of every creator who has one, in the catalog, on creator pages and in Mino. Included from Growth.",
       fr: "Affichez l’e-mail de contact de chaque créateur qui en a un, dans le catalogue, sur les pages créateur et dans Mino. Inclus dès Growth.",
+    },
+  ),
+  "video-insights": gate(
+    canSeeVideoInsights,
+    { en: "Video insights", fr: "Analyse des vidéos" },
+    {
+      en: "See why each creator's videos work: hooks, formats and patterns measured on their own views, every video's hook and transcript, and library filters by hook and format. Included from Growth.",
+      fr: "Découvrez pourquoi les vidéos de chaque créateur marchent : accroches, formats et tendances mesurés sur ses propres vues, l’accroche et la transcription de chaque vidéo, et les filtres de la vidéothèque par accroche et format. Inclus dès Growth.",
     },
   ),
   "gifting-links": gate(

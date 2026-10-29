@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { reportAiFailure } from "@/lib/ai-provider";
+import { getAuthedUserId } from "@/lib/api-auth";
 import { analyzeCreatorContent } from "@/lib/creator-content-analysis";
+import { llmConfigured } from "@/lib/llm";
+import { canUseMinoAnalysis, lowestTierFor } from "@/lib/plan-limits";
+import { paywallResponse, resolveOwnerPlan } from "@/lib/plan-gate-server";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 45;
@@ -8,13 +13,19 @@ export const maxDuration = 45;
 // Analyze a creator's video frames (cover images) with Claude vision. Cached in
 // creators_index.content_analysis when that column exists (migration); works
 // without it too (recomputed each call). Runs server-side where
-// ANTHROPIC_API_KEY is available (prod/Vercel).
-export async function GET(_req: Request, { params }: { params: Promise<{ username: string }> }) {
+// an LLM provider is configured (src/lib/llm.ts).
+export async function GET(req: Request, { params }: { params: Promise<{ username: string }> }) {
+  // Signed-in paid plans only: an uncached call spends AI vision credits.
+  const userId = await getAuthedUserId(req);
+  if (!userId) return NextResponse.json({ analysis: null, error: "Unauthorized" }, { status: 401 });
   const { username } = await params;
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY || !process.env.NEXT_PUBLIC_SUPABASE_URL) {
     return NextResponse.json({ analysis: null, reason: "no db" }, { status: 503 });
   }
   const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+  if (!canUseMinoAnalysis(await resolveOwnerPlan(admin, userId))) {
+    return paywallResponse("mino-analysis", lowestTierFor(canUseMinoAnalysis));
+  }
 
   // Try with the cache column; fall back if the migration hasn't been applied.
   let row: { display_name?: string; primary_niche?: string; followers?: number; top_videos?: unknown; content_analysis?: unknown } | null = null;
@@ -44,7 +55,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ usernam
     .map((v) => v.cover)
     .filter((u): u is string => !!u);
   if (covers.length === 0) return NextResponse.json({ analysis: null, reason: "no covers" });
-  if (!process.env.ANTHROPIC_API_KEY) return NextResponse.json({ analysis: null, reason: "no key" });
+  if (!llmConfigured()) return NextResponse.json({ analysis: null, reason: "no key" });
 
   try {
     const analysis = await analyzeCreatorContent(covers, {
@@ -57,6 +68,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ usernam
     }
     return NextResponse.json({ analysis });
   } catch (e) {
-    return NextResponse.json({ analysis: null, error: e instanceof Error ? e.message : "analyze failed" });
+    reportAiFailure("creator-analyze", e);
+    return NextResponse.json({ analysis: null, error: "analysis_unavailable" });
   }
 }

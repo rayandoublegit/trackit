@@ -1,8 +1,5 @@
 {
   "functions": {
-    "src/app/api/analyze/route.ts": {
-      "maxDuration": 300
-    },
     "src/app/api/cron/seed-niches/route.ts": {
       "maxDuration": 300
     },
@@ -26,13 +23,12 @@
     },
     "src/app/api/cron/outreach-replies/route.ts": {
       "maxDuration": 300
+    },
+    "src/app/api/cron/video-intel/route.ts": {
+      "maxDuration": 300
     }
   },
   "crons": [
-    {
-      "path": "/api/weekly-reminder",
-      "schedule": "0 9 * * 1"
-    },
     {
       "path": "/api/cron/monthly-payouts",
       "schedule": "0 9 1 * *"
@@ -60,6 +56,26 @@
     {
       "path": "/api/cron/outreach-replies",
       "schedule": "*/20 * * * *"
+    },
+    {
+      "path": "/api/cron/video-intel?stage=enqueue",
+      "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/cron/video-intel?stage=transcripts",
+      "schedule": "1-59/2 * * * *"
+    },
+    {
+      "path": "/api/cron/video-intel?stage=submit",
+      "schedule": "4-59/10 * * * *"
+    },
+    {
+      "path": "/api/cron/video-intel?stage=collect",
+      "schedule": "2-59/5 * * * *"
+    },
+    {
+      "path": "/api/cron/video-intel?stage=niche",
+      "schedule": "30 3 * * *"
     }
   ]
 }

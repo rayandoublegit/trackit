@@ -1,4 +1,4 @@
-import Anthropic from "@anthropic-ai/sdk";
+import { chat } from "@/lib/llm";
 
 export interface CreatorClassification {
   primaryNiche: string;
@@ -64,12 +64,7 @@ export async function classifyCreator(input: {
   bio: string;
   captions: string[];
 }): Promise<CreatorClassification> {
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-  const msg = await client.messages.create({
-    model: "claude-haiku-4-5-20251001",
-    max_tokens: 300,
-    messages: [{ role: "user", content: buildClassificationPrompt(input) }],
-  });
-  const text = msg.content[0].type === "text" ? msg.content[0].text : "";
+  const msg = await chat([{ role: "user", content: buildClassificationPrompt(input) }], { model: "fast", maxTokens: 300 });
+  const text = msg.text;
   return parseClassification(text);
 }

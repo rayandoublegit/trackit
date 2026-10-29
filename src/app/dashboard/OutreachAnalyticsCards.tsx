@@ -61,7 +61,7 @@ export function OutreachAnalyticsCards({
   const replyRate = stats.sent > 0 ? Math.round((stats.replied / stats.sent) * 100) : 0;
   const cards = [
     { label: lang === "fr" ? "Envoyés" : "Sent", value: String(stats.sent) },
-    { label: lang === "fr" ? "Ouverts" : "Opened", value: String(stats.opened) },
+    // Opens are not tracked (no pixel): no "Opened" card that would always read 0.
     { label: lang === "fr" ? "Réponses" : "Replies", value: String(stats.replied) },
     { label: lang === "fr" ? "Taux de réponse" : "Reply rate", value: lang === "fr" ? `${replyRate} %` : `${replyRate}%` },
     { label: lang === "fr" ? "Convertis" : "Converted", value: String(stats.converted) },

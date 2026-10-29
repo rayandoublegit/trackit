@@ -11,6 +11,8 @@ import { useLang, type Lang } from "@/lib/useLang";
 import { nicheLabel } from "@/lib/niche-tree";
 import { CreatorProfileError, getCachedCreatorProfile, loadCreatorProfile } from "@/lib/creator-profile-cache";
 import { CoverImage } from "./CoverImage";
+import { CreatorContentInsights, VideoInsightBadges } from "./CreatorContentInsights";
+import type { VideoInsightBrief } from "@/lib/video-intel/client-types";
 import "./creator-profile.css";
 
 // A creator's page, market-research style: identity and links, key numbers
@@ -157,7 +159,7 @@ function ViewsBars({ videos, tracked }: { videos: LibraryVideo[]; tracked: boole
   );
 }
 
-function VideoCard({ v, rank }: { v: LibraryVideo; rank?: number }) {
+function VideoCard({ v, rank, insight }: { v: LibraryVideo; rank?: number; insight?: VideoInsightBrief }) {
   const lang = useLang();
   return (
     <a className="cp-video" href={v.shareUrl || undefined} target="_blank" rel="noreferrer">
@@ -173,6 +175,7 @@ function VideoCard({ v, rank }: { v: LibraryVideo; rank?: number }) {
       </span>
       <span className="cp-video__meta">
         {v.caption ? <span className="cp-video__caption">{v.caption}</span> : null}
+        {insight ? <VideoInsightBadges insight={insight} lang={lang} /> : null}
         <span className="cp-video__stats">
           {v.likes ? (
             <span>
@@ -234,6 +237,8 @@ export function CreatorProfilePage({
   const [data, setData] = useState<CreatorProfileData | null>(() => getCachedCreatorProfile(username));
   const [error, setError] = useState<"missing" | "failed" | null>(null);
   const [tab, setTab] = useState<"top" | "latest">("top");
+  // Per-video insights (hook, hook type, format), filled by the "why their videos work" block.
+  const [videoInsights, setVideoInsights] = useState<Record<string, VideoInsightBrief>>({});
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -385,6 +390,8 @@ export function CreatorProfilePage({
         </section>
       </div>
 
+      <CreatorContentInsights username={username} lang={lang} onInsights={(videos) => setVideoInsights(videos)} />
+
       <div className="cp-grid-main">
         <section className="cp-card">
           <header className="cp-card__head">
@@ -405,7 +412,7 @@ export function CreatorProfilePage({
           ) : videos.length ? (
             <div className="cp-videos">
               {videos.slice(0, 18).map((v, i) => (
-                <VideoCard key={v.id} v={v} rank={tab === "top" ? i + 1 : undefined} />
+                <VideoCard key={v.id} v={v} rank={tab === "top" ? i + 1 : undefined} insight={videoInsights[v.id]} />
               ))}
             </div>
           ) : (

@@ -1,4 +1,5 @@
 import { compactNumber, emailIn, firstUrlIn, http, isoDate, num, scrapeCreatorsGet, str } from "./sc-client";
+import { audioKindOf, mediaUrlOf } from "@/lib/video-intel/captions";
 import { hashtagsOf, type CreatorSource, type RelatedAccount, type ScrapedProfile, type ScrapedSearchHit, type ScrapedVideo } from "./types";
 
 // Instagram through ScrapeCreators (1 credit per call):
@@ -108,6 +109,8 @@ export function parseInstagramPosts(raw: any): ScrapedVideo[] {
       shares: num(item?.share_count ?? item?.reshare_count),
       saves: 0,
       related: relatedOfPost(item),
+      ...(mediaType === "video" && audioKindOf(item) ? { audioKind: audioKindOf(item) } : {}),
+      ...(mediaType === "video" && mediaUrlOf(item) ? { mediaUrl: mediaUrlOf(item) } : {}),
     });
   }
   return out;

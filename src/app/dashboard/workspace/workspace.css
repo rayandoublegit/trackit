@@ -1767,6 +1767,9 @@ body.dashboard-page {
   }
 
   .ws-rail__item {
+    /* The desktop rail sets width: 100%; in the bottom bar that made every
+       tab as wide as the screen (only "Home" was visible). */
+    width: auto;
     flex: 1 0 auto;
     min-width: 56px;
     padding: 6px 6px 4px;

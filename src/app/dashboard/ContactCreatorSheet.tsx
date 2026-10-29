@@ -50,6 +50,9 @@ function copy(lang: Lang) {
     writing: fr ? "Rédaction d’un e-mail personnalisé…" : "Writing a personalised email…",
     aiDraft: fr ? "Brouillon rédigé par l’IA à partir du profil. Relisez avant d’envoyer." : "AI draft based on the profile. Review it before sending.",
     templateDraft: fr ? "Modèle rempli avec les infos du profil. Modifiez-le librement." : "Template filled from the profile. Edit it freely.",
+    aiDownDraft: fr
+      ? "Mino est momentanément indisponible : voici un modèle rempli avec les infos du profil. Modifiez-le librement."
+      : "Mino is temporarily unavailable: here is a template filled from the profile. Edit it freely.",
     aiUpsellTitle: fr ? "Rédiger avec l’IA — Pro" : "Write it with AI — Pro",
     aiUpsellBody: fr
       ? "Avec Pro, Mino écrit un premier e-mail personnalisé à partir du profil du créateur."
@@ -159,7 +162,7 @@ export function ContactCreatorHost({
   const [to, setTo] = useState("");
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
-  const [draftSource, setDraftSource] = useState<EmailDraft["source"] | null>(null);
+  const [draftSource, setDraftSource] = useState<EmailDraft["source"] | "ai-down" | null>(null);
   const [loadingDraft, setLoadingDraft] = useState(false);
   const [saveEmail, setSaveEmail] = useState(true);
   const [client, setClient] = useState<MailClient | null>(null);
@@ -206,7 +209,7 @@ export function ContactCreatorHost({
           if (requestId.current !== id) return;
           setSubject(draft.subject);
           setBody(draft.body);
-          setDraftSource(draft.source);
+          setDraftSource(draft.aiUnavailable ? "ai-down" : draft.source);
           setLoadingDraft(false);
         });
       } else {
@@ -402,7 +405,7 @@ export function ContactCreatorHost({
                   <span className="cc-label">{t.message}</span>
                   <textarea className="cc-textarea" rows={11} value={body} onChange={(e) => setBody(e.target.value)} />
                 </label>
-                {draftSource && <div className="cc-hint">{draftSource === "ai" ? t.aiDraft : t.templateDraft}</div>}
+                {draftSource && <div className="cc-hint">{draftSource === "ai" ? t.aiDraft : draftSource === "ai-down" ? t.aiDownDraft : t.templateDraft}</div>}
                 {!canUseAIOutreach(plan) && (
                   <UpgradeNudge lang={lang} feature="ai-outreach" title={t.aiUpsellTitle} body={t.aiUpsellBody} cta={t.aiUpsellCta} />
                 )}

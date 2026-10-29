@@ -178,8 +178,8 @@ async function seedNiche(niche: string): Promise<number> {
 }
 
 export async function POST(request: Request) {
-  const { secret, niche } = await request.json();
-  if (secret !== process.env.CRON_SECRET) {
+  const { secret, niche } = await request.json().catch(() => ({}));
+  if (!process.env.CRON_SECRET || secret !== process.env.CRON_SECRET) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

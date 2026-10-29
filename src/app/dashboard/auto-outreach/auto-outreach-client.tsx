@@ -48,6 +48,10 @@ const ERRORS: Record<string, { en: string; fr: string }> = {
   ai_refused: { en: "The AI declined to write this email. Rephrase your offer.", fr: "L'IA a refusé d'écrire cet e-mail. Reformulez votre offre." },
   ai_bad_output: { en: "The AI answer could not be read. Try again.", fr: "La réponse de l'IA est illisible. Réessayez." },
   ai_error: { en: "The email could not be written. Try again.", fr: "L'e-mail n'a pas pu être rédigé. Réessayez." },
+  ai_unavailable: {
+    en: "Mino is temporarily unavailable, so this email could not be written. Try again in a few minutes.",
+    fr: "Mino est momentanément indisponible : cet e-mail n'a pas pu être rédigé. Réessayez dans quelques minutes.",
+  },
   unsupported_numbers: {
     en: "The AI used figures that are not in this creator's data, so the draft was rejected. Regenerate it.",
     fr: "L'IA a utilisé des chiffres absents des données du créateur : le brouillon a été rejeté. Régénérez-le.",

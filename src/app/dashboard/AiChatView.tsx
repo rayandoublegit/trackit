@@ -203,6 +203,10 @@ function analyzeErrorText(code: string, fr: boolean, siteHost?: string): string 
       return fr
         ? `L’analyse par l’IA n’est pas disponible sur ce serveur pour l’instant (clé Anthropic absente)${siteHost ? `. J’ai bien pu lire votre site (${siteHost})` : ""}. Vous pouvez quand même me décrire votre marque, par exemple « créatrices skincare en France avec un email ».`
         : `AI analysis isn’t available on this server right now (no Anthropic key)${siteHost ? `. I could read your site (${siteHost})` : ""}. You can still describe your brand, for example “skincare creators in France with an email”.`;
+    case "ai_down":
+      return fr
+        ? `Mino est momentanément indisponible, l’analyse n’a pas pu être faite${siteHost ? ` (votre site ${siteHost} a bien été lu)` : ""}. Réessayez dans quelques minutes, ou décrivez votre marque en une phrase, par exemple « créatrices skincare en France » : la recherche de créateurs fonctionne toujours.`
+        : `Mino is temporarily unavailable, so the analysis couldn’t run${siteHost ? ` (your site ${siteHost} was read fine)` : ""}. Try again in a few minutes, or describe your brand in one sentence, for example “skincare creators in France”: creator search still works.`;
     case "site_blocked":
     case "site_invalid_url":
       return fr ? "Je ne peux pas ouvrir cette adresse : seuls les sites web publics (http ou https) sont acceptés." : "I can’t open that address: only public websites (http or https) are allowed.";
@@ -726,7 +730,17 @@ export function AiChatView({
       reply?: string;
       creators?: FeedCreator[];
       search?: { label: string; sources: string[]; filters?: MinoCatalogFilters };
+      error?: string;
+      message?: string;
     };
+    if (data.error === "ai_unavailable") {
+      // The AI provider is down: say so plainly, with a retry card.
+      const lastAsk = history.filter((m) => m.role === "user").at(-1)?.content ?? "";
+      return {
+        content: data.message || (fr ? `Mino est momentanément indisponible. ${isCreator ? "Réessaie" : "Réessayez"} dans quelques minutes.` :"Mino is temporarily unavailable. Try again in a few minutes."),
+        widget: { kind: "error", retryText: lastAsk },
+      };
+    }
     if (!res.ok || !data.ok || !data.reply) throw new Error(`ai-chat ${res.status}`);
     return {
       content: data.reply,

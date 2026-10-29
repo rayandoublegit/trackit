@@ -1148,6 +1148,7 @@ function DashboardPageContent() {
             onUpgrade={handleUpgradeBasic}
             onUpgradePro={handleUpgradePro}
             onUpgradeScale={handleUpgradeScale}
+            brandName={profile?.business_name ?? ""}
             openSendRequest={outreachSendRequest}
             onOpenSendHandled={() => setOutreachSendRequest(null)}
             onNavigateToBilling={() => {
@@ -2135,7 +2136,9 @@ function OutreachView({
   isMobile,
   openSendRequest,
   onOpenSendHandled,
+  brandName = "",
 }: {
+  brandName?: string;
   userId?: string;
   plan: PlanTier;
   onNavigateToBilling: () => void;
@@ -2258,6 +2261,7 @@ function OutreachView({
           onUpgradePro={onUpgradePro}
           onUpgradeScale={onUpgradeScale}
           refreshKey={historyRefreshKey}
+          brandName={brandName}
         />
       </div>
 

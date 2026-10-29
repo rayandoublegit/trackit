@@ -1,6 +1,7 @@
-import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse, type NextRequest } from "next/server";
+import { reportAiFailure } from "@/lib/ai-provider";
 import { getAuthedUserId } from "@/lib/api-auth";
+import { chat, llmConfigured } from "@/lib/llm";
 
 export const dynamic = "force-dynamic";
 
@@ -64,17 +65,13 @@ export async function POST(request: NextRequest) {
   const nowIso = new Date().toISOString();
   const fallback = localFallbackParse(text);
 
-  if (!process.env.ANTHROPIC_API_KEY) {
+  if (!llmConfigured()) {
     if (!fallback) return NextResponse.json({ ok: false, error: "Could not parse" }, { status: 422 });
     return NextResponse.json({ ok: true, meeting: fallback, source: "fallback" });
   }
 
   try {
-    const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-    const message = await anthropic.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 400,
-      messages: [
+    const message = await chat([
         {
           role: "user",
           content: `Parse this natural-language meeting note into JSON only (no markdown).
@@ -87,10 +84,9 @@ Return exactly:
 - if only a time is given, use today (or tomorrow if time already passed)
 - title short; withWho optional; notes can echo original text`,
         },
-      ],
-    });
+      ], { model: "fast", maxTokens: 400, timeoutMs: 20_000 });
 
-    const raw = message.content[0]?.type === "text" ? message.content[0].text : "";
+    const raw = message.text;
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error("no json");
     const parsed = JSON.parse(jsonMatch[0]) as ParsedMeeting;
@@ -106,7 +102,8 @@ Return exactly:
       },
       source: "claude",
     });
-  } catch {
+  } catch (e) {
+    if (!(e instanceof Error && /^(no json|incomplete)/.test(e.message))) reportAiFailure("parse-meeting", e);
     if (!fallback) return NextResponse.json({ ok: false, error: "Could not parse" }, { status: 422 });
     return NextResponse.json({ ok: true, meeting: fallback, source: "fallback" });
   }

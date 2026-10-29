@@ -17,6 +17,10 @@ function targets() {
 }
 
 export async function POST(request: NextRequest) {
+  // Spends search API credits and writes the catalog: scheduled jobs / staff only.
+  if (!process.env.CRON_SECRET || request.headers.get("authorization") !== `Bearer ${process.env.CRON_SECRET}`) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   const admin = getSupabaseAdmin();
   if (!admin) return NextResponse.json({ error: "Server misconfigured" }, { status: 500 });
   if (!process.env.RAPIDAPI_KEY) return NextResponse.json({ error: "Search API missing" }, { status: 500 });

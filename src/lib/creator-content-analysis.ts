@@ -1,4 +1,4 @@
-import Anthropic from "@anthropic-ai/sdk";
+import { chat } from "@/lib/llm";
 
 export interface ContentAnalysis {
   style: string; // visual style/format
@@ -78,19 +78,18 @@ export async function analyzeCreatorContent(
   );
   if (imgs.length === 0) return null;
 
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-  const content: Anthropic.ContentBlockParam[] = [
-    ...imgs.map((im) => ({
-      type: "image" as const,
-      source: { type: "base64" as const, media_type: im.media_type, data: im.data },
-    })),
-    { type: "text" as const, text: buildAnalysisPrompt(meta) },
-  ];
-  const msg = await client.messages.create({
-    model: "claude-haiku-4-5-20251001",
-    max_tokens: 500,
-    messages: [{ role: "user", content }],
-  });
-  const text = msg.content[0]?.type === "text" ? msg.content[0].text : "";
+  const msg = await chat(
+    [
+      {
+        role: "user",
+        content: [
+          ...imgs.map((im) => ({ type: "image_url" as const, image_url: { url: `data:${im.media_type};base64,${im.data}` } })),
+          { type: "text" as const, text: buildAnalysisPrompt(meta) },
+        ],
+      },
+    ],
+    { model: "fast", maxTokens: 500 },
+  );
+  const text = msg.text;
   return parseAnalysis(text);
 }

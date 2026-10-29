@@ -1,5 +1,6 @@
 import { ProviderError } from "./http";
 import { compactNumber, http, isoDate, num, scrapeCreatorsGet, str } from "./sc-client";
+import { captionFieldsOf } from "@/lib/video-intel/captions";
 import { hashtagsOf, type CallMeter, type CreatorSource, type ScrapedProfile, type ScrapedSearchHit, type ScrapedVideo } from "./types";
 
 // YouTube through ScrapeCreators (1 credit per call), keyed by the channel
@@ -56,6 +57,8 @@ function ytVideo(v: any, short: boolean): ScrapedVideo | null {
     comments: num(v?.commentCountInt ?? compactNumber(v?.commentCountText)),
     shares: 0,
     saves: 0,
+    // Caption tracks are not in the list endpoints today; kept if a payload ever carries them.
+    ...captionFieldsOf(v),
   };
 }
 

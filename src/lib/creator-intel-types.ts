@@ -57,4 +57,8 @@ export type VideoLibraryResult = {
   needsTracking?: boolean;
   /** Free plan: more videos match than the plan shows (upgrade to see them). */
   teaserLocked?: boolean;
+  /** Video insights per video (platform:video_id), Growth and above (lib/video-intel). */
+  insights?: Record<string, import("@/lib/video-intel/client-types").VideoInsightBrief>;
+  /** Insight filters asked on a plan without video insights. */
+  insightsLocked?: boolean;
 };

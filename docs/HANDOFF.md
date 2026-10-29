@@ -89,6 +89,14 @@ Billing: Whop (webhook `src/app/api/whop/webhook`) plus legacy Stripe price ids 
 | Database | Supabase `tokpuhzjhysqxwjkxfya` |
 
 `/api/ai-chat` uses OpenAI when `OPENAI_API_KEY` is set, otherwise Anthropic.
+When the AI provider fails (credit balance, revoked key, overload, network),
+every caller goes through `src/lib/ai-provider.ts`: users see "Mino est
+momentanément indisponible" / "Mino is temporarily unavailable" (503
+`ai_unavailable`), creator search results still come back, the Contact composer
+falls back to its template, outreach sequences postpone instead of burning
+attempts, and the team gets one email (Resend, `OPS_ALERT_EMAIL`, default the
+signup-notification address; at most every 6 h per instance) when the owner must
+act (billing or key).
 The scraper uses ScrapeCreators first (TikTok, Instagram, YouTube) and falls back to RapidAPI for TikTok (`SCRAPER_PROVIDER_TIKTOK` swaps the order) and Instagram (RapidAPI "Instagram Scraper Stable API", `RAPIDAPI_INSTAGRAM_KEY`; the only Instagram provider without a ScrapeCreators key, capped by `SCRAPE_INSTAGRAM_MAX_CALLS_PER_WEEK` / `_PER_30D`, see SCRAPING.md "Instagram").
 
 The separate `partnerads` Vercel project (partnerads.vercel.app) was deleted on
@@ -224,7 +232,6 @@ Full details in [SCRAPING.md](SCRAPING.md).
 
 | Path | Schedule | What |
 | --- | --- | --- |
-| `/api/weekly-reminder` | Mondays 09:00 | weekly reminder emails |
 | `/api/cron/monthly-payouts` | 1st of month 09:00 | disabled in code (no real transfers) |
 | `/api/cron/scrape/weekly-discovery` | Mondays 00:05 | queues the week's keyword searches (no API call) |
 | `/api/cron/scrape/weekly-refresh` | Mondays 00:15 | queues every creator due this week (no API call) |

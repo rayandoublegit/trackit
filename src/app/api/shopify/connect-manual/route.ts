@@ -32,8 +32,8 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         ok: false,
-        error: "Shopify requires Growth or above.",
-        errorFr: "Shopify nécessite le plan Growth ou supérieur.",
+        error: "Shopify requires Pro or Scale.",
+        errorFr: "Shopify nécessite le plan Pro ou Scale.",
         code: "plan_gate",
       },
       { status: 402 },
@@ -42,7 +42,7 @@ export async function POST(request: Request) {
 
   // Normalize the domain: strip protocol, trailing slash, and force .myshopify.com host.
   shop = shop.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
-  if (!shop.endsWith(".myshopify.com")) {
+  if (!/^[a-z0-9][a-z0-9-]*\.myshopify\.com$/.test(shop)) {
     return NextResponse.json(
       { ok: false, error: "The domain must end with .myshopify.com" },
       { status: 400 },

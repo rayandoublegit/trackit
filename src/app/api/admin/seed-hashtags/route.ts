@@ -10,7 +10,7 @@ const THIRTY_DAYS = 30 * 24 * 3600 * 1000;
 
 export async function POST(req: NextRequest) {
   const auth = req.headers.get("authorization");
-  if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!process.env.CRON_SECRET || auth !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
   const { hashtags, niche } = await req.json();

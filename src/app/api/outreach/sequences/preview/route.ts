@@ -3,6 +3,7 @@
 // pending contacts, max 3) from their stored data, saves it as the contact's
 // draft and returns it. The cron sends exactly this draft, so what the brand
 // reviews is what goes out.
+import { isAiOutage, reportAiFailure } from "@/lib/ai-provider";
 import { NextResponse, type NextRequest } from "next/server";
 import { composePlainText, normalizeLang, normalizeTone } from "@/lib/outreach-sequences";
 import { buildFactLines, resolveEmailLanguage } from "@/lib/outreach-sequences-prompt";
@@ -112,8 +113,13 @@ export async function POST(request: NextRequest) {
           fullText: composePlainText(draft.body ?? "", signature, draft.optOutLang ?? language.optOutLang),
         };
       } catch (e) {
-        const code = e instanceof GenerationError ? e.code : "ai_error";
-        return { contactId: c.id, name: c.creator_name, email: c.creator_email, username: c.creator_username, facts: factLines, error: code, detail: (e as Error).message.slice(0, 300) };
+        if (!(e instanceof GenerationError)) {
+          const outage = isAiOutage(e);
+          reportAiFailure("sequence-preview", e);
+          // Provider texts ("credit balance…") stay in the logs, never in the brand's UI.
+          return { contactId: c.id, name: c.creator_name, email: c.creator_email, username: c.creator_username, facts: factLines, error: outage ? "ai_unavailable" : "ai_error" };
+        }
+        return { contactId: c.id, name: c.creator_name, email: c.creator_email, username: c.creator_username, facts: factLines, error: e.code, detail: e.message.slice(0, 300) };
       }
     }),
   );

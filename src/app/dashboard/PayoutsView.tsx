@@ -2571,12 +2571,12 @@ export function PayoutsView({
             ? [
                 { title: "Une vente est trackée", body: "Shopify, ou une vente ajoutée à la main sur une campagne." },
                 { title: "La commission se calcule", body: "Chaque créateur voit ce qui lui est dû." },
-                { title: "Vous payez", body: "À la main, ou automatiquement le 1er du mois." },
+                { title: "Vous payez", body: "En un clic, créateur par créateur ou tous d’un coup." },
               ]
             : [
                 { title: "A sale gets tracked", body: "From Shopify, or added by hand on a campaign." },
                 { title: "Commission calculates", body: "Each creator sees exactly what they’re owed." },
-                { title: "You pay", body: "Manually, or automatically on the 1st of the month." },
+                { title: "You pay", body: "In one click, one creator at a time or everyone at once." },
               ]
         }
         primaryLabel={fr ? "Ouvrir les campagnes" : "Open campaigns"}
@@ -2710,16 +2710,20 @@ export function PayoutsView({
                 {lang === "fr" ? "Paiement automatique" : "Automatic payout"}
               </div>
               <div style={{ fontSize: 14, color: "var(--ws-text-muted)", letterSpacing: "-0.01em" }}>
-                {lang === "fr"
-                  ? "Le 1er de chaque mois, tous les créateurs avec un solde positif sont payés automatiquement."
-                  : "On the 1st of every month, all creators with a positive balance are paid automatically."}
+                {AUTO_PAYOUTS_LIVE
+                  ? lang === "fr"
+                    ? "Le 1er de chaque mois, tous les créateurs avec un solde positif sont payés automatiquement."
+                    : "On the 1st of every month, all creators with a positive balance are paid automatically."
+                  : lang === "fr"
+                    ? "Bientôt : le 1er de chaque mois, les créateurs avec un solde positif seront payés automatiquement. Pour l’instant, payez-les depuis la liste ci-dessus."
+                    : "Coming soon: on the 1st of every month, creators with a positive balance will be paid automatically. For now, pay them from the list above."}
               </div>
             </div>
-            <label style={{ cursor: canUseAutoPayouts(plan as PlanTier) ? "pointer" : "not-allowed", display: "flex", flexShrink: 0, opacity: canUseAutoPayouts(plan as PlanTier) ? 1 : 0.45 }}>
+            <label style={{ cursor: AUTO_PAYOUTS_LIVE && canUseAutoPayouts(plan as PlanTier) ? "pointer" : "not-allowed", display: "flex", flexShrink: 0, opacity: AUTO_PAYOUTS_LIVE && canUseAutoPayouts(plan as PlanTier) ? 1 : 0.45 }}>
               <input
                 type="checkbox"
-                checked={autoPayoutMonthly && canUseAutoPayouts(plan as PlanTier)}
-                disabled={!canUseAutoPayouts(plan as PlanTier)}
+                checked={AUTO_PAYOUTS_LIVE && autoPayoutMonthly && canUseAutoPayouts(plan as PlanTier)}
+                disabled={!AUTO_PAYOUTS_LIVE || !canUseAutoPayouts(plan as PlanTier)}
                 onChange={async (e: React.ChangeEvent<HTMLInputElement>) => {
                   if (!canUseAutoPayouts(plan as PlanTier)) return;
                   const val = e.target.checked;
@@ -2730,11 +2734,11 @@ export function PayoutsView({
                 }}
                 style={{ position: "absolute", opacity: 0, width: 0, height: 0 }}
               />
-              <PayoutsToggle on={autoPayoutMonthly && canUseAutoPayouts(plan)} />
+              <PayoutsToggle on={AUTO_PAYOUTS_LIVE && autoPayoutMonthly && canUseAutoPayouts(plan)} />
             </label>
           </div>
 
-          {autoPayoutMonthly && canUseAutoPayouts(plan as PlanTier) && (
+          {AUTO_PAYOUTS_LIVE && autoPayoutMonthly && canUseAutoPayouts(plan as PlanTier) && (
             <div style={{ borderTop: "1px solid var(--ws-border)", padding: "16px 20px 20px", background: "var(--ws-surface-2)" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
                 <div style={{ flex: 1, minWidth: 200, opacity: canUseStripeConnectPayouts(plan) ? 1 : 0.45 }}>
@@ -2789,6 +2793,16 @@ export function PayoutsView({
     </>
   );
 }
+
+/**
+ * Funding the balance by card is not wired to a payment provider yet: no money
+ * would move. Until it is, the button explains that instead of adding a fake
+ * amount to a number kept in the browser.
+ */
+const BALANCE_TOPUP_LIVE = false;
+
+/** The monthly payout cron is disabled (no real transfers yet): the toggle says "coming soon". */
+const AUTO_PAYOUTS_LIVE = false;
 
 function walletBalanceStorageKey(userId: string) {
   return `trackit_wallet_balance_${userId}`;
@@ -3641,7 +3655,7 @@ export function BalanceView({
   };
 
   useEffect(() => {
-    if (!userId) return;
+    if (!userId || !BALANCE_TOPUP_LIVE) return;
     setWalletBalance(loadWalletBalance(userId));
   }, [userId]);
 
@@ -3690,12 +3704,27 @@ export function BalanceView({
       setUpgradeFeature("balance");
       return;
     }
+    if (!BALANCE_TOPUP_LIVE) {
+      setPayMessage(
+        lang === "fr"
+          ? "Le rechargement du solde par carte arrive bientôt. En attendant, vous payez vos créateurs directement depuis Paiements : rien n’est débité ici."
+          : "Funding the balance by card is coming soon. Meanwhile, you pay creators directly from Payouts: nothing is charged here.",
+      );
+      return;
+    }
     if (presetAmount != null) setFundAmount(String(presetAmount));
     setAddFundsOpen(true);
   };
 
-  const balanceHint =
-    owedTotal > walletBalance
+  const balanceHint = !BALANCE_TOPUP_LIVE
+    ? owedTotal > 0
+      ? lang === "fr"
+        ? `${formatCurrency(owedTotal, lang)} dus à vos créateurs : payez-les depuis Paiements`
+        : `${formatCurrency(owedTotal, lang)} owed to your creators: pay them from Payouts`
+      : lang === "fr"
+        ? "Rien à payer pour l’instant"
+        : "Nothing owed right now"
+    : owedTotal > walletBalance
       ? lang === "fr"
         ? `${formatCurrency(owedTotal - walletBalance, lang)} à ajouter pour couvrir les commissions`
         : `${formatCurrency(owedTotal - walletBalance, lang)} needed to cover commissions`
@@ -3910,8 +3939,13 @@ export function BalanceView({
                 </button>
               )}
             </div>
+            {payMessage && (
+              <p role="status" style={{ margin: "14px 0 0", fontSize: 13, color: "var(--ws-text-muted)", letterSpacing: "-0.01em", lineHeight: 1.45 }}>
+                {payMessage}
+              </p>
+            )}
 
-            {hasBillingPaymentMethod && (
+            {BALANCE_TOPUP_LIVE && hasBillingPaymentMethod && (
               <div style={{ marginTop: 24 }}>
                 <div style={{ fontSize: 12, color: "var(--ws-text-dim)", letterSpacing: "-0.01em", marginBottom: 10 }}>
                   {lang === "fr" ? "Montants rapides" : "Quick amounts"}
