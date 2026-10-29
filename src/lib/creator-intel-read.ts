@@ -86,7 +86,7 @@ function bitsFromFeed(c: FeedCreator | undefined): CreatorBits | undefined {
   };
 }
 
-function bitsFromViewRow(v: Row): CreatorBits {
+export function bitsFromViewRow(v: Row): CreatorBits {
   const username = str(v.username);
   return {
     displayName: str(v.display_name) || username,
@@ -106,7 +106,7 @@ function videoFormat(v: Row, mediaType: LibraryVideo["mediaType"]): LibraryVideo
   return str(v.platform).toLowerCase() === "youtube" && n(v.duration_seconds) > 180 ? "long" : "short";
 }
 
-function trackedVideo(v: Row, c: CreatorBits | undefined): LibraryVideo {
+export function trackedVideo(v: Row, c: CreatorBits | undefined): LibraryVideo {
   const username = str(v.username);
   const { cover, fallback } = videoCover({ platform: str(v.platform), username, raw: str(v.cover_url) });
   const mediaType = (["video", "photo", "carousel"].includes(str(v.media_type)) ? v.media_type : "video") as LibraryVideo["mediaType"];
@@ -390,7 +390,7 @@ function orderVideos(query: Query, sort: VideoSort | undefined): Query {
   return out.order("views", { ascending: false }).order("video_id", { ascending: true });
 }
 
-function applyVideoFilters(query: Query, q: VideoQuery, source: "view" | "table"): Query {
+export function applyVideoFilters(query: Query, q: VideoQuery, source: "view" | "table"): Query {
   let vq = query;
   if (q.platform) vq = vq.ilike("platform", q.platform);
   if (q.minViews) vq = vq.gte("views", q.minViews);

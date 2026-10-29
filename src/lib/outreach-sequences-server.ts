@@ -2,7 +2,8 @@
 // from stored data, Claude generation with the number guard, audience lookup and
 // the outreach_history mirror. Used by /api/mailboxes*, /api/outreach/sequences*
 // and the two crons.
-import Anthropic from "@anthropic-ai/sdk";
+import { isAiOutage } from "@/lib/ai-provider";
+import { chat, llmConfigured } from "@/lib/llm";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
 import { requireBrandSpace } from "@/lib/brand-workspace-server";
@@ -28,7 +29,7 @@ import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { isMissingWorkspaceIdError } from "@/lib/workspace-db";
 
 /** Latest Sonnet: fast and good at short, specific writing. */
-export const SEQUENCE_MODEL = "claude-sonnet-5-5";
+export const SEQUENCE_MODEL = "smart";
 
 // ── Access ─────────────────────────────────────────────────────────────────────
 
@@ -203,27 +204,26 @@ export class GenerationError extends Error {
   }
 }
 
-let anthropic: Anthropic | null = null;
-function client(): Anthropic {
-  if (!process.env.ANTHROPIC_API_KEY) throw new GenerationError("ANTHROPIC_API_KEY is not set", "ai_not_configured");
-  anthropic ??= new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-  return anthropic;
-}
-
 async function callJson(system: string, user: string, schema: Record<string, unknown>) {
-  const response = await client().messages.create({
-    model: SEQUENCE_MODEL,
-    max_tokens: 4000,
-    system,
-    messages: [{ role: "user", content: user }],
-    output_config: { effort: "low", format: { type: "json_schema", schema } },
-  });
-  if (response.stop_reason === "refusal") throw new GenerationError("The model declined this request", "ai_refused");
-  const text = response.content
-    .filter((b): b is Anthropic.TextBlock => b.type === "text")
-    .map((b) => b.text)
-    .join("");
-  const parsed = parseEmailJson(text);
+  if (!llmConfigured()) throw new GenerationError("No LLM provider is configured (CHEAPER_INFERENCE_API_KEY)", "ai_not_configured");
+  // OpenAI-format gateway: the schema goes in the system prompt; parseEmailJson validates as before.
+  const response = await chat(
+    [
+      {
+        role: "system",
+        content: `${system}
+
+Answer with ONE JSON object only (no prose, no code fence) that matches this JSON schema:
+${JSON.stringify(schema)}`,
+      },
+      { role: "user", content: user },
+    ],
+    { model: SEQUENCE_MODEL, maxTokens: 2000, timeoutMs: 45_000 },
+  );
+  if (response.finishReason === "refusal" || response.finishReason === "content_filter") {
+    throw new GenerationError("The model declined this request", "ai_refused");
+  }
+  const parsed = parseEmailJson(response.text);
   if (!parsed) throw new GenerationError("The model returned an unreadable answer", "ai_bad_output");
   return parsed;
 }
@@ -310,6 +310,8 @@ export async function generateSequenceEmail(input: GenerateInput): Promise<Gener
     return { subject: input.firstSubject ?? "", body: result.body, languageCode: language.code, optOutLang: language.optOutLang };
   } catch (e) {
     if (e instanceof GenerationError && e.code === "ai_not_configured") throw e;
+    // Provider down (credit balance, overload…): the cron postpones instead of sending a template.
+    if (!(e instanceof GenerationError) && isAiOutage(e)) throw e;
     return fallback();
   }
 }

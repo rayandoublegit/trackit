@@ -20,6 +20,8 @@ export type EmailDraft = {
   subject: string;
   body: string;
   source: "ai" | "template";
+  /** True when the AI was allowed but the provider was down: the template stands in. */
+  aiUnavailable?: boolean;
 };
 
 const PLATFORM_NAMES: Record<string, string> = {
@@ -159,8 +161,8 @@ export async function generateCreatorEmailDraft(options: {
         lang: options.lang,
       }),
     });
-    if (!res.ok) return template;
-    const data = (await res.json().catch(() => ({}))) as { message?: unknown; subject?: unknown };
+    const data = (await res.json().catch(() => ({}))) as { message?: unknown; subject?: unknown; error?: unknown };
+    if (!res.ok) return data.error === "ai_unavailable" ? { ...template, aiUnavailable: true } : template;
     const message = typeof data.message === "string" ? fillPlaceholders(data.message, brand) : "";
     if (message.length < 40) return template;
     const subject = typeof data.subject === "string" && data.subject.trim() ? data.subject.trim() : template.subject;

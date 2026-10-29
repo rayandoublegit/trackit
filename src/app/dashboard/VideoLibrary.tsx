@@ -10,6 +10,67 @@ import { createFetchCache } from "@/lib/client-fetch-cache";
 import { CoverImage } from "./CoverImage";
 import "./video-library.css";
 import { UpgradeNudge } from "@/components/PlanLock";
+import { TranscriptViewer, VideoInsightBadges } from "./CreatorContentInsights";
+import { CTA_LABELS, FORMAT_LABELS, HOOK_LABELS, type VideoInsightBrief } from "@/lib/video-intel/client-types";
+import "./creator-insights.css";
+
+/** Video-insight filters (Growth and above), kept in this view: hook type, format, CTA, topic, product, sort by performance. */
+type InsightFilterState = { hookType: string; contentFormat: string; ctaType: string; topic: string; mentionsProduct: boolean; sortPerformance: boolean };
+const EMPTY_INSIGHT_FILTERS: InsightFilterState = { hookType: "", contentFormat: "", ctaType: "", topic: "", mentionsProduct: false, sortPerformance: false };
+
+function insightParams(f: InsightFilterState): string {
+  const p = new URLSearchParams();
+  if (f.hookType) p.set("hookType", f.hookType);
+  if (f.contentFormat) p.set("contentFormat", f.contentFormat);
+  if (f.ctaType) p.set("ctaType", f.ctaType);
+  if (f.topic.trim().length >= 2) p.set("topic", f.topic.trim());
+  if (f.mentionsProduct) p.set("mentionsProduct", "1");
+  if (f.sortPerformance) p.set("sort", "performance");
+  const s = p.toString();
+  return s ? `&${s}` : "";
+}
+
+function InsightFilterBar({ value, onChange, lang }: { value: InsightFilterState; onChange: (v: InsightFilterState) => void; lang: Lang }) {
+  const fr = lang === "fr";
+  const options = (table: Record<string, [string, string]>) =>
+    Object.entries(table).map(([k, l]) => (
+      <option key={k} value={k}>
+        {l[fr ? 1 : 0]}
+      </option>
+    ));
+  const active = JSON.stringify(value) !== JSON.stringify(EMPTY_INSIGHT_FILTERS);
+  return (
+    <div className="ci-filters" role="group" aria-label={fr ? "Filtres d'analyse vidéo" : "Video insight filters"}>
+      <span className="ci-filters__title">{fr ? "Analyse" : "Insights"}</span>
+      <select value={value.hookType} onChange={(e) => onChange({ ...value, hookType: e.target.value })} aria-label={fr ? "Type d'accroche" : "Hook type"}>
+        <option value="">{fr ? "Toutes les accroches" : "Any hook"}</option>
+        {options(HOOK_LABELS)}
+      </select>
+      <select value={value.contentFormat} onChange={(e) => onChange({ ...value, contentFormat: e.target.value })} aria-label="Format">
+        <option value="">{fr ? "Tous les formats" : "Any format"}</option>
+        {options(FORMAT_LABELS)}
+      </select>
+      <select value={value.ctaType} onChange={(e) => onChange({ ...value, ctaType: e.target.value })} aria-label={fr ? "Appel à l'action" : "Call to action"}>
+        <option value="">{fr ? "Tous les appels à l'action" : "Any CTA"}</option>
+        {options(CTA_LABELS)}
+      </select>
+      <input value={value.topic} onChange={(e) => onChange({ ...value, topic: e.target.value })} placeholder={fr ? "Sujet (ex. skincare)" : "Topic (e.g. skincare)"} aria-label={fr ? "Sujet" : "Topic"} />
+      <label>
+        <input type="checkbox" checked={value.mentionsProduct} onChange={(e) => onChange({ ...value, mentionsProduct: e.target.checked })} />
+        {fr ? "Parle d'un produit" : "Mentions a product"}
+      </label>
+      <label>
+        <input type="checkbox" checked={value.sortPerformance} onChange={(e) => onChange({ ...value, sortPerformance: e.target.checked })} />
+        {fr ? "Trier par performance" : "Sort by performance"}
+      </label>
+      {active ? (
+        <button type="button" className="ci-filters__clear" onClick={() => onChange(EMPTY_INSIGHT_FILTERS)}>
+          {fr ? "Effacer" : "Clear"}
+        </button>
+      ) : null}
+    </div>
+  );
+}
 
 // Creators > Videos: every tracked video, like an ad library. Filters come from
 // the catalog bar; this component fetches /api/videos and renders the cards.
@@ -107,7 +168,7 @@ const I = ({ d }: { d: string }) => (
   </svg>
 );
 
-function VideoCard({ v, index, onOpenCreator }: { v: LibraryVideo; index: number; onOpenCreator: (username: string) => void }) {
+function VideoCard({ v, index, onOpenCreator, insight, onTranscript }: { v: LibraryVideo; index: number; onOpenCreator: (username: string) => void; insight?: VideoInsightBrief; onTranscript?: () => void }) {
   const lang = useLang();
   const fr = lang === "fr";
   const [more, setMore] = useState(false);
@@ -140,6 +201,11 @@ function VideoCard({ v, index, onOpenCreator }: { v: LibraryVideo; index: number
             </button>
           ) : null}
         </p>
+      ) : null}
+      {insight ? (
+        <div className="vl-card__insight">
+          <VideoInsightBadges insight={insight} lang={lang} />
+        </div>
       ) : null}
       <a className="vl-card__media" href={v.shareUrl || undefined} target="_blank" rel="noreferrer">
         <CoverImage src={v.cover} fallback={v.coverFallback} width={270} height={420} priority={index < 4} />
@@ -187,6 +253,11 @@ function VideoCard({ v, index, onOpenCreator }: { v: LibraryVideo; index: number
       ) : null}
       <footer className="vl-card__foot">
         <button type="button" onClick={() => onOpenCreator(v.username)}>{fr ? "Voir le créateur" : "See creator"}</button>
+        {insight && onTranscript ? (
+          <button type="button" className="ci-transcript-btn" onClick={onTranscript}>
+            {fr ? "Transcription" : "Transcript"}
+          </button>
+        ) : null}
         <a href={v.shareUrl || undefined} target="_blank" rel="noreferrer">
           {fr ? "Ouvrir la vidéo" : "Open video"} <I d="M7 17L17 7M9 7h8v8" />
         </a>
@@ -218,6 +289,10 @@ export function VideoLibrary({
   const [error, setError] = useState(false);
   const [needsTracking, setNeedsTracking] = useState(false);
   const [teaserLocked, setTeaserLocked] = useState(false);
+  const [intel, setIntel] = useState<InsightFilterState>(EMPTY_INSIGHT_FILTERS);
+  const [insights, setInsights] = useState<Record<string, VideoInsightBrief>>({});
+  const [insightsLocked, setInsightsLocked] = useState(false);
+  const [transcriptOf, setTranscriptOf] = useState<{ platform: string; id: string } | null>(null);
   const gen = useRef(0);
   const firstLoad = useRef(true);
   const moreBusy = useRef(false);
@@ -225,10 +300,10 @@ export function VideoLibrary({
 
   const params = useCallback(
     (offset: number, limit: number, snapshot = false) => {
-      const query = videoFiltersToParams(filters, search, platform, offset, limit);
+      const query = videoFiltersToParams(filters, search, platform, offset, limit) + insightParams(intel);
       return snapshot ? `${query}&source=snapshot` : query;
     },
-    [filters, search, platform],
+    [filters, search, platform, intel],
   );
   const cacheKey = params(0, FIRST_PAGE);
 
@@ -240,6 +315,8 @@ export function VideoLibrary({
       setSource(d.source);
       setNeedsTracking(Boolean(d.needsTracking));
       setTeaserLocked(Boolean(d.teaserLocked));
+      setInsights(d.insights ?? {});
+      setInsightsLocked(Boolean(d.insightsLocked));
       setLoading(false);
     };
     setError(false);
@@ -286,15 +363,17 @@ export function VideoLibrary({
       const merged = [...videos, ...d.videos.filter((v) => !seen.has(`${v.platform}-${v.id}`))];
       setVideos(merged);
       setHasMore(d.hasMore && d.videos.length > 0);
+      const mergedInsights = { ...insights, ...(d.insights ?? {}) };
+      setInsights(mergedInsights);
       const cached = libraryCache.get(cacheKey);
-      if (cached) libraryCache.set(cacheKey, { ...cached, videos: merged, hasMore: d.hasMore && d.videos.length > 0 });
+      if (cached) libraryCache.set(cacheKey, { ...cached, videos: merged, hasMore: d.hasMore && d.videos.length > 0, insights: mergedInsights });
     } catch {
       /* the button stays; the next scroll retries */
     } finally {
       moreBusy.current = false;
       if (my === gen.current) setLoadingMore(false);
     }
-  }, [cacheKey, hasMore, params, source, videos]);
+  }, [cacheKey, hasMore, params, source, videos, insights]);
 
   // Infinite scroll: the next page starts loading well before the end of the grid.
   useEffect(() => {
@@ -308,8 +387,22 @@ export function VideoLibrary({
     return () => io.disconnect();
   }, [hasMore, loadMore, videos.length]);
 
+  const bar = <InsightFilterBar value={intel} onChange={setIntel} lang={lang} />;
+  const lockedNudge = insightsLocked ? (
+    <div style={{ maxWidth: 560, margin: "8px auto 16px" }}>
+      <UpgradeNudge
+        lang={lang}
+        feature="video-insights"
+        title={fr ? "Filtres d'analyse vidéo avec Growth" : "Video insight filters with Growth"}
+        body={fr ? "Filtrez par accroche, format, appel à l'action ou sujet, et triez par performance réelle." : "Filter by hook, format, call to action or topic, and sort by real performance."}
+      />
+    </div>
+  ) : null;
+
   if (loading && !videos.length) {
     return (
+      <>
+      {bar}
       <div className="vl-grid" aria-hidden>
         {Array.from({ length: 8 }, (_, i) => (
           <div key={i} className="vl-card is-ghost" style={{ ["--i" as string]: i }}>
@@ -319,12 +412,16 @@ export function VideoLibrary({
           </div>
         ))}
       </div>
+      </>
     );
   }
-  if (error) return <p className="vl-empty">{fr ? "La bibliothèque de vidéos ne répond pas. Réessayez dans un instant." : "The video library is not responding. Try again in a moment."}</p>;
+  if (error) return <>{bar}<p className="vl-empty">{fr ? "La bibliothèque de vidéos ne répond pas. Réessayez dans un instant." : "The video library is not responding. Try again in a moment."}</p></>;
   if (!videos.length) {
     return (
-      <p className="vl-empty">
+      <>
+      {bar}
+      {lockedNudge}
+      {lockedNudge ? null : <p className="vl-empty">
         {needsTracking
           ? fr
             ? "Aucune vidéo suivie ne correspond encore. Le format, la durée et le lien produit ne sont connus que pour les vidéos suivies, et de nouvelles vidéos sont ajoutées chaque jour."
@@ -332,12 +429,14 @@ export function VideoLibrary({
           : fr
             ? "Aucune vidéo ne correspond encore à ces filtres."
             : "No video matches these filters yet."}
-      </p>
+      </p>}
+      </>
     );
   }
 
   return (
     <>
+      {bar}
       {source === "snapshot" ? (
         <p className="vl-note">
           {fr
@@ -347,7 +446,14 @@ export function VideoLibrary({
       ) : null}
       <div className="vl-grid">
         {videos.map((v, i) => (
-          <VideoCard key={`${v.platform}-${v.id}`} v={v} index={i} onOpenCreator={onOpenCreator} />
+          <VideoCard
+            key={`${v.platform}-${v.id}`}
+            v={v}
+            index={i}
+            onOpenCreator={onOpenCreator}
+            insight={insights[`${v.platform}:${v.id}`]}
+            onTranscript={() => setTranscriptOf({ platform: v.platform, id: v.id })}
+          />
         ))}
       </div>
       {hasMore ? (
@@ -368,6 +474,7 @@ export function VideoLibrary({
           />
         </div>
       ) : null}
+      {transcriptOf ? <TranscriptViewer platform={transcriptOf.platform} videoId={transcriptOf.id} lang={lang} onClose={() => setTranscriptOf(null)} /> : null}
     </>
   );
 }

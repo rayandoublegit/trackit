@@ -344,6 +344,21 @@ export function SettingsView({
           <p style={{ fontSize: 14, color: "var(--ws-text-muted)", letterSpacing: "-0.01em" }}>{lang === "fr" ? "Chargement des paramètres..." : "Loading settings..."}</p>
         ) : (
           <>
+            {(tab === "general" || tab === "profile") && (!user || !profile) && (
+              <div role="alert" style={{ fontSize: 14, color: "var(--ws-text-muted)", letterSpacing: "-0.01em", display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+                <span>{lang === "fr" ? "Impossible de charger vos paramètres pour le moment." : "Your settings couldn’t be loaded right now."}</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLoading(true);
+                    void reloadProfile().finally(() => setLoading(false));
+                  }}
+                  style={{ background: "none", border: "1px solid var(--ws-border)", borderRadius: 8, padding: "6px 12px", color: "var(--ws-text)", cursor: "pointer", fontFamily: "inherit", fontSize: 13 }}
+                >
+                  {lang === "fr" ? "Réessayer" : "Try again"}
+                </button>
+              </div>
+            )}
             {tab === "general" && user && profile && (
               <GeneralSettings
                 userId={user.id}

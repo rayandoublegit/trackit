@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getAuthedUserId } from "@/lib/api-auth";
 import {
   getSupabaseAdminForVideos,
   resolveCreatorVideoStreams,
@@ -10,6 +11,8 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ username: string }> }
 ) {
+  // Signed-in only: a miss falls back to a paid provider call.
+  if (!(await getAuthedUserId(request))) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { username } = await params;
   if (!username?.trim()) {
     return NextResponse.json({ error: "missing username" }, { status: 400 });

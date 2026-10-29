@@ -146,6 +146,11 @@ export function canSeeCreatorEmails(plan: PlanTier): boolean {
   return isGrowthOrAbove(plan);
 }
 
+/** Video intelligence: why a creator's videos work, hooks / formats per video, transcripts, insight filters (Growth and above). */
+export function canSeeVideoInsights(plan: PlanTier): boolean {
+  return isGrowthOrAbove(plan);
+}
+
 /** Hourly live lookups per workspace owner; `0` = none (Free). */
 export function liveLookupHourlyLimit(plan: PlanTier): number {
   return canUseLiveLookup(plan) ? LIVE_LOOKUP_MAX_PER_HOUR : 0;

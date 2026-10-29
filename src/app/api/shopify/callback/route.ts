@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { isMyshopifyDomain, validShopifyQueryHmac } from "@/lib/shopify-webhook";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
@@ -10,7 +11,15 @@ export async function GET(request: NextRequest) {
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
-  if (!code || !shop || !state || state !== storedState) {
+  // Same browser (state cookie), a real *.myshopify.com host (the app secret is
+  // sent there) and Shopify's own signature on the redirect.
+  if (
+    !code ||
+    !isMyshopifyDomain(shop) ||
+    !state ||
+    state !== storedState ||
+    !validShopifyQueryHmac(searchParams, process.env.SHOPIFY_CLIENT_SECRET)
+  ) {
     return NextResponse.redirect(`${appUrl}/dashboard?shopify=error`);
   }
 

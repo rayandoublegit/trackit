@@ -234,7 +234,9 @@ function FollowUpPanel({
   onClose,
   onSend,
   onMarkManual,
+  brandName,
 }: {
+  brandName: string;
   lang: "en" | "fr";
   entry: OutreachHistoryEntry;
   slideIn: boolean;
@@ -242,7 +244,7 @@ function FollowUpPanel({
   onSend: () => Promise<void> | void;
   onMarkManual: () => void;
 }) {
-  const [message, setMessage] = useState(() => buildFollowUpMessage(entry.creator, "Trackit", lang));
+  const [message, setMessage] = useState(() => buildFollowUpMessage(entry.creator, brandName.trim() || (lang === "fr" ? "L’équipe" : "The team"), lang));
   const [tone, setTone] = useState<FollowUpTone>("Casual");
   const [platform, setPlatform] = useState(entry.platform.toLowerCase());
   const [sending, setSending] = useState(false);
@@ -267,7 +269,7 @@ function FollowUpPanel({
         body: JSON.stringify({
           creator: selectedCreator,
           originalMessage: originalMessageText,
-          brand: "Trackit",
+          brand: brandName.trim(),
           daysSince: 3,
           tone: tone.toLowerCase(),
           lang,
@@ -1349,7 +1351,9 @@ export function OutreachHistorySection({
   isMobile,
   refreshKey = 0,
   userId,
+  brandName = "",
 }: {
+  brandName?: string;
   plan: PlanTier;
   onNavigateToBilling: () => void;
   onUpgrade?: () => void;
@@ -1613,14 +1617,14 @@ export function OutreachHistorySection({
       body: JSON.stringify({
         creator: { displayName: item.creator, username: item.handle, platform: item.platform },
         originalMessage: item.message,
-        brand: "Trackit",
+        brand: brandName.trim(),
         daysSince: 3,
         tone: "casual",
         lang,
       }),
     });
     const data = await res.json().catch(() => ({}));
-    if (data.followUp || data.message) {
+    if (res.ok && (data.followUp || data.message)) {
       await navigator.clipboard.writeText(data.followUp || data.message);
       alert(lang === "fr" ? "Message de relance copié dans le presse-papiers ✓" : "Follow-up outreach copied to clipboard ✓");
       const { supabase: sb } = await import("@/lib/supabase");
@@ -1631,6 +1635,14 @@ export function OutreachHistorySection({
       setManageEntry(null);
       await loadHistory();
       dispatchOutreachHistoryUpdated();
+    } else {
+      setToast(
+        typeof data.message === "string" && data.error
+          ? data.message
+          : lang === "fr"
+            ? "La relance n’a pas pu être rédigée. Réessayez."
+            : "The follow-up couldn’t be written. Try again.",
+      );
     }
   };
 
@@ -1709,7 +1721,7 @@ export function OutreachHistorySection({
   const filterTabs: { id: HistoryFilter; label: string }[] = [
     { id: "all", label: lang === "fr" ? "Tous" : "All" },
     { id: "sent", label: lang === "fr" ? "Envoyé" : "Sent" },
-    { id: "opened", label: lang === "fr" ? "Ouvert" : "Opened" },
+    // No "Opened" tab: opens are not tracked (no pixel), it would always read 0.
     { id: "replied", label: lang === "fr" ? "Répondu" : "Replied" },
     { id: "no_response", label: lang === "fr" ? "Pas de réponse" : "No reply" },
     { id: "converted", label: lang === "fr" ? "Converti" : "Converted" },
@@ -2024,6 +2036,7 @@ export function OutreachHistorySection({
           onClose={closeFollowUp}
           onSend={() => completeFollowUpSend(followUpEntry.id)}
           onMarkManual={() => completeFollowUpSend(followUpEntry.id)}
+          brandName={brandName}
         />
       )}
 

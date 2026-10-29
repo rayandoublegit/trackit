@@ -5,6 +5,7 @@ import { hashtagsOf, type CallMeter, type CreatorSource, type ScrapePlatform, ty
 import { scrapeCreatorsInstagram } from "./sources-instagram";
 import { rapidApiInstagram } from "./sources-instagram-rapid";
 import { scrapeCreatorsYouTube } from "./sources-youtube";
+import { captionFieldsOf } from "@/lib/video-intel/captions";
 
 // TikTok sources (ScrapeCreators and the RapidAPI TikTok scraper) and the
 // provider choice for every platform. Parsers are pure and exported for tests:
@@ -75,6 +76,7 @@ export function parseRapidVideos(raw: any, username: string): ScrapedVideo[] {
       shares: num(v?.share_count),
       saves: num(v?.collect_count),
       ...langAndRegion(v?.desc_language ?? v?.language, v?.region ?? v?.author?.region),
+      ...captionFieldsOf(v),
     });
   }
   return out;
@@ -123,6 +125,7 @@ export function parseScrapeCreatorsTikTokVideos(raw: any, username: string): Scr
       shares: num(st.share_count),
       saves: num(st.collect_count),
       ...langAndRegion(a?.desc_language, a?.author?.region ?? a?.region),
+      ...captionFieldsOf(a),
     });
   }
   return out;

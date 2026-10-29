@@ -1,5 +1,6 @@
-import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
+import { reportAiFailure } from "@/lib/ai-provider";
+import { chat, llmConfigured, type ContentPart } from "@/lib/llm";
 import { getAuthedUserId } from "@/lib/api-auth";
 import { ANALYSIS_JSON_SCHEMA, asksForEmail, parseJsonObject, validateAnalysis, type MinoAnalysisMeta } from "@/lib/mino-analysis";
 import { cardCreator, runCreatorSearch, type MinoSearchResult } from "@/lib/mino-creator-search";
@@ -25,7 +26,6 @@ export const maxDuration = 60;
 
 type Lang = "en" | "fr";
 
-const MODEL = "claude-sonnet-5-5";
 const IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif", "image/heic", "image/heif"]);
 
@@ -172,7 +172,7 @@ export async function POST(request: Request) {
   if (!site && !img) return fail(siteError ? 422 : 400, siteError ?? "nothing_to_analyse", { url: rawUrl ?? null });
 
   // 2. Analysis.
-  if (!process.env.ANTHROPIC_API_KEY) {
+  if (!llmConfigured()) {
     return fail(503, "ai_unavailable", {
       site: site ? { host: site.host, title: site.title, description: site.description } : null,
     });
@@ -192,33 +192,38 @@ export async function POST(request: Request) {
     .filter(Boolean)
     .join("\n\n");
 
-  const content: Anthropic.ContentBlockParam[] = [];
-  if (img) content.push({ type: "image", source: { type: "base64", media_type: img.mediaType, data: img.data } });
+  const content: ContentPart[] = [];
+  if (img) content.push({ type: "image_url", image_url: { url: `data:${img.mediaType};base64,${img.data}` } });
   content.push({ type: "text", text });
 
   let analysis: ReturnType<typeof validateAnalysis> = null;
   try {
-    const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: 45_000, maxRetries: 1 });
-    const response = await anthropic.messages.create({
-      model: MODEL,
-      max_tokens: 4000,
-      system: systemPrompt(lang),
-      output_config: {
-        effort: "low",
-        format: { type: "json_schema", schema: ANALYSIS_JSON_SCHEMA as unknown as Record<string, unknown> },
-      },
-      messages: [{ role: "user", content }],
-    });
-    // Reached Claude: a billable analysis, whatever the answer.
+    // The gateway speaks the OpenAI format: the schema the Anthropic structured
+    // output enforced goes in the system prompt, the validation below is unchanged.
+    const response = await chat(
+      [
+        {
+          role: "system",
+          content: `${systemPrompt(lang)}
+
+Answer with ONE JSON object only (no prose, no code fence) that matches this JSON schema:
+${JSON.stringify(ANALYSIS_JSON_SCHEMA)}`,
+        },
+        { role: "user", content },
+      ],
+      { model: "smart", maxTokens: 2500, timeoutMs: 45_000 },
+    );
+    // Reached the model: a billable analysis, whatever the answer.
     await recordUsage(admin, userId, "mino-analysis", { site: site?.host ?? null, image: Boolean(img) });
-    if (response.stop_reason === "refusal") return fail(422, "analysis_refused");
-    const out = response.content
-      .filter((b): b is Anthropic.TextBlock => b.type === "text")
-      .map((b) => b.text)
-      .join("");
+    if (response.finishReason === "refusal" || response.finishReason === "content_filter") return fail(422, "analysis_refused");
+    const out = response.text;
     analysis = validateAnalysis(parseJsonObject(out), { wantEmail: asksForEmail(message) });
   } catch (e) {
-    console.error("POST /api/mino/analyze model", e instanceof Anthropic.APIError ? `${e.status} ${e.message}` : e);
+    const failure = reportAiFailure("mino-analyze", e);
+    // Provider down (credit balance, key, overload, network): an honest "unavailable", not a crash.
+    if (failure.kind !== "request" && failure.kind !== "unknown") {
+      return fail(503, "ai_down", { site: site ? { host: site.host, title: site.title, description: site.description } : null });
+    }
     return fail(502, "analysis_failed");
   }
   if (!analysis) return fail(502, "analysis_failed");

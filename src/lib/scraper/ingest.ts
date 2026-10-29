@@ -323,8 +323,15 @@ export async function refreshCreator(
         saves: v.saves,
         engagement_rate: v.views > 0 ? Math.round(((v.likes + v.comments + v.shares) / v.views) * 10_000) / 100 : null,
         last_scraped_at: nowIso,
+        // Free transcript source for video intelligence (migration 000053). Every row carries
+        // the keys (a bulk upsert fills missing keys with null anyway): the latest payload wins,
+        // which is what we want for caption URLs that are signed and expire.
+        subtitle_url: v.subtitleUrl ?? null,
+        subtitle_lang: v.subtitleLang ?? null,
+        audio_kind: v.audioKind ?? null,
+        media_url: v.mediaUrl ?? null,
       })),
-      ["format", "product_url"],
+      ["format", "product_url", "subtitle_url", "subtitle_lang", "audio_kind", "media_url"],
     );
     await admin.from("creator_video_snapshots").upsert(
       videos.map((v) => ({ platform, video_id: v.id, captured_on: today, views: v.views, likes: v.likes, comments: v.comments, shares: v.shares })),

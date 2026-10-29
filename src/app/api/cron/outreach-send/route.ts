@@ -5,6 +5,7 @@
 import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { isAiOutage, reportAiFailure } from "@/lib/ai-provider";
 import { credentialsFromRow, getMailboxDriver } from "@/lib/mailbox-driver";
 import {
   advanceAfterSend,
@@ -17,6 +18,7 @@ import {
   mailboxCanSendNow,
   makeMessageId,
   MAX_SEND_ATTEMPTS,
+  nextWindowOpening,
   normalizeLang,
   normalizeSendWindow,
   normalizeSteps,
@@ -92,7 +94,7 @@ async function sentLast24h(admin: SupabaseClient, mailboxId: string, now: Date):
 }
 
 export async function GET(request: Request) {
-  if (request.headers.get("authorization") !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!process.env.CRON_SECRET || request.headers.get("authorization") !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const admin = getSupabaseAdmin();
@@ -264,6 +266,16 @@ async function sendStep(
     }
     if (!p.facts) p.facts = facts;
   } catch (e) {
+    if (!(e instanceof GenerationError) && isAiOutage(e)) {
+      // The AI provider is down (credit balance, overload…): not this contact's fault.
+      // Try again in an hour without spending one of its attempts.
+      reportAiFailure("outreach-send", e);
+      await admin
+        .from("outreach_sequence_contacts")
+        .update({ next_send_at: nextWindowOpening(new Date(now.getTime() + 60 * 60 * 1000), window).toISOString() })
+        .eq("id", contact.id);
+      return "failed";
+    }
     const permanent = e instanceof GenerationError && (e.code === "unsupported_numbers" || e.code === "ai_refused");
     return recordFailure(admin, contact, window, now, (e as Error).message, permanent, null, stepIndex);
   }

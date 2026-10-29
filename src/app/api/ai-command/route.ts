@@ -1,6 +1,7 @@
-import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse, type NextRequest } from "next/server";
+import { aiUnavailableMessage, isAiOutage, reportAiFailure } from "@/lib/ai-provider";
 import { getAuthedUserId } from "@/lib/api-auth";
+import { chat, llmConfigured } from "@/lib/llm";
 
 export const dynamic = "force-dynamic";
 
@@ -342,7 +343,7 @@ export async function POST(request: NextRequest) {
 
   const views = navigableForRole(role);
 
-  if (!process.env.ANTHROPIC_API_KEY) {
+  if (!llmConfigured()) {
     return NextResponse.json({
       ok: true,
       command: localFallback(context ? `${context}\n${text}` : text, lang, nowLocal, creators, role),
@@ -351,7 +352,6 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
     const roleBlurb =
       role === "creator"
         ? `The user is a CREATOR on Trackit. They can open analytics (sales/commissions/RPM), upload content, join community, read brand infos/rules/pricing, hooks, Pay it / balance, planner, whiteboard, settings. They cannot pay other creators or create brand campaigns.`
@@ -375,10 +375,7 @@ Do NOT use pay_creator or create_campaign. For money/payout questions, navigate 
 {"action":"clarify","question":"..."}
 {"action":"chat","reply":"..."}`;
 
-    const message = await anthropic.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 500,
-      messages: [
+    const message = await chat([
         {
           role: "user",
           content: `You are Mino, the execution assistant of Trackit. Convert the user's request into EXACTLY ONE JSON object. Output JSON only — no markdown, no prose.
@@ -402,10 +399,9 @@ Rules:
 Previous context: """${context}"""
 User request: """${text}"""`,
         },
-      ],
-    });
+      ], { model: "fast", maxTokens: 500, timeoutMs: 20_000 });
 
-    const raw = message.content[0]?.type === "text" ? message.content[0].text : "";
+    const raw = message.text;
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
     const parsed = jsonMatch ? (JSON.parse(jsonMatch[0]) as unknown) : null;
     const command = sanitizeAction(parsed, role, lang);
@@ -413,11 +409,15 @@ User request: """${text}"""`,
 
     return NextResponse.json({ ok: true, command, source: "claude" });
   } catch (e) {
-    console.error("POST /api/ai-command", e);
-    return NextResponse.json({
-      ok: true,
-      command: localFallback(context ? `${context}\n${text}` : text, lang, nowLocal, creators, role),
-      source: "fallback",
-    });
+    let outage = false;
+    if (e instanceof Error && e.message === "unparseable action") console.error("POST /api/ai-command", e.message);
+    else {
+      reportAiFailure("ai-command", e);
+      outage = isAiOutage(e);
+    }
+    const command = localFallback(context ? `${context}\n${text}` : text, lang, nowLocal, creators, role);
+    // Simple actions still run locally; a plain conversation says Mino is unavailable instead of a canned line.
+    if (outage && command.action === "chat") command.reply = aiUnavailableMessage(lang, role);
+    return NextResponse.json({ ok: true, command, source: "fallback" });
   }
 }

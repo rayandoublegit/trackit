@@ -1,6 +1,7 @@
-import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
+import { AI_UNAVAILABLE, aiUnavailableMessage, reportAiFailure } from "@/lib/ai-provider";
 import { getAuthedUserId } from "@/lib/api-auth";
+import { chat, llmConfigured } from "@/lib/llm";
 import { cardCreator, describeSearch, parseCreatorSearch, runCreatorSearch, type MinoSearchResult } from "@/lib/mino-creator-search";
 import { searchToCatalogFilters } from "@/lib/mino-filters";
 import { canSeeCreatorEmails, canUseLiveSearch, getResultsPerSearchLimit } from "@/lib/plan-limits";
@@ -98,6 +99,13 @@ function cleanReply(text: string): string {
     .replace(/^\s*[-*]\s+/gm, "");
 }
 
+/** The model's answer, "" when no provider is configured. Throws when the provider fails. */
+async function modelReply(system: string, messages: ChatMessage[], maxTokens: number): Promise<string> {
+  if (!llmConfigured()) return "";
+  const result = await chat([{ role: "system", content: system }, ...messages], { model: "fast", maxTokens, timeoutMs: 40_000 });
+  return cleanReply(result.text);
+}
+
 export async function POST(request: Request) {
   // Signed-in users only: every call spends AI credits.
   const userId = await getAuthedUserId(request);
@@ -130,42 +138,27 @@ export async function POST(request: Request) {
     const maxTokens = result ? 160 : deep ? 1200 : 220;
 
     let reply = "";
-    if (process.env.OPENAI_API_KEY) {
-      const res = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "gpt-4o-mini",
-          max_tokens: maxTokens,
-          messages: [{ role: "system", content: system }, ...messages],
-        }),
-      });
-      const payload = (await res.json()) as { choices?: { message?: { content?: string } }[] };
-      reply = cleanReply(payload.choices?.[0]?.message?.content ?? "");
-    } else if (process.env.ANTHROPIC_API_KEY) {
-      const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-      const message = await anthropic.messages.create({
-        model: "claude-haiku-4-5-20251001",
-        max_tokens: maxTokens,
-        system,
-        messages,
-      });
-      reply = cleanReply(
-        message.content
-          .filter((b): b is Anthropic.TextBlock => b.type === "text")
-          .map((b) => b.text)
-          .join("\n"),
-      );
+    let providerDown = false;
+    try {
+      reply = await modelReply(system, messages, maxTokens);
+    } catch (e) {
+      // Provider down (credit balance, key, overload, network): search results
+      // still go out with a plain sentence; a chat-only ask says Mino is unavailable.
+      reportAiFailure("ai-chat", e);
+      providerDown = true;
+      if (!result) {
+        return NextResponse.json({ ok: false, error: AI_UNAVAILABLE, message: aiUnavailableMessage(lang, role) }, { status: 503 });
+      }
     }
 
-    const aiConfigured = Boolean(process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY);
+    const aiConfigured = llmConfigured();
     const fallback =
       !aiConfigured && !result
         ? lang === "fr"
           ? "Je ne peux pas discuter pour l’instant : l’assistant IA n’est pas configuré sur ce serveur. Je peux quand même chercher des créateurs, par exemple « créatrices beauté en France avec un email »."
           : "I can’t chat right now: the AI assistant isn’t configured on this server. I can still search creators, for example “beauty creators in France with an email”."
         : fallbackReply(result, lang);
-    return NextResponse.json({ ok: true, reply: reply || fallback, ...extra });
+    return NextResponse.json({ ok: true, reply: reply || fallback, ...(providerDown ? { aiUnavailable: true } : {}), ...extra });
   } catch (e) {
     console.error("POST /api/ai-chat", e);
     return NextResponse.json({ ok: false, error: "Chat failed" }, { status: 500 });

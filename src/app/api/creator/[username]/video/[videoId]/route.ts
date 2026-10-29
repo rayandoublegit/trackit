@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getAuthedUserId } from "@/lib/api-auth";
 import {
   getSupabaseAdminForVideos,
   resolveCreatorVideoStreams,
@@ -7,9 +8,11 @@ import {
 export const dynamic = "force-dynamic";
 
 export async function GET(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ username: string; videoId: string }> }
 ) {
+  // Signed-in only: a miss falls back to a paid provider call.
+  if (!(await getAuthedUserId(req))) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { username, videoId } = await params;
   if (!username?.trim() || !videoId?.trim()) {
     return NextResponse.json({ error: "missing params" }, { status: 400 });
